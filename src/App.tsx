@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Car as CarIcon, ShoppingCart, ShieldCheck, Zap, Tag } from 'lucide-react'
 import { CarSelector, type Car } from './components/CarSelector'
 import { PartSelector } from './components/PartSelector'
@@ -8,32 +8,46 @@ import { RecentSearches } from './components/RecentSearches'
 import { StepIndicator } from './components/StepIndicator'
 import { useCart } from './hooks/useCart'
 import { useRecentSearches } from './hooks/useRecentSearches'
-
-type Step = 'car' | 'part' | 'results'
+import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
 
 function App() {
-  const [step, setStep] = useState<Step>('car')
-  const [car, setCar] = useState<Car | null>(null)
-  const [part, setPart] = useState<string | null>(null)
+  const initial = routeFromSearch(window.location.search)
+  const [step, setStep] = useState<Step>(initial.step)
+  const [car, setCar] = useState<Car | null>(initial.car)
+  const [part, setPart] = useState<string | null>(initial.part)
   const [showCart, setShowCart] = useState(false)
 
   const cart = useCart()
   const recent = useRecentSearches()
 
-  const runSearch = (selectedCar: Car, selectedPart: string) => {
-    setCar(selectedCar)
-    setPart(selectedPart)
-    recent.record(selectedCar, selectedPart)
+  const applyRoute = (r: AppRoute) => {
+    setStep(r.step)
+    setCar(r.car)
+    setPart(r.part)
     setShowCart(false)
-    setStep('results')
   }
 
-  const goHome = () => {
-    setShowCart(false)
-    setCar(null)
-    setPart(null)
-    setStep('car')
+  // Push a new history entry and update the view. The URL is what makes a
+  // search shareable, bookmarkable, and refresh-safe.
+  const navigate = (r: AppRoute) => {
+    window.history.pushState(null, '', window.location.pathname + searchFromRoute(r))
+    applyRoute(r)
   }
+
+  // Browser back/forward: re-derive the view from the URL. Never push here or
+  // we'd corrupt the history stack.
+  useEffect(() => {
+    const onPop = () => applyRoute(routeFromSearch(window.location.search))
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const runSearch = (selectedCar: Car, selectedPart: string) => {
+    recent.record(selectedCar, selectedPart)
+    navigate({ step: 'results', car: selectedCar, part: selectedPart })
+  }
+
+  const goHome = () => navigate({ step: 'car', car: null, part: null })
 
   const viewKey = showCart ? 'cart' : step
 
@@ -111,10 +125,7 @@ function App() {
                   </div>
 
                   <CarSelector
-                    onConfirm={(selectedCar) => {
-                      setCar(selectedCar)
-                      setStep('part')
-                    }}
+                    onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
                   />
                   <RecentSearches
                     searches={recent.searches}
@@ -127,7 +138,7 @@ function App() {
               {step === 'part' && car && (
                 <PartSelector
                   car={car}
-                  onBack={() => setStep('car')}
+                  onBack={goHome}
                   onSelect={(selectedPart) => runSearch(car, selectedPart)}
                 />
               )}
@@ -136,7 +147,7 @@ function App() {
                 <ResultsList
                   car={car}
                   part={part}
-                  onBackToPart={() => setStep('part')}
+                  onBackToPart={() => navigate({ step: 'part', car, part: null })}
                   onBackToCar={goHome}
                   onAddToCart={(listing) =>
                     cart.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)
