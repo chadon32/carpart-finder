@@ -49,9 +49,7 @@ export function PartSelector({
           className="field mb-4"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-              const partNum = e.currentTarget.value.trim()
-              alert(`Searching by part number: ${partNum}`)
-              onSelect(partNum)
+              onSelect(e.currentTarget.value.trim())
             }
           }}
         />

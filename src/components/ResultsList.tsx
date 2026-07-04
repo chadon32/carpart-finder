@@ -15,6 +15,7 @@ import {
   Truck,
   Store,
   Package,
+  ShieldCheck,
 } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { searchParts, type Listing } from '../api/client'
@@ -106,10 +107,9 @@ export function ResultsList({
   const [hideOverseas, setHideOverseas] = usePersistedState<boolean>('cpf-hide-overseas', false)
   const [zip, setZip] = usePersistedState<string>('cpf-zip', '')
 
-  // Advanced Filters
-  const [filterOEM, setFilterOEM] = usePersistedState<boolean>('cpf-oem', false)
-  const [filterAftermarket, setFilterAftermarket] = usePersistedState<boolean>('cpf-aftermarket', false)
-  const [filterFastShipping, setFilterFastShipping] = usePersistedState<boolean>('cpf-fast-shipping', false)
+  // Real filters only: fast delivery uses eBay's actual delivery estimates,
+  // min rating uses real seller feedback percentages.
+  const [filterFastDelivery, setFilterFastDelivery] = usePersistedState<boolean>('cpf-fast-shipping', false)
   const [minRating, setMinRating] = usePersistedState<number>('cpf-min-rating', 0)
 
   // Watchlist (persisted)
@@ -119,8 +119,6 @@ export function ResultsList({
   const [compareList, setCompareList] = useState<Listing[]>([])
   const [showCompareModal, setShowCompareModal] = useState(false)
 
-  // Saved Searches (simulated)
-  const [savedSearches, setSavedSearches] = usePersistedState<any[]>('cpf-saved-searches', [])
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
 
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
@@ -158,10 +156,11 @@ export function ResultsList({
     if (condition === 'used') list = list.filter(isUsed)
     if (hideOverseas) list = list.filter((l) => !l.crossBorder)
 
-    // Advanced Filters (simulated)
-    if (filterOEM) list = list.filter((l) => l.price > 80) // Simulate OEM being more expensive
-    if (filterAftermarket) list = list.filter((l) => l.price < 120)
-    if (filterFastShipping) list = list.filter((l) => l.shippingCost === 0 || (l.shippingCost ?? 0) < 10)
+    // Fast delivery = eBay's own worst-case estimate arrives within 7 days.
+    if (filterFastDelivery) {
+      const cutoff = Date.now() + 7 * 24 * 60 * 60 * 1000
+      list = list.filter((l) => l.deliveryMax && new Date(l.deliveryMax).getTime() <= cutoff)
+    }
     if (minRating > 0) list = list.filter((l) => Number(l.sellerFeedbackPercentage ?? 0) >= minRating)
 
     list.sort((a, b) => {
@@ -176,7 +175,7 @@ export function ResultsList({
     })
     return list
 
-  }, [results, sortBy, condition, hideOverseas, filterOEM, filterAftermarket, filterFastShipping, minRating])
+  }, [results, sortBy, condition, hideOverseas, filterFastDelivery, minRating])
 
   const priceRange = useMemo(() => {
     if (visible.length === 0) return null
@@ -290,28 +289,18 @@ export function ResultsList({
                 Hide overseas
               </label>
 
-              {/* Advanced Filters */}
-              <div className="inline-flex gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200" title="Filters are simulated for demo purposes">
-                <span className="px-2 py-1 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-lg">DEMO</span>
-                <button
-                  onClick={() => setFilterOEM(!filterOEM)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filterOEM ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  OEM Only
-                </button>
-                <button
-                  onClick={() => setFilterAftermarket(!filterAftermarket)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filterAftermarket ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  Aftermarket
-                </button>
-                <button
-                  onClick={() => setFilterFastShipping(!filterFastShipping)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filterFastShipping ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  Fast Shipping
-                </button>
-              </div>
+              {/* Fast delivery (based on eBay's real delivery estimates) */}
+              <button
+                type="button"
+                onClick={() => setFilterFastDelivery(!filterFastDelivery)}
+                className={`rounded-2xl px-4 py-1.5 text-xs font-semibold shadow-sm ring-1 transition ${
+                  filterFastDelivery
+                    ? 'bg-brand-600 text-white ring-brand-600'
+                    : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Arrives within a week
+              </button>
 
               {/* Minimum Seller Rating */}
               <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
@@ -323,6 +312,7 @@ export function ResultsList({
                   step="5"
                   value={minRating}
                   onChange={(e) => setMinRating(Number(e.target.value))}
+                  aria-label="Minimum seller rating percentage"
                   className="w-20 accent-brand-600"
                 />
                 <span className="font-mono w-8 text-right">{minRating}%</span>
@@ -339,6 +329,7 @@ export function ResultsList({
                   value={zip}
                   onChange={(e) => setZip(e.target.value.replace(/\D/g, ''))}
                   placeholder="ZIP"
+                  aria-label="Delivery ZIP code"
                   className="w-14 border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
@@ -357,66 +348,60 @@ export function ResultsList({
 
           <div className="mt-6 grid gap-8 md:grid-cols-12">
             <div className="md:col-span-7 xl:col-span-8">
-              <div className="mb-4 flex items-end justify-between px-1">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
                 <div>
-                  <div className="text-xs font-semibold tracking-[1.5px] text-brand-600">EBAY MARKETPLACE</div>
+                  <div className="text-xs font-semibold tracking-[1.5px] text-brand-600">LIVE EBAY LISTINGS</div>
                   <div className="text-2xl font-semibold tracking-[-0.4px] text-slate-950">
-                    {visible.length} listings • {vehicleLabel}
+                    {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
+                    {priceRange && (
+                      <span className="ml-2 text-base font-normal text-slate-500">
+                        ${priceRange.min.toFixed(2)} – ${priceRange.max.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
-                {priceRange && (
-                  <div className="hidden text-right text-sm text-slate-500 sm:block">
-                    ${priceRange.min.toFixed(0)} — ${priceRange.max.toFixed(0)}
-                  </div>
-                )}
-                <button
-                  onClick={() => {
-                    const newSearch = { id: Date.now(), year: car.year, make: car.make, model: car.model, part, trim: car.trim || '' }
-                    setSavedSearches([...savedSearches, newSearch])
-                  }}
-                  className="btn btn-ghost px-4 py-1.5 text-xs"
-                >
-                  Save Search
-                </button>
-
-                {savedSearches.length > 0 && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-500">{savedSearches.length} saved</span>
-                    <button
-                      onClick={() => {
-                        const latest = savedSearches[savedSearches.length - 1]
-                        alert(`Would re-run search for: ${latest.year} ${latest.make} ${latest.model} - ${latest.part}`)
-                      }}
-                      className="text-brand-600 hover:text-brand-700 underline"
-                    >
-                      View
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    setCondition('all')
-                    setHideOverseas(false)
-                    setFilterOEM(false)
-                    setFilterAftermarket(false)
-                    setFilterFastShipping(false)
-                    setMinRating(0)
-                  }}
-                  className="btn btn-ghost px-3 py-1.5 text-xs"
-                >
-                  Clear
-                </button>
-
-                {compareList.length > 1 && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowCompareModal(true)}
-                    className="btn btn-primary px-4 py-1.5 text-xs"
+                    type="button"
+                    onClick={() => {
+                      setCondition('all')
+                      setHideOverseas(false)
+                      setFilterFastDelivery(false)
+                      setMinRating(0)
+                    }}
+                    className="btn btn-ghost px-3 py-1.5 text-xs"
                   >
-                    Compare ({compareList.length})
+                    Clear filters
                   </button>
-                )}
+                  {compareList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCompareModal(true)}
+                      className="btn btn-primary px-4 py-1.5 text-xs"
+                    >
+                      Compare ({compareList.length})
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {visible.length === 0 && (
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">
+                  No listings match these filters.{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCondition('all')
+                      setHideOverseas(false)
+                      setFilterFastDelivery(false)
+                      setMinRating(0)
+                    }}
+                    className="font-semibold text-brand-700 underline hover:text-brand-800"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
 
               <ul className="flex flex-col gap-4">
                 {visible.map((listing, i) => {
@@ -425,6 +410,11 @@ export function ResultsList({
                   return (
                     <li
                       key={listing.id}
+                      onClick={(e) => {
+                        // Open the detail view unless an inner button/link was the target.
+                        if ((e.target as HTMLElement).closest('a,button')) return
+                        setSelectedListing(listing)
+                      }}
                       className={`listing-card group flex flex-col gap-4 p-5 sm:flex-row sm:items-start cursor-pointer ${isBestValue ? 'ring-1 ring-brand-300/70' : ''}`}
                     >
                       {isBestValue && (
@@ -454,8 +444,8 @@ export function ResultsList({
                               <div className="text-xs text-emerald-600 font-medium">↓ Price dropped</div>
                             )}
                             {listing.originalPrice && <div className="text-xs text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</div>}
-                            <div className="font-semibold tracking-[-1.8px] text-slate-950 text-[27px] leading-none">
-                              ${listing.price.toFixed(0)}
+                            <div className="font-semibold tracking-[-0.5px] text-slate-950 text-[24px] leading-none">
+                              ${listing.price.toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -484,8 +474,11 @@ export function ResultsList({
                         )}
 
                         <div className="mt-3 flex flex-wrap gap-1.5">
-                          {listing.verifiedFitment === false && <span className="badge bg-amber-100 text-amber-800"><AlertTriangle size={12} /> Fitment not verified</span>}
-                          <span className="badge bg-emerald-100 text-emerald-800">High fitment confidence</span>
+                          {listing.verifiedFitment === false ? (
+                            <span className="badge bg-amber-100 text-amber-800"><AlertTriangle size={12} /> Fitment not verified</span>
+                          ) : (
+                            <span className="badge bg-emerald-100 text-emerald-800"><ShieldCheck size={12} /> Verified fitment</span>
+                          )}
                           {isBestValue && <span className="badge bg-emerald-100 text-emerald-800"><Sparkles size={12} /> Recommended</span>}
                           {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={12} /> Top Rated</span>}
                           {listing.bestOfferAccepted && <span className="badge bg-slate-100 text-slate-700">Best Offer</span>}
@@ -571,7 +564,9 @@ export function ResultsList({
                   })}
                 </div>
 
-                <div className="mt-4 text-center text-[10px] text-slate-400">Prices shown are live from each retailer</div>
+                <div className="mt-4 text-center text-xs text-slate-500">
+                  Opens each store's search for this exact part in a new tab
+                </div>
               </div>
             </aside>
           </div>
@@ -602,13 +597,13 @@ export function ResultsList({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {compareList.map((item, index) => (
-                <div key={index} className="border rounded-2xl p-4">
+              {compareList.map((item) => (
+                <div key={item.id} className="border rounded-2xl p-4">
                   <div className="font-semibold text-sm mb-2">{item.title}</div>
-                  <div className="text-2xl font-bold mb-2">${item.price}</div>
+                  <div className="text-2xl font-bold mb-2">${item.price.toFixed(2)}</div>
                   <div className="text-xs text-slate-500 mb-1">{item.condition} • {item.source}</div>
                   <div className="text-xs text-slate-500">{item.seller}</div>
-                  <a href={item.link} target="_blank" className="btn btn-primary w-full mt-4 text-sm">View Listing</a>
+                  <a href={item.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-full mt-4 text-sm">View Listing</a>
                 </div>
               ))}
             </div>

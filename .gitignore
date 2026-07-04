@@ -23,8 +23,9 @@ server/.env.*
 # Vercel
 .vercel
 
-# Local Claude Code tooling config
+# Local AI tooling artifacts (session logs, configs)
 .claude/
+terminals/
 
 # Editor directories and files
 .vscode/*

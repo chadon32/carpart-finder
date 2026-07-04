@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Car as CarIcon, ShoppingCart, ShieldCheck, Zap, Tag, User } from 'lucide-react'
+import { Car as CarIcon, ShoppingCart, ShieldCheck, Zap, Tag } from 'lucide-react'
 import { CarSelector, type Car } from './components/CarSelector'
 import { PartSelector } from './components/PartSelector'
 import { ResultsList } from './components/ResultsList'
@@ -16,11 +16,6 @@ function App() {
   const [car, setCar] = useState<Car | null>(null)
   const [part, setPart] = useState<string | null>(null)
   const [showCart, setShowCart] = useState(false)
-  const [showAccount, setShowAccount] = useState(false)
-  const [user, setUser] = useState<{ name: string; email: string } | null>(() => {
-    const saved = localStorage.getItem('carpartsradar-user')
-    return saved ? JSON.parse(saved) : null
-  })
 
   const cart = useCart()
   const recent = useRecentSearches()
@@ -52,20 +47,11 @@ function App() {
             </span>
             <div className="text-left">
               <span className="block text-[21px] font-semibold tracking-[-0.4px] text-slate-950">CarPartsRadar</span>
-              <span className="hidden text-[10px] font-medium tracking-[0.5px] text-slate-500 sm:block">PREMIUM PARTS MARKETPLACE</span>
+              <span className="hidden text-xs font-medium tracking-[0.5px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
             </div>
           </button>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowAccount(true)}
-              className="btn btn-ghost px-3 py-2.5 text-sm flex items-center gap-2"
-            >
-              <User size={17} />
-              {user ? user.name.split(' ')[0] : 'Account'}
-            </button>
-
             <button
               type="button"
               onClick={() => setShowCart(true)}
@@ -100,11 +86,11 @@ function App() {
                   {/* Premium Hero */}
                   <div className="mb-12 text-center">
                     <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-1.5 text-xs font-semibold tracking-[1px] text-brand-700 shadow-sm ring-1 ring-brand-100">
-                      LIVE • VERIFIED FITMENT • BEST VALUE
+                      LIVE PRICES • FITMENT-FILTERED • VALUE-RANKED
                     </div>
 
-                    <h1 className="text-balance text-6xl font-semibold tracking-[-2.2px] text-slate-950 sm:text-7xl">
-                      The smartest way to<br />buy car parts.
+                    <h1 className="text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px] lg:text-7xl">
+                      The smartest way to buy car parts.
                     </h1>
 
                     <p className="mx-auto mt-5 max-w-lg text-lg text-slate-600">
@@ -175,61 +161,6 @@ function App() {
         </div>
       </footer>
 
-      {/* AI Chat Assistant */}
-      <button
-        onClick={() => {
-          const query = prompt('What would you like to know about your car parts?')
-          if (query) {
-            alert(`AI Response (simulated):\n\nBased on your question about "${query}", we recommend checking our top-rated listings and verifying fitment before purchasing.`)
-          }
-        }}
-        className="fixed bottom-6 right-6 rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-brand-700"
-      >
-        Ask AI Assistant
-      </button>
-
-      {/* Account Modal */}
-      {showAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowAccount(false)}>
-          <div className="w-full max-w-md rounded-3xl bg-white p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-semibold mb-4">Account</h3>
-            
-            {user ? (
-              <div>
-                <p className="mb-4">Logged in as <strong>{user.name}</strong> ({user.email})</p>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('carpartsradar-user')
-                    setUser(null)
-                    setShowAccount(false)
-                  }}
-                  className="btn btn-secondary w-full"
-                >
-                  Log Out
-                </button>
-              </div>
-            ) : (
-              <div>
-                <input type="text" placeholder="Full Name" className="field mb-3" id="name" />
-                <input type="email" placeholder="Email" className="field mb-4" id="email" />
-                <button
-                  onClick={() => {
-                    const name = (document.getElementById('name') as HTMLInputElement).value || 'User'
-                    const email = (document.getElementById('email') as HTMLInputElement).value || 'user@example.com'
-                    const newUser = { name, email }
-                    localStorage.setItem('carpartsradar-user', JSON.stringify(newUser))
-                    setUser(newUser)
-                    setShowAccount(false)
-                  }}
-                  className="btn btn-primary w-full"
-                >
-                  Sign Up / Login
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

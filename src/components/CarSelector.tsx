@@ -21,14 +21,16 @@ const vehicleTypeOptions: { value: VehicleType; label: string }[] = [
   { value: 'truck', label: 'Truck' },
 ]
 
-// Top 30 most popular car makes in the USA (AutoZone style)
+// Top 30 most popular car makes in the USA, matched case-insensitively
+// against NHTSA's (uppercase) make names. Order here = display order.
 const POPULAR_MAKES = [
-  'Toyota', 'Ford', 'Chevrolet', 'Honda', 'Nissan', 'Hyundai', 'Kia', 
-  'Jeep', 'Subaru', 'GMC', 'Ram', 'Mazda', 'Volkswagen', 'BMW', 
+  'Toyota', 'Ford', 'Chevrolet', 'Honda', 'Nissan', 'Hyundai', 'Kia',
+  'Jeep', 'Subaru', 'GMC', 'Ram', 'Mazda', 'Volkswagen', 'BMW',
   'Mercedes-Benz', 'Tesla', 'Dodge', 'Lexus', 'Buick', 'Chrysler',
-  'Acura', 'Audi', 'Cadillac', 'Mitsubishi', 'Volvo', 'Lincoln', 
-  'Genesis', 'Infiniti', 'Land Rover', 'Mini'
+  'Acura', 'Audi', 'Cadillac', 'Mitsubishi', 'Volvo', 'Lincoln',
+  'Genesis', 'Infiniti', 'Land Rover', 'Mini',
 ]
+const POPULAR_RANK = new Map(POPULAR_MAKES.map((m, i) => [m.toUpperCase(), i]))
 
 export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   const [vehicleType, setVehicleType] = useState<VehicleType>('all')
@@ -39,15 +41,13 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
 
   const [makes, setMakes] = useState<string[]>([])
 
-  // Sorted makes: Popular makes first, then the rest alphabetically
-  const sortedMakes = [...makes].sort((a, b) => {
-    const aIsPopular = POPULAR_MAKES.includes(a)
-    const bIsPopular = POPULAR_MAKES.includes(b)
-
-    if (aIsPopular && !bIsPopular) return -1
-    if (!aIsPopular && bIsPopular) return 1
-    return a.localeCompare(b)
-  })
+  // Split the fetched makes (which reflect the vehicle-type filter) into a
+  // popular group and the rest — both drawn from real NHTSA data, so no make
+  // can appear twice and no popular make appears that the filter excluded.
+  const popularOptions = makes
+    .filter((m) => POPULAR_RANK.has(m.toUpperCase()))
+    .sort((a, b) => POPULAR_RANK.get(a.toUpperCase())! - POPULAR_RANK.get(b.toUpperCase())!)
+  const otherOptions = makes.filter((m) => !POPULAR_RANK.has(m.toUpperCase()))
   const [models, setModels] = useState<string[]>([])
   const [trims, setTrims] = useState<string[]>([])
 
@@ -128,7 +128,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
     <div className="card p-7">
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-slate-950">Select your vehicle</h2>
-        <p className="mt-1 text-sm text-slate-600">We only show parts guaranteed to fit your exact car.</p>
+        <p className="mt-1 text-sm text-slate-600">We filter listings to fit the exact vehicle you pick.</p>
       </div>
 
       {error && (
@@ -173,8 +173,8 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
             label=""
             placeholder={makesLoading ? 'Loading makes…' : 'Select make'}
             groups={[
-              { label: 'Popular Makes', options: POPULAR_MAKES },
-              { label: 'All Makes', options: sortedMakes.filter(m => !POPULAR_MAKES.includes(m)) }
+              ...(popularOptions.length > 0 ? [{ label: 'Popular Makes', options: popularOptions }] : []),
+              { label: 'All Makes', options: otherOptions },
             ]}
             value={make}
             onChange={(v) => setMake(v)}

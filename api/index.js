@@ -45,16 +45,22 @@ app.use((_req, res, next) => {
   next()
 })
 
-// Rate limiting - 100 requests per 15 minutes per IP
-const limiter = rateLimit({
+// Behind Vercel's proxy, req.ip is the proxy unless we trust the first
+// X-Forwarded-For hop — without this, every visitor shares ONE rate bucket
+// and the whole site 429s under light traffic.
+app.set('trust proxy', 1)
+
+// Rate-limit only the expensive endpoint (each visitor's search flow makes
+// ~5-7 API calls total, so a whole-app 100/15min cap would starve real use).
+const searchLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 300,
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 })
 
-app.use(limiter)
+app.use('/api/search', searchLimiter)
 
 app.get('/api/makes', async (req, res) => {
   try {

@@ -34,8 +34,6 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
   const cached = cache.get(cacheKey)
 
   if (cached && Date.now() < cached.expiresAt) {
-    // Cache hit
-    console.log(`[Cache] HIT: ${cacheKey}`)
     return { ...cached.data, cached: true }
   }
 
@@ -88,19 +86,7 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
       expiresAt: Date.now() + CACHE_TTL_MS,
       staleUntil: Date.now() + STALE_TTL_MS,
     })
-    console.log(`[Cache] MISS (stored): ${cacheKey} | Cache size: ${cache.size}/${MAX_CACHE_SIZE}`)
-  } else {
-    console.log(`[Cache] MISS (no results): ${cacheKey}`)
   }
 
   return data
-}
-
-// Optional: expose cache stats for debugging / monitoring
-export function getCacheStats() {
-  return {
-    size: cache.size,
-    maxSize: MAX_CACHE_SIZE,
-    ttlMinutes: Math.round(CACHE_TTL_MS / 1000 / 60),
-  }
 }

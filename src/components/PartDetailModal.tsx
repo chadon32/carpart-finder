@@ -40,7 +40,7 @@ export function PartDetailModal({
             <div className="text-xs font-semibold tracking-[1px] text-brand-600">DETAILED VIEW</div>
             <div className="font-semibold text-xl tracking-tight text-slate-950">{part}</div>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
@@ -69,7 +69,7 @@ export function PartDetailModal({
               {listing.originalPrice && (
                 <span className="text-lg text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</span>
               )}
-              <span className="text-5xl font-semibold tracking-[-2px] text-slate-950">${listing.price.toFixed(0)}</span>
+              <span className="text-5xl font-semibold tracking-[-1px] text-slate-950">${listing.price.toFixed(2)}</span>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -103,9 +103,15 @@ export function PartDetailModal({
               </div>
             )}
 
-            <div className="mt-5 flex items-center gap-2 text-xs text-emerald-700">
-              <ShieldCheck size={14} /> Fits {vehicleLabel}
-            </div>
+            {listing.verifiedFitment === false ? (
+              <div className="mt-5 flex items-center gap-2 text-xs text-amber-700">
+                <ShieldCheck size={14} /> Fitment for {vehicleLabel} not verified — check before buying
+              </div>
+            ) : (
+              <div className="mt-5 flex items-center gap-2 text-xs text-emerald-700">
+                <ShieldCheck size={14} /> Verified to fit {vehicleLabel}
+              </div>
+            )}
           </div>
         </div>
 
@@ -127,13 +133,6 @@ export function PartDetailModal({
           >
             View on {listing.source} <ExternalLink size={16} />
           </a>
-
-          <button 
-            onClick={() => alert('Price alert set! You will be notified if the price drops.')}
-            className="btn btn-secondary flex-1 py-3 text-base"
-          >
-            Set Price Alert
-          </button>
 
           <button onClick={onClose} className="btn btn-ghost py-3 text-base">
             Close

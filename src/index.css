@@ -10,9 +10,9 @@
   --color-brand-300: #5eead4;
   --color-brand-400: #2dd4bf;
   --color-brand-500: #14b8a6;
-  --color-brand-600: #0f766e;
+  --color-brand-600: #0d9488;
   --color-brand-700: #0f766e;
-  --color-brand-800: #134e4b;
+  --color-brand-800: #115e59;
   --color-brand-900: #134e4b;
 
   --color-accent-500: #f97316;
@@ -103,10 +103,6 @@ body {
 
   .btn-secondary {
     @apply border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.985];
-  }
-
-  .btn-ghost {
-    @apply text-slate-500 hover:bg-slate-100 hover:text-slate-900;
   }
 
   .btn-ghost {
