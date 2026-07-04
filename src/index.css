@@ -3,20 +3,24 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Brand palette — a refined, trustworthy blue used for primary actions. */
-  --color-brand-50: #eff6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-200: #bfdbfe;
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
-  --color-brand-800: #1e40af;
-  --color-brand-900: #1e3a8a;
+  /* Premium 2026 Automotive Palette — Deep navy, cool slate, rich teal accent */
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0f766e;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #134e4b;
+  --color-brand-900: #134e4b;
+
+  --color-accent-500: #f97316;
+  --color-accent-600: #ea580c;
 
   --animate-fade-in: fade-in 0.3s ease-out both;
-  --animate-slide-up: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-up: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
 @keyframes fade-in {
@@ -39,6 +43,16 @@
   }
 }
 
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
@@ -50,32 +64,68 @@ body {
 }
 
 @layer components {
-  .card {
-    @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+  .app-bg {
+    background-color: #f8fafc;
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% -15%, rgb(15 118 110 / 0.06), transparent),
+      radial-gradient(ellipse 50% 30% at 100% 0%, rgb(15 118 110 / 0.04), transparent);
   }
 
-  /* Compose in markup: className="btn btn-primary px-4 py-2.5" */
+  .card {
+    @apply rounded-3xl border border-slate-200/70 bg-white shadow-sm shadow-slate-900/[0.04];
+  }
+
+  .card-elevated {
+    @apply rounded-3xl border border-slate-200/60 bg-white shadow-lg shadow-slate-900/[0.06];
+  }
+
+  /* Premium listing card */
+  .listing-card {
+    @apply relative overflow-hidden rounded-3xl border border-slate-200 bg-white transition-all duration-200 hover:border-brand-300 hover:shadow-xl hover:shadow-slate-900/[0.07];
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 shadow-sm shadow-slate-900/[0.02] transition-all hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 hover:shadow-md active:scale-[0.985];
+  }
+
+  .filter-bar {
+    @apply flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/70 bg-white p-2 shadow-sm;
+  }
+
+  /* Premium button system */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-all duration-150 outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all duration-200 outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .btn-primary {
-    @apply bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow active:scale-[0.98];
+    @apply bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-lg active:scale-[0.985];
   }
 
   .btn-secondary {
-    @apply border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98];
+    @apply border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.985];
   }
 
   .btn-ghost {
     @apply text-slate-500 hover:bg-slate-100 hover:text-slate-900;
   }
 
+  .btn-ghost {
+    @apply text-slate-500 hover:bg-slate-100 hover:text-slate-900;
+  }
+
+  .btn-accent {
+    @apply bg-accent-500 text-white shadow-sm hover:bg-accent-600 active:scale-[0.985];
+  }
+
   .field {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400;
+    @apply w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-50;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-semibold;
+  }
+
+  .section-title {
+    @apply text-2xl font-semibold tracking-tight text-slate-900;
   }
 }

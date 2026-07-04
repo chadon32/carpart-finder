@@ -5,6 +5,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import rateLimit from 'express-rate-limit'
 import { searchCheapestListings } from '../server/search.js'
 import { getMakes, getModels } from '../server/nhtsa.js'
 import { getTrims } from '../server/ebayCompatibility.js'
@@ -13,11 +14,47 @@ import { getVehicleImage } from '../server/vehicleImages.js'
 
 const app = express()
 
-app.use(cors())
+// Secure CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  process.env.FRONTEND_URL, // e.g. https://yourdomain.com
+].filter(Boolean)
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+    return callback(new Error('Not allowed by CORS'))
+  },
+  credentials: true,
+  methods: ['GET'],
+  allowedHeaders: ['Content-Type'],
+}))
+
 app.use((_req, res, next) => {
   res.set('Cache-Control', 'no-store')
+  // Security headers
+  res.set('X-Content-Type-Options', 'nosniff')
+  res.set('X-Frame-Options', 'DENY')
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:")
   next()
 })
+
+// Rate limiting - 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.use(limiter)
 
 app.get('/api/makes', async (req, res) => {
   try {
@@ -25,7 +62,7 @@ app.get('/api/makes', async (req, res) => {
     res.json({ makes })
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: err.message })
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 
@@ -39,7 +76,7 @@ app.get('/api/models', async (req, res) => {
     res.json({ models })
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: err.message })
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 
@@ -55,7 +92,7 @@ app.get('/api/prices', async (req, res) => {
     res.json({ prices })
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: err.message })
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 
@@ -69,7 +106,7 @@ app.get('/api/trims', async (req, res) => {
     res.json({ trims })
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: err.message })
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 
@@ -86,7 +123,7 @@ app.get('/api/vehicle-image', async (req, res) => {
     res.json({ imageUrl })
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: err.message })
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 
@@ -109,7 +146,7 @@ app.get('/api/search', async (req, res) => {
     res.json(result)
   } catch (err) {
     console.error(err)
-    res.status(502).json({ error: err.message })
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 

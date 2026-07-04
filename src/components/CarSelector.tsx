@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Car as CarIcon, ArrowRight, AlertCircle } from 'lucide-react'
+import { ArrowRight, AlertCircle } from 'lucide-react'
 import { fetchMakes, fetchModels, fetchTrims, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
 import { VehicleThumbnail } from './VehicleThumbnail'
@@ -21,6 +21,15 @@ const vehicleTypeOptions: { value: VehicleType; label: string }[] = [
   { value: 'truck', label: 'Truck' },
 ]
 
+// Top 30 most popular car makes in the USA (AutoZone style)
+const POPULAR_MAKES = [
+  'Toyota', 'Ford', 'Chevrolet', 'Honda', 'Nissan', 'Hyundai', 'Kia', 
+  'Jeep', 'Subaru', 'GMC', 'Ram', 'Mazda', 'Volkswagen', 'BMW', 
+  'Mercedes-Benz', 'Tesla', 'Dodge', 'Lexus', 'Buick', 'Chrysler',
+  'Acura', 'Audi', 'Cadillac', 'Mitsubishi', 'Volvo', 'Lincoln', 
+  'Genesis', 'Infiniti', 'Land Rover', 'Mini'
+]
+
 export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   const [vehicleType, setVehicleType] = useState<VehicleType>('all')
   const [year, setYear] = useState('')
@@ -29,6 +38,16 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   const [trim, setTrim] = useState('')
 
   const [makes, setMakes] = useState<string[]>([])
+
+  // Sorted makes: Popular makes first, then the rest alphabetically
+  const sortedMakes = [...makes].sort((a, b) => {
+    const aIsPopular = POPULAR_MAKES.includes(a)
+    const bIsPopular = POPULAR_MAKES.includes(b)
+
+    if (aIsPopular && !bIsPopular) return -1
+    if (!aIsPopular && bIsPopular) return 1
+    return a.localeCompare(b)
+  })
   const [models, setModels] = useState<string[]>([])
   const [trims, setTrims] = useState<string[]>([])
 
@@ -106,15 +125,10 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   const canConfirm = Boolean(year && make && model)
 
   return (
-    <div className="card p-6 sm:p-7">
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-          <CarIcon size={18} strokeWidth={2.2} />
-        </span>
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">Select your vehicle</h2>
-          <p className="text-sm text-slate-500">We only show parts that fit your exact car.</p>
-        </div>
+    <div className="card p-7">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight text-slate-950">Select your vehicle</h2>
+        <p className="mt-1 text-sm text-slate-600">We only show parts guaranteed to fit your exact car.</p>
       </div>
 
       {error && (
@@ -151,14 +165,22 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
           value={year}
           onChange={(v) => setYear(v)}
         />
-        <Combobox
-          label="Make"
-          placeholder={makesLoading ? 'Loading makes…' : 'Select make'}
-          options={makes}
-          value={make}
-          onChange={(v) => setMake(v)}
-          disabled={makesLoading}
-        />
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-slate-700">Make</label>
+
+          {/* Single dropdown with Popular Makes at the top, then All Makes */}
+          <Combobox
+            label=""
+            placeholder={makesLoading ? 'Loading makes…' : 'Select make'}
+            groups={[
+              { label: 'Popular Makes', options: POPULAR_MAKES },
+              { label: 'All Makes', options: sortedMakes.filter(m => !POPULAR_MAKES.includes(m)) }
+            ]}
+            value={make}
+            onChange={(v) => setMake(v)}
+            disabled={makesLoading}
+          />
+        </div>
         <Combobox
           label="Model"
           placeholder={!make || !year ? 'Pick year & make first' : modelsLoading ? 'Loading models…' : 'Select model'}
@@ -169,51 +191,70 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
         />
       </div>
 
-      <div className="mt-4 sm:w-1/2">
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between">
+          <label className="block text-sm font-semibold text-slate-700">Trim (optional)</label>
+          {trim && (
+            <button type="button" onClick={() => setTrim('')} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+              Clear selection
+            </button>
+          )}
+        </div>
+
         {trimsLoading ? (
-          <>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Trim (optional)</label>
-            <input disabled value="" onChange={() => {}} placeholder="Loading trims…" className="field" />
-          </>
+          <div className="field bg-slate-50 text-slate-400">Loading trim options…</div>
         ) : trims.length > 0 ? (
           <>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="block text-sm font-semibold text-slate-700">Trim (optional)</label>
-              {trim && (
-                <button type="button" onClick={() => setTrim('')} className="text-xs font-medium text-slate-500 hover:text-slate-900">
-                  Clear
+            {/* Nice card-style selector when there aren't too many options */}
+            {trims.length <= 8 ? (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => setTrim('')}
+                  className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                    !trim ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  Any trim
                 </button>
-              )}
-            </div>
-            <Combobox label="" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
-            <p className="mt-1.5 text-xs text-slate-400">Real fitment options from eBay's compatibility data.</p>
+                {trims.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTrim(t)}
+                    className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                      trim === t ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <Combobox label="" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
+            )}
+            <p className="mt-2 text-xs text-slate-400">Showing real fitment options from eBay compatibility data.</p>
           </>
         ) : (
-          <>
-            <label className="mb-1.5 block text-sm font-semibold text-slate-700">Trim (optional)</label>
-            <input
-              type="text"
-              value={trim}
-              onChange={(e) => setTrim(e.target.value)}
-              placeholder="e.g. LE, Sport, Limited"
-              className="field"
-            />
-            <p className="mt-1.5 text-xs text-slate-400">
-              No trim data for this vehicle — type it to narrow your search, or leave it blank.
-            </p>
-          </>
+          <input
+            type="text"
+            value={trim}
+            onChange={(e) => setTrim(e.target.value)}
+            placeholder="e.g. LE, Sport, Limited (optional)"
+            className="field"
+          />
         )}
       </div>
 
       {make && model && (
-        <div className="mt-5 flex items-center gap-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3">
-          <VehicleThumbnail make={make} model={model} className="h-20 w-32 sm:h-24 sm:w-40" iconSize={36} />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">Your vehicle</p>
-            <p className="mt-0.5 truncate text-base font-bold text-slate-900">
+        <div className="mt-6 flex flex-col items-center gap-4 rounded-3xl border border-brand-200/70 bg-gradient-to-br from-brand-50/60 via-white to-white p-5 shadow-sm sm:flex-row">
+          <VehicleThumbnail make={make} model={model} className="h-24 w-40 sm:h-28 sm:w-48" iconSize={42} />
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-xs font-semibold uppercase tracking-[1px] text-brand-600">Your Vehicle</p>
+            <p className="mt-1 text-lg font-bold tracking-tight text-slate-950">
               {year} {make} {model}
             </p>
-            {trim && <p className="truncate text-sm text-slate-500">{trim}</p>}
+            {trim && <p className="text-sm text-slate-600">{trim}</p>}
           </div>
         </div>
       )}

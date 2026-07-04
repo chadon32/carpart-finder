@@ -51,7 +51,7 @@ export function VehicleThumbnail({
     }
   }, [make, model])
 
-  const frame = `${className} shrink-0 overflow-hidden rounded-xl border border-slate-200`
+  const frame = `${className} shrink-0 overflow-hidden rounded-2xl border border-slate-200 shadow-sm`
 
   if (loading) {
     return <div className={`${frame} animate-pulse bg-slate-100`} />
@@ -66,7 +66,7 @@ export function VehicleThumbnail({
   }
 
   return (
-    <div className={`${frame} bg-slate-50`}>
+    <div className={`${frame} bg-slate-50 ring-1 ring-slate-100`}>
       <img
         src={imageUrl}
         alt={`${make} ${model}`}

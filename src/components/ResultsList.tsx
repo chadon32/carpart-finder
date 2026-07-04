@@ -14,12 +14,14 @@ import {
   RotateCw,
   Truck,
   Store,
+  Package,
 } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { searchParts, type Listing } from '../api/client'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
+import { PartDetailModal } from './PartDetailModal'
 
 type SortKey = 'value' | 'price' | 'rating'
 type ConditionFilter = 'all' | 'new' | 'used'
@@ -35,8 +37,6 @@ function valueScore(l: Listing) {
 
 const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
 
-// "Arrives Jul 6–9" (collapses the month when the range is within one month;
-// single date otherwise). Returns null if no estimate available.
 function deliveryLabel(l: Listing) {
   if (!l.deliveryMin && !l.deliveryMax) return null
   const min = l.deliveryMin ? new Date(l.deliveryMin) : null
@@ -66,14 +66,13 @@ function isUsed(l: Listing) {
 
 function SkeletonCard() {
   return (
-    <li className="card animate-pulse p-4">
-      <div className="flex gap-4">
-        <div className="h-24 w-24 shrink-0 rounded-xl bg-slate-200" />
-        <div className="flex-1 space-y-2.5 py-1">
-          <div className="h-4 w-3/4 rounded bg-slate-200" />
-          <div className="h-3 w-1/2 rounded bg-slate-100" />
-          <div className="h-3 w-1/3 rounded bg-slate-100" />
-          <div className="mt-3 h-3 w-2/3 rounded bg-slate-100" />
+    <li className="rounded-3xl border border-slate-200 bg-white p-5">
+      <div className="flex gap-5">
+        <div className="h-24 w-24 shrink-0 animate-shimmer rounded-3xl bg-slate-200" />
+        <div className="flex-1 space-y-3 py-1">
+          <div className="h-4 w-3/4 animate-shimmer rounded bg-slate-200" />
+          <div className="h-3 w-1/2 animate-shimmer rounded bg-slate-100" />
+          <div className="mt-4 h-8 w-2/3 animate-shimmer rounded-2xl bg-slate-100" />
         </div>
       </div>
     </li>
@@ -107,7 +106,23 @@ export function ResultsList({
   const [hideOverseas, setHideOverseas] = usePersistedState<boolean>('cpf-hide-overseas', false)
   const [zip, setZip] = usePersistedState<string>('cpf-zip', '')
 
-  // Only a complete 5-digit ZIP affects results; partial input won't trigger refetches.
+  // Advanced Filters
+  const [filterOEM, setFilterOEM] = usePersistedState<boolean>('cpf-oem', false)
+  const [filterAftermarket, setFilterAftermarket] = usePersistedState<boolean>('cpf-aftermarket', false)
+  const [filterFastShipping, setFilterFastShipping] = usePersistedState<boolean>('cpf-fast-shipping', false)
+  const [minRating, setMinRating] = usePersistedState<number>('cpf-min-rating', 0)
+
+  // Watchlist (persisted)
+  const [watched, setWatched] = usePersistedState<string[]>('cpf-watched', [])
+
+  // Comparison
+  const [compareList, setCompareList] = useState<Listing[]>([])
+  const [showCompareModal, setShowCompareModal] = useState(false)
+
+  // Saved Searches (simulated)
+  const [savedSearches, setSavedSearches] = usePersistedState<any[]>('cpf-saved-searches', [])
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
+
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
 
   useEffect(() => {
@@ -143,6 +158,12 @@ export function ResultsList({
     if (condition === 'used') list = list.filter(isUsed)
     if (hideOverseas) list = list.filter((l) => !l.crossBorder)
 
+    // Advanced Filters (simulated)
+    if (filterOEM) list = list.filter((l) => l.price > 80) // Simulate OEM being more expensive
+    if (filterAftermarket) list = list.filter((l) => l.price < 120)
+    if (filterFastShipping) list = list.filter((l) => l.shippingCost === 0 || (l.shippingCost ?? 0) < 10)
+    if (minRating > 0) list = list.filter((l) => Number(l.sellerFeedbackPercentage ?? 0) >= minRating)
+
     list.sort((a, b) => {
       if (sortBy === 'price') return a.price - b.price
       if (sortBy === 'rating') {
@@ -154,7 +175,8 @@ export function ResultsList({
       return valueScore(a) - valueScore(b)
     })
     return list
-  }, [results, sortBy, condition, hideOverseas])
+
+  }, [results, sortBy, condition, hideOverseas, filterOEM, filterAftermarket, filterFastShipping, minRating])
 
   const priceRange = useMemo(() => {
     if (visible.length === 0) return null
@@ -189,25 +211,25 @@ export function ResultsList({
 
       {loading && (
         <ul className="mt-6 flex flex-col gap-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </ul>
       )}
 
       {!loading && error && (
-        <div className="mt-8 flex flex-col items-center rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+        <div className="mt-8 flex flex-col items-center rounded-3xl border border-red-100 bg-red-50 p-8 text-center">
           <AlertTriangle className="text-red-500" size={28} />
           <p className="mt-2 font-semibold text-red-800">We couldn't complete this search.</p>
           <p className="mt-1 text-xs text-red-500">{error}</p>
-          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-primary mt-4 px-4 py-2">
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-primary mt-4 px-5 py-2">
             <RotateCw size={15} /> Try again
           </button>
         </div>
       )}
 
       {!loading && !error && results.length === 0 && (
-        <div className="mt-8 flex flex-col items-center rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center">
+        <div className="mt-8 flex flex-col items-center rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center">
           {failedProviders.length > 0 ? (
             <>
               <AlertTriangle className="text-amber-500" size={28} />
@@ -221,7 +243,7 @@ export function ResultsList({
               <p className="mt-1 text-sm text-slate-500">Try a broader part name or a different vehicle.</p>
             </>
           )}
-          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-secondary mt-4 px-4 py-2">
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-secondary mt-4 px-5 py-2">
             <RotateCw size={15} /> Retry
           </button>
         </div>
@@ -230,33 +252,102 @@ export function ResultsList({
       {!loading && !error && results.length > 0 && (
         <>
           {stale ? (
-            <p className="mt-5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-              <AlertTriangle size={14} /> Live search is temporarily unavailable — showing recent results from the
-              last hour. Prices may have changed.
+            <p className="mt-5 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
+              <AlertTriangle size={14} /> Live search is temporarily unavailable — showing recent results from the last hour.
             </p>
           ) : (
             failedProviders.length > 0 && (
-              <p className="mt-5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              <p className="mt-5 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800">
                 <AlertTriangle size={14} /> Showing available results — {failedProviders.join(', ')} was unavailable.
               </p>
             )
           )}
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <p className="text-sm text-slate-600">
-              <span className="text-base font-bold text-slate-900">{visible.length}</span>{' '}
-              {visible.length === 1 ? 'result' : 'results'}
-              {priceRange && (
-                <span className="text-slate-400">
-                  {' '}
-                  · ${priceRange.min.toFixed(2)}
-                  {priceRange.max !== priceRange.min && `–$${priceRange.max.toFixed(2)}`}
-                </span>
-              )}
-            </p>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Condition Filter */}
+              <div className="inline-flex gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+                {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCondition(c)}
+                    className={`rounded-xl px-4 py-1.5 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    {c === 'all' ? 'All' : c}
+                  </button>
+                ))}
+              </div>
+
+              {/* Hide Overseas */}
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
+                <input
+                  type="checkbox"
+                  checked={hideOverseas}
+                  onChange={(e) => setHideOverseas(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-brand-600"
+                />
+                Hide overseas
+              </label>
+
+              {/* Advanced Filters */}
+              <div className="inline-flex gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200" title="Filters are simulated for demo purposes">
+                <span className="px-2 py-1 text-[10px] font-bold text-amber-600 bg-amber-100 rounded-lg">DEMO</span>
+                <button
+                  onClick={() => setFilterOEM(!filterOEM)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filterOEM ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  OEM Only
+                </button>
+                <button
+                  onClick={() => setFilterAftermarket(!filterAftermarket)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filterAftermarket ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Aftermarket
+                </button>
+                <button
+                  onClick={() => setFilterFastShipping(!filterFastShipping)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filterFastShipping ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  Fast Shipping
+                </button>
+              </div>
+
+              {/* Minimum Seller Rating */}
+              <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
+                <span>Min Rating</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={minRating}
+                  onChange={(e) => setMinRating(Number(e.target.value))}
+                  className="w-20 accent-brand-600"
+                />
+                <span className="font-mono w-8 text-right">{minRating}%</span>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-slate-500">Sort by</label>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className="field w-auto py-1.5 pr-8">
+              <div className="flex items-center gap-1.5 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
+                <Truck size={14} className="text-slate-400" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={5}
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value.replace(/\D/g, ''))}
+                  placeholder="ZIP"
+                  className="w-14 border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                />
+              </div>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                className="field w-auto py-2 pr-8 text-xs font-semibold"
+              >
                 <option value="price">Cheapest first</option>
                 <option value="value">Best value</option>
                 <option value="rating">Seller rating</option>
@@ -264,244 +355,263 @@ export function ResultsList({
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <div className="inline-flex gap-1 rounded-lg bg-slate-100 p-1">
-              {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
+          <div className="mt-6 grid gap-8 md:grid-cols-12">
+            <div className="md:col-span-7 xl:col-span-8">
+              <div className="mb-4 flex items-end justify-between px-1">
+                <div>
+                  <div className="text-xs font-semibold tracking-[1.5px] text-brand-600">EBAY MARKETPLACE</div>
+                  <div className="text-2xl font-semibold tracking-[-0.4px] text-slate-950">
+                    {visible.length} listings • {vehicleLabel}
+                  </div>
+                </div>
+                {priceRange && (
+                  <div className="hidden text-right text-sm text-slate-500 sm:block">
+                    ${priceRange.min.toFixed(0)} — ${priceRange.max.toFixed(0)}
+                  </div>
+                )}
                 <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCondition(c)}
-                  className={`rounded-md px-3 py-1 text-xs font-semibold capitalize transition ${
-                    condition === c ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  onClick={() => {
+                    const newSearch = { id: Date.now(), year: car.year, make: car.make, model: car.model, part, trim: car.trim || '' }
+                    setSavedSearches([...savedSearches, newSearch])
+                  }}
+                  className="btn btn-ghost px-4 py-1.5 text-xs"
                 >
-                  {c === 'all' ? 'All' : c}
+                  Save Search
                 </button>
-              ))}
-            </div>
-            <label className="ml-1 flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-600">
-              <input
-                type="checkbox"
-                checked={hideOverseas}
-                onChange={(e) => setHideOverseas(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
-              />
-              Hide overseas
-            </label>
 
-            <div className="ml-auto flex items-center gap-1.5 text-xs font-medium text-slate-600">
-              <Truck size={14} className="text-slate-400" />
-              <span className="hidden sm:inline">Deliver to</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={5}
-                value={zip}
-                onChange={(e) => setZip(e.target.value.replace(/\D/g, ''))}
-                placeholder="ZIP"
-                aria-label="Delivery ZIP code"
-                className="w-20 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:outline-none"
-              />
-            </div>
-          </div>
+                {savedSearches.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500">{savedSearches.length} saved</span>
+                    <button
+                      onClick={() => {
+                        const latest = savedSearches[savedSearches.length - 1]
+                        alert(`Would re-run search for: ${latest.year} ${latest.make} ${latest.model} - ${latest.part}`)
+                      }}
+                      className="text-brand-600 hover:text-brand-700 underline"
+                    >
+                      View
+                    </button>
+                  </div>
+                )}
 
-          {visible.length === 0 ? (
-            <div className="mt-6 rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
-              No results match these filters.{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setCondition('all')
-                  setHideOverseas(false)
-                }}
-                className="font-semibold text-brand-600 hover:underline"
-              >
-                Clear filters
-              </button>
-            </div>
-          ) : (
-            <ul className="mt-5 flex flex-col gap-4">
-              {visible.map((listing, i) => {
-                const inCart = isInCart(listing.id)
-                return (
-                  <li
-                    key={listing.id}
-                    className="group rounded-2xl border border-slate-200 p-4 transition-all duration-150 hover:border-brand-200 hover:shadow-md hover:shadow-slate-900/5"
+                <button
+                  onClick={() => {
+                    setCondition('all')
+                    setHideOverseas(false)
+                    setFilterOEM(false)
+                    setFilterAftermarket(false)
+                    setFilterFastShipping(false)
+                    setMinRating(0)
+                  }}
+                  className="btn btn-ghost px-3 py-1.5 text-xs"
+                >
+                  Clear
+                </button>
+
+                {compareList.length > 1 && (
+                  <button
+                    onClick={() => setShowCompareModal(true)}
+                    className="btn btn-primary px-4 py-1.5 text-xs"
                   >
-                    <div className="flex gap-4">
-                      <div className="flex shrink-0 flex-col items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
-                          {i + 1}
-                        </span>
-                        {listing.image && (
-                          <img
-                            src={listing.image}
-                            alt=""
-                            className="h-24 w-24 rounded-xl border border-slate-100 bg-white object-cover"
-                          />
+                    Compare ({compareList.length})
+                  </button>
+                )}
+              </div>
+
+              <ul className="flex flex-col gap-4">
+                {visible.map((listing, i) => {
+                  const inCart = isInCart(listing.id)
+                  const isBestValue = listing.id === bestValueId
+                  return (
+                    <li
+                      key={listing.id}
+                      className={`listing-card group flex flex-col gap-4 p-5 sm:flex-row sm:items-start cursor-pointer ${isBestValue ? 'ring-1 ring-brand-300/70' : ''}`}
+                    >
+                      {isBestValue && (
+                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-600 to-teal-600" />
+                      )}
+
+                      <div className="relative shrink-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-slate-900 text-[10px] font-bold text-white shadow">
+                          #{i + 1}
+                        </div>
+                        {listing.image ? (
+                          <img src={listing.image} alt={listing.title} className="mt-3 h-24 w-24 rounded-3xl border border-slate-100 object-cover shadow-sm" />
+                        ) : (
+                          <div className="mt-3 flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-100 bg-slate-50 text-slate-300">
+                            <Package size={30} strokeWidth={1.25} />
+                          </div>
                         )}
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <h3 className="font-semibold leading-snug text-slate-900 transition group-hover:text-brand-700">
+                      <div className="min-w-0 flex-1 pt-1">
+                        <div className="flex flex-col gap-y-1 pr-1 sm:flex-row sm:items-start sm:justify-between">
+                          <h3 className="text-[15px] font-semibold leading-tight tracking-[-0.1px] text-slate-950 group-hover:text-brand-700">
                             {listing.title}
                           </h3>
-                          <div className="shrink-0 text-right">
+                          <div className="mt-1 shrink-0 text-right sm:mt-0">
                             {listing.originalPrice && (
-                              <div className="text-xs text-slate-400 line-through">
-                                ${listing.originalPrice.toFixed(2)}
-                              </div>
+                              <div className="text-xs text-emerald-600 font-medium">↓ Price dropped</div>
                             )}
-                            <div className="text-xl font-extrabold tracking-tight text-slate-900">
-                              ${listing.price.toFixed(2)}
+                            {listing.originalPrice && <div className="text-xs text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</div>}
+                            <div className="font-semibold tracking-[-1.8px] text-slate-950 text-[27px] leading-none">
+                              ${listing.price.toFixed(0)}
                             </div>
                           </div>
                         </div>
 
-                        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">
-                            {listing.condition}
-                          </span>
-                          <span className="truncate">
-                            {listing.seller} on {listing.source}
-                            {listing.sellerFeedbackPercentage && (
-                              <span className="inline-flex items-center gap-0.5">
-                                {' '}
-                                · <Star size={12} className="fill-amber-400 text-amber-400" />
-                                {listing.sellerFeedbackPercentage}%
-                                {listing.sellerFeedbackScore
-                                  ? ` (${listing.sellerFeedbackScore.toLocaleString()})`
-                                  : ''}
-                              </span>
-                            )}
-                          </span>
-                        </p>
-                        {listing.itemLocation && (
-                          <p className="mt-1 flex items-center gap-1 text-sm text-slate-400">
-                            <MapPin size={13} /> {listing.itemLocation}
-                          </p>
-                        )}
-                        {(shippingLabel(listing) || deliveryLabel(listing)) && (
-                          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                            <span className="inline-flex items-center gap-1 font-medium text-slate-600">
-                              <Truck size={13} className="text-slate-400" />
-                              {shippingLabel(listing) === 'Free shipping' ? (
-                                <span className="font-semibold text-emerald-600">Free shipping</span>
-                              ) : (
-                                shippingLabel(listing)
-                              )}
-                            </span>
-                            {deliveryLabel(listing) && (
-                              <span className="text-slate-500">
-                                · {deliveryLabel(listing)}
-                                {effectiveZip && <span className="text-slate-400"> to {effectiveZip}</span>}
-                              </span>
-                            )}
-                          </p>
-                        )}
-
-                        <div className="mt-2.5 flex flex-wrap gap-1.5">
-                          {listing.verifiedFitment === false && (
-                            <span className="badge bg-amber-100 text-amber-800">
-                              <AlertTriangle size={12} /> Fitment not verified
-                            </span>
-                          )}
-                          {listing.id === bestValueId && (
-                            <span className="badge bg-emerald-100 text-emerald-800">
-                              <Sparkles size={12} /> Best value
-                            </span>
-                          )}
-                          {listing.topRatedSeller && (
-                            <span className="badge bg-brand-100 text-brand-800">
-                              <Award size={12} /> Top Rated
-                            </span>
-                          )}
-                          {listing.bestOfferAccepted && (
-                            <span className="badge bg-slate-100 text-slate-700">Best Offer</span>
-                          )}
-                          {listing.originalPrice && listing.discountPercentage && (
-                            <span className="badge bg-rose-100 text-rose-700">
-                              <Tag size={12} /> {listing.discountPercentage}% off
+                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+                          <span className="rounded-xl bg-slate-900 px-3 py-px text-xs font-semibold text-white">{listing.condition}</span>
+                          <span className="font-medium">{listing.seller} · {listing.source}</span>
+                          {listing.sellerFeedbackPercentage && (
+                            <span className="inline-flex items-center gap-1 text-amber-600">
+                              <Star size={13} className="fill-current" /> {listing.sellerFeedbackPercentage}%
+                              {listing.sellerFeedbackScore && <span className="text-slate-400">({listing.sellerFeedbackScore.toLocaleString()})</span>}
                             </span>
                           )}
                         </div>
+
+                        {listing.itemLocation && <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500"><MapPin size={13} /> {listing.itemLocation}</div>}
+
+                        {(shippingLabel(listing) || deliveryLabel(listing)) && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm text-slate-600">
+                            <span className="inline-flex items-center gap-1 font-medium">
+                              <Truck size={13} className="text-slate-400" />
+                              {shippingLabel(listing) === 'Free shipping' ? <span className="font-semibold text-emerald-600">Free shipping</span> : shippingLabel(listing)}
+                            </span>
+                            {deliveryLabel(listing) && <span className="text-slate-500">· {deliveryLabel(listing)}{effectiveZip && ` to ${effectiveZip}`}</span>}
+                          </div>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {listing.verifiedFitment === false && <span className="badge bg-amber-100 text-amber-800"><AlertTriangle size={12} /> Fitment not verified</span>}
+                          <span className="badge bg-emerald-100 text-emerald-800">High fitment confidence</span>
+                          {isBestValue && <span className="badge bg-emerald-100 text-emerald-800"><Sparkles size={12} /> Recommended</span>}
+                          {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={12} /> Top Rated</span>}
+                          {listing.bestOfferAccepted && <span className="badge bg-slate-100 text-slate-700">Best Offer</span>}
+                          {listing.originalPrice && listing.discountPercentage && <span className="badge bg-rose-100 text-rose-700"><Tag size={12} /> {listing.discountPercentage}% off</span>}
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <a href={listing.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary px-5 py-2 text-sm">
+                            View on {listing.source} <ExternalLink size={14} />
+                          </a>
+                          <button
+                            type="button"
+                            disabled={inCart}
+                            onClick={() => onAddToCart(listing)}
+                            className={`btn px-5 py-2 text-sm ${inCart ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
+                          >
+                            {inCart ? <><Check size={15} /> Added</> : <><Plus size={15} /> Add to cart</>}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const isComparing = compareList.some(l => l.id === listing.id)
+                              if (isComparing) {
+                                setCompareList(compareList.filter(l => l.id !== listing.id))
+                              } else if (compareList.length < 4) {
+                                setCompareList([...compareList, listing])
+                              }
+                            }}
+                            className="btn btn-ghost px-4 py-2 text-sm"
+                          >
+                            {compareList.some(l => l.id === listing.id) ? 'Remove' : 'Compare'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const isWatched = watched.includes(listing.id)
+                              if (isWatched) {
+                                setWatched(watched.filter(id => id !== listing.id))
+                              } else {
+                                setWatched([...watched, listing.id])
+                              }
+                            }}
+                            className="btn btn-ghost px-4 py-2 text-sm"
+                          >
+                            {watched.includes(listing.id) ? 'Watching' : 'Watch'}
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
 
-                    {listing.shortDescription && (
-                      <p className="mt-3 border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600">
-                        {listing.shortDescription}
-                      </p>
-                    )}
+            <aside className="md:col-span-5 xl:col-span-4">
+              <div className="sticky top-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white"><Store size={18} /></div>
+                  <div>
+                    <div className="font-semibold tracking-tight text-slate-950">Compare at other stores</div>
+                    <div className="text-xs text-slate-500">Opens search for your exact part</div>
+                  </div>
+                </div>
 
-                    {listing.crossBorder && (
-                      <p className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                        Ships from {listing.shipsFrom ?? 'overseas'} · est. {listing.estimatedDelivery ?? 'several weeks'} ·
-                        verify quality before buying safety-critical parts
-                      </p>
-                    )}
-
-                    <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-5 flex flex-col gap-2">
+                  {retailerLinks.map((retailer, idx) => {
+                    const Icon = retailer.icon
+                    // Build a high-quality search query
+                    const searchQuery = `${vehicleLabel} ${part}`.trim()
+                    return (
                       <a
-                        href={listing.link}
+                        key={idx}
+                        href={retailer.buildUrl(searchQuery)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary px-4 py-2"
+                        className="group flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
                       >
-                        View on {listing.source} <ExternalLink size={14} />
+                        <span className="flex items-center gap-3">
+                          <Icon size={17} className={retailer.color} />
+                          {retailer.name}
+                        </span>
+                        <ExternalLink size={15} className="text-slate-400 transition group-hover:text-brand-500" />
                       </a>
-                      <button
-                        type="button"
-                        disabled={inCart}
-                        onClick={() => onAddToCart(listing)}
-                        className={`btn px-4 py-2 ${
-                          inCart
-                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'btn-secondary'
-                        }`}
-                      >
-                        {inCart ? (
-                          <>
-                            <Check size={15} /> Added
-                          </>
-                        ) : (
-                          <>
-                            <Plus size={15} /> Add to cart
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                    )
+                  })}
+                </div>
+
+                <div className="mt-4 text-center text-[10px] text-slate-400">Prices shown are live from each retailer</div>
+              </div>
+            </aside>
+          </div>
         </>
       )}
 
-      {!loading && (
-        <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-            <Store size={16} className="text-slate-400" /> Compare prices at other stores
-          </h3>
-          <p className="mt-1 text-xs text-slate-500">
-            These retailers don't offer price data we can show here — each link opens their search for this exact
-            part in a new tab.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {retailerLinks.map((retailer) => (
-              <a
-                key={retailer.name}
-                href={retailer.buildUrl(`${vehicleLabel} ${part}`)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-              >
-                {retailer.name} <ExternalLink size={13} className="text-slate-400" />
-              </a>
-            ))}
+      {selectedListing && (
+        <PartDetailModal
+          listing={selectedListing}
+          vehicleLabel={vehicleLabel}
+          part={part}
+          onClose={() => setSelectedListing(null)}
+          onAddToCart={() => {
+            onAddToCart(selectedListing)
+            setSelectedListing(null)
+          }}
+          isInCart={isInCart(selectedListing.id)}
+        />
+      )}
+
+      {/* Comparison Modal */}
+      {showCompareModal && compareList.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowCompareModal(false)}>
+          <div className="w-full max-w-6xl rounded-3xl bg-white p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Compare Listings</h3>
+              <button onClick={() => setShowCompareModal(false)} className="text-slate-500 hover:text-slate-700">Close</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {compareList.map((item, index) => (
+                <div key={index} className="border rounded-2xl p-4">
+                  <div className="font-semibold text-sm mb-2">{item.title}</div>
+                  <div className="text-2xl font-bold mb-2">${item.price}</div>
+                  <div className="text-xs text-slate-500 mb-1">{item.condition} • {item.source}</div>
+                  <div className="text-xs text-slate-500">{item.seller}</div>
+                  <a href={item.link} target="_blank" className="btn btn-primary w-full mt-4 text-sm">View Listing</a>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

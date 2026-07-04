@@ -1,7 +1,6 @@
-import { ChevronLeft, Zap } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { Combobox } from './Combobox'
-import { VehicleThumbnail } from './VehicleThumbnail'
 import { partTypesForVehicle, popularPartTypesForVehicle } from '../data/partTypes'
 import { isElectricVehicle } from '../data/electricVehicles'
 
@@ -19,23 +18,20 @@ export function PartSelector({
   const popularPartTypes = popularPartTypesForVehicle(electric)
 
   return (
-    <div className="card p-6 sm:p-7">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <VehicleThumbnail make={car.make} model={car.model} className="h-11 w-16" iconSize={20} />
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">What part do you need?</h2>
-            <p className="text-sm text-slate-500">
-              For your{' '}
-              <span className="font-medium text-slate-700">
-                {car.year} {car.make} {car.model}
-                {car.trim && ` ${car.trim}`}
-              </span>
-            </p>
-          </div>
+    <div className="card p-7">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-slate-950">What part do you need?</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Showing parts for{' '}
+            <span className="font-medium text-slate-800">
+              {car.year} {car.make} {car.model}
+              {car.trim && ` ${car.trim}`}
+            </span>
+          </p>
         </div>
-        <button type="button" onClick={onBack} className="btn btn-ghost -mr-2 shrink-0 px-2 py-1.5">
-          <ChevronLeft size={16} /> <span className="hidden sm:inline">Change</span>
+        <button type="button" onClick={onBack} className="btn btn-ghost px-3 py-1.5 text-sm">
+          Change vehicle
         </button>
       </div>
 
@@ -46,6 +42,19 @@ export function PartSelector({
       )}
 
       <div className="mt-5">
+        <div className="mb-2 text-xs text-slate-500">Or search by part number</div>
+        <input
+          type="text"
+          placeholder="Enter part number (e.g. 04465-0K010)"
+          className="field mb-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+              const partNum = e.currentTarget.value.trim()
+              alert(`Searching by part number: ${partNum}`)
+              onSelect(partNum)
+            }
+          }}
+        />
         <Combobox
           label="Part type"
           placeholder="Search any part (e.g. outer tie rods)"
@@ -61,12 +70,7 @@ export function PartSelector({
         <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Popular parts</p>
         <div className="flex flex-wrap gap-2">
           {popularPartTypes.map((part) => (
-            <button
-              key={part.name}
-              type="button"
-              onClick={() => onSelect(part.name)}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-            >
+            <button key={part.name} type="button" onClick={() => onSelect(part.name)} className="chip">
               {part.name}
             </button>
           ))}

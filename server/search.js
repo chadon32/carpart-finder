@@ -6,15 +6,25 @@ const providers = [
   { name: 'AliExpress', module: aliexpress },
 ]
 
+// ==================== CACHE CONFIGURATION ====================
 // Short-lived in-memory cache. Live prices don't change by the second, so
 // caching identical searches for a few minutes makes back/forth navigation and
 // repeat searches instant and avoids burning eBay API quota.
-const CACHE_TTL_MS = 5 * 60 * 1000
-// Stale-if-error window: when a live search fails outright, recent results
-// (up to an hour old, clearly flagged as stale) beat an error page.
-const STALE_TTL_MS = 60 * 60 * 1000
+const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS) || 5 * 60 * 1000          // 5 minutes default
+const STALE_TTL_MS = Number(process.env.STALE_TTL_MS) || 60 * 60 * 1000        // 1 hour stale fallback
+const MAX_CACHE_SIZE = Number(process.env.MAX_CACHE_SIZE) || 500               // Max cached searches
+
 const cache = new Map()
 
+// Simple LRU eviction: delete oldest entries when over limit
+function evictOldestIfNeeded() {
+  if (cache.size > MAX_CACHE_SIZE) {
+    const oldestKey = cache.keys().next().value
+    cache.delete(oldestKey)
+  }
+}
+
+// ==================== MAIN SEARCH FUNCTION ====================
 export async function searchCheapestListings({ year, make, model, trim, part, zip, limit = 15 }) {
   const query = `${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part}`.trim()
   const ctx = { year, make, model, trim, part, zip, query }
@@ -22,7 +32,10 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
   // Delivery estimates vary by ZIP, so the cache key must include it.
   const cacheKey = `${query}::${limit}::${zip || ''}`.toLowerCase()
   const cached = cache.get(cacheKey)
+
   if (cached && Date.now() < cached.expiresAt) {
+    // Cache hit
+    console.log(`[Cache] HIT: ${cacheKey}`)
     return { ...cached.data, cached: true }
   }
 
@@ -69,8 +82,25 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
   // Only cache genuinely useful responses so a transient total failure isn't
   // frozen in for 5 minutes.
   if (results.length > 0) {
-    cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS, staleUntil: Date.now() + STALE_TTL_MS })
+    evictOldestIfNeeded()
+    cache.set(cacheKey, {
+      data,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      staleUntil: Date.now() + STALE_TTL_MS,
+    })
+    console.log(`[Cache] MISS (stored): ${cacheKey} | Cache size: ${cache.size}/${MAX_CACHE_SIZE}`)
+  } else {
+    console.log(`[Cache] MISS (no results): ${cacheKey}`)
   }
 
   return data
+}
+
+// Optional: expose cache stats for debugging / monitoring
+export function getCacheStats() {
+  return {
+    size: cache.size,
+    maxSize: MAX_CACHE_SIZE,
+    ttlMinutes: Math.round(CACHE_TTL_MS / 1000 / 60),
+  }
 }
