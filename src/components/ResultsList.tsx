@@ -99,6 +99,7 @@ export function ResultsList({
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<Listing[]>([])
   const [providerErrors, setProviderErrors] = useState<Record<string, string>>({})
+  const [stale, setStale] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   const [sortBy, setSortBy] = usePersistedState<SortKey>('cpf-sort', 'price')
@@ -118,6 +119,7 @@ export function ResultsList({
         if (cancelled) return
         setResults(res.results)
         setProviderErrors(res.providerErrors || {})
+        setStale(Boolean(res.stale))
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -227,10 +229,17 @@ export function ResultsList({
 
       {!loading && !error && results.length > 0 && (
         <>
-          {failedProviders.length > 0 && (
+          {stale ? (
             <p className="mt-5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-              <AlertTriangle size={14} /> Showing available results — {failedProviders.join(', ')} was unavailable.
+              <AlertTriangle size={14} /> Live search is temporarily unavailable — showing recent results from the
+              last hour. Prices may have changed.
             </p>
+          ) : (
+            failedProviders.length > 0 && (
+              <p className="mt-5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                <AlertTriangle size={14} /> Showing available results — {failedProviders.join(', ')} was unavailable.
+              </p>
+            )
           )}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -393,6 +402,11 @@ export function ResultsList({
                         )}
 
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {listing.verifiedFitment === false && (
+                            <span className="badge bg-amber-100 text-amber-800">
+                              <AlertTriangle size={12} /> Fitment not verified
+                            </span>
+                          )}
                           {listing.id === bestValueId && (
                             <span className="badge bg-emerald-100 text-emerald-800">
                               <Sparkles size={12} /> Best value

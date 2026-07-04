@@ -1,3 +1,5 @@
+import { fetchWithRetry } from './httpClient.js'
+
 const isSandbox = process.env.EBAY_ENV === 'sandbox'
 export const EBAY_API_ROOT = isSandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com'
 
@@ -18,17 +20,21 @@ export async function getAccessToken() {
   }
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-  const res = await fetch(`${EBAY_API_ROOT}/identity/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const res = await fetchWithRetry(
+    `${EBAY_API_ROOT}/identity/v1/oauth2/token`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        scope: 'https://api.ebay.com/oauth/api_scope',
+      }),
     },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      scope: 'https://api.ebay.com/oauth/api_scope',
-    }),
-  })
+    { timeoutMs: 6000, retries: 2 }
+  )
 
   if (!res.ok) {
     const text = await res.text()

@@ -22,6 +22,9 @@ export type Listing = {
   shippingCost?: number | null
   deliveryMin?: string | null
   deliveryMax?: string | null
+  // False when eBay's compatibility filter couldn't be applied and the results
+  // came from a relaxed keyword search instead.
+  verifiedFitment?: boolean
 }
 
 export type SearchResponse = {
@@ -30,6 +33,8 @@ export type SearchResponse = {
   providerErrors: Record<string, string>
   skippedProviders: string[]
   cached?: boolean
+  // True when live search failed and these are recent last-known-good results.
+  stale?: boolean
 }
 
 async function getJson<T>(url: string): Promise<T> {

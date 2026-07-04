@@ -10,6 +10,9 @@ const providers = [
 // caching identical searches for a few minutes makes back/forth navigation and
 // repeat searches instant and avoids burning eBay API quota.
 const CACHE_TTL_MS = 5 * 60 * 1000
+// Stale-if-error window: when a live search fails outright, recent results
+// (up to an hour old, clearly flagged as stale) beat an error page.
+const STALE_TTL_MS = 60 * 60 * 1000
 const cache = new Map()
 
 export async function searchCheapestListings({ year, make, model, trim, part, zip, limit = 15 }) {
@@ -55,10 +58,18 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
 
   const data = { query, results, providerErrors, skippedProviders: skipped }
 
+  // Every provider failed and we have nothing to show — fall back to the last
+  // known-good results for this exact query if they're recent enough. A stale
+  // price beats an error page, as long as the UI says it's stale.
+  const totalFailure = results.length === 0 && Object.keys(providerErrors).length > 0
+  if (totalFailure && cached && Date.now() < cached.staleUntil) {
+    return { ...cached.data, stale: true, providerErrors }
+  }
+
   // Only cache genuinely useful responses so a transient total failure isn't
   // frozen in for 5 minutes.
   if (results.length > 0) {
-    cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS })
+    cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS, staleUntil: Date.now() + STALE_TTL_MS })
   }
 
   return data

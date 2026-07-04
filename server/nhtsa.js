@@ -1,3 +1,5 @@
+import { fetchWithRetry } from './httpClient.js'
+
 const BASE_URL = 'https://vpic.nhtsa.dot.gov/api/vehicles'
 
 const makesCache = new Map()
@@ -14,7 +16,11 @@ export const VEHICLE_TYPES = {
 }
 
 async function fetchMakesForType(nhtsaType) {
-  const res = await fetch(`${BASE_URL}/GetMakesForVehicleType/${encodeURIComponent(nhtsaType)}?format=json`)
+  const res = await fetchWithRetry(
+    `${BASE_URL}/GetMakesForVehicleType/${encodeURIComponent(nhtsaType)}?format=json`,
+    {},
+    { timeoutMs: 10000, retries: 2 }
+  )
   if (!res.ok) throw new Error(`NHTSA makes lookup failed (${res.status})`)
   const data = await res.json()
   return data.Results || []
@@ -44,8 +50,10 @@ export async function getModels(make, year) {
     return cached.data
   }
 
-  const res = await fetch(
-    `${BASE_URL}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}?format=json`
+  const res = await fetchWithRetry(
+    `${BASE_URL}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}?format=json`,
+    {},
+    { timeoutMs: 10000, retries: 2 }
   )
   if (!res.ok) throw new Error(`NHTSA models lookup failed (${res.status})`)
   const data = await res.json()

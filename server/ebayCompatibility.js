@@ -1,4 +1,5 @@
 import { EBAY_API_ROOT, getAccessToken } from './ebayAuth.js'
+import { fetchWithRetry } from './httpClient.js'
 
 const TAXONOMY_URL = `${EBAY_API_ROOT}/commerce/taxonomy/v1`
 
@@ -16,9 +17,11 @@ async function getMotorsCategoryTreeId() {
   }
 
   const token = await getAccessToken()
-  const res = await fetch(`${TAXONOMY_URL}/get_default_category_tree_id?marketplace_id=EBAY_MOTORS_US`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const res = await fetchWithRetry(
+    `${TAXONOMY_URL}/get_default_category_tree_id?marketplace_id=EBAY_MOTORS_US`,
+    { headers: { Authorization: `Bearer ${token}` } },
+    { timeoutMs: 6000, retries: 2 }
+  )
   if (!res.ok) throw new Error(`eBay category tree lookup failed (${res.status})`)
 
   const data = await res.json()
@@ -46,9 +49,11 @@ export async function getTrims(year, make, model) {
     filter: `Year:${year},Make:${make},Model:${model}`,
   })
 
-  const res = await fetch(`${TAXONOMY_URL}/category_tree/${treeId}/get_compatibility_property_values?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const res = await fetchWithRetry(
+    `${TAXONOMY_URL}/category_tree/${treeId}/get_compatibility_property_values?${params}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+    { timeoutMs: 7000, retries: 1 }
+  )
 
   if (!res.ok) {
     const text = await res.text()

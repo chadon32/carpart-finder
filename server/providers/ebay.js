@@ -1,5 +1,6 @@
 import { EBAY_API_ROOT, getAccessToken, isConfigured } from '../ebayAuth.js'
 import { categoryForPart } from '../partCategories.js'
+import { fetchWithRetry } from '../httpClient.js'
 
 const SEARCH_URL = `${EBAY_API_ROOT}/buy/browse/v1/item_summary/search`
 const ITEM_URL = `${EBAY_API_ROOT}/buy/browse/v1/item`
@@ -16,9 +17,11 @@ export async function getCurrentPrices(ids) {
     ids.map(async (id) => {
       const itemId = id.startsWith('ebay-') ? id.slice('ebay-'.length) : id
       try {
-        const res = await fetch(`${ITEM_URL}/${encodeURIComponent(itemId)}`, {
-          headers: { Authorization: `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' },
-        })
+        const res = await fetchWithRetry(
+          `${ITEM_URL}/${encodeURIComponent(itemId)}`,
+          { headers: { Authorization: `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
+          { timeoutMs: 6000, retries: 1 }
+        )
         if (res.status === 404) {
           return [id, { available: false }]
         }
@@ -69,7 +72,9 @@ async function runSearch(token, { q, categoryId, compatibilityFilter, zip }) {
     headers['X-EBAY-C-ENDUSERCTX'] = `contextualLocation=${encodeURIComponent(`country=US,zip=${zip}`)}`
   }
 
-  const res = await fetch(`${SEARCH_URL}?${params.toString()}`, { headers })
+  // Tight timeout + one retry: the search runs up to three relaxation tiers,
+  // so generous per-call budgets would compound into a very slow worst case.
+  const res = await fetchWithRetry(`${SEARCH_URL}?${params.toString()}`, { headers }, { timeoutMs: 7000, retries: 1 })
 
   if (!res.ok) {
     const text = await res.text()
@@ -80,9 +85,16 @@ async function runSearch(token, { q, categoryId, compatibilityFilter, zip }) {
   return data.itemSummaries || []
 }
 
-function mapItem(item) {
+// A listing has to be actually buyable to be worth showing: real title, a
+// working link, and a plausible price. eBay occasionally returns $0 stubs.
+function isValidItem(item) {
+  return Boolean(item.title && item.itemWebUrl && Number(item.price?.value) > 0)
+}
+
+function mapItem(item, { verifiedFitment }) {
   return {
     id: `ebay-${item.itemId}`,
+    verifiedFitment,
     title: item.title,
     price: Number(item.price?.value ?? 0),
     currency: item.price?.currency ?? 'USD',
@@ -133,18 +145,26 @@ export async function search(ctx, { limit = 10 } = {}) {
   ]
 
   let items = []
+  let verifiedFitment = false
   for (const attempt of attempts) {
-    items = await runSearch(token, attempt)
-    if (items.length > 0) break
+    items = (await runSearch(token, attempt)).filter(isValidItem)
+    if (items.length > 0) {
+      // Only tier 1 runs eBay's compatibility filter; results from the relaxed
+      // tiers are keyword matches whose fitment the user must verify themselves.
+      verifiedFitment = Boolean(attempt.compatibilityFilter)
+      break
+    }
   }
 
   const seenSellers = new Set()
+  const seenItemIds = new Set()
   const results = []
   for (const item of items) {
     const seller = item.seller?.username || 'Unknown seller'
-    if (seenSellers.has(seller)) continue
+    if (seenSellers.has(seller) || seenItemIds.has(item.itemId)) continue
     seenSellers.add(seller)
-    results.push(mapItem(item))
+    seenItemIds.add(item.itemId)
+    results.push(mapItem(item, { verifiedFitment }))
     if (results.length >= limit) break
   }
 
