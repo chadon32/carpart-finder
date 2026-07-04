@@ -70,6 +70,7 @@ export function VehicleThumbnail({
       <img
         src={imageUrl}
         alt={`${make} ${model}`}
+        loading="lazy"
         onError={() => setFailed(true)}
         className="h-full w-full object-cover"
       />

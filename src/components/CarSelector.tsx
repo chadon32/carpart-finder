@@ -233,7 +233,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
             ) : (
               <Combobox label="" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
             )}
-            <p className="mt-2 text-xs text-slate-400">Showing real fitment options from eBay compatibility data.</p>
+            <p className="mt-2 text-xs text-slate-500">Showing real fitment options from eBay compatibility data.</p>
           </>
         ) : (
           <input

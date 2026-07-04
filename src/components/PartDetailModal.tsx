@@ -1,6 +1,6 @@
-import React from 'react'
 import { X, ExternalLink, Star, Truck, Award, ShieldCheck } from 'lucide-react'
 import type { Listing } from '../api/client'
+import { Modal } from './Modal'
 
 interface PartDetailModalProps {
   listing: Listing
@@ -19,22 +19,9 @@ export function PartDetailModal({
   onAddToCart,
   isInCart,
 }: PartDetailModalProps) {
-  // Close on Escape key
-  React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-2xl animate-slide-up overflow-hidden rounded-3xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+    <Modal label={`${part} — listing details`} onClose={onClose}>
+      {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <div className="text-xs font-semibold tracking-[1px] text-brand-600">DETAILED VIEW</div>
@@ -52,6 +39,7 @@ export function PartDetailModal({
               <img
                 src={listing.image}
                 alt={listing.title}
+                loading="lazy"
                 className="w-full rounded-2xl border border-slate-100 object-cover shadow-sm"
               />
             ) : (
@@ -138,7 +126,6 @@ export function PartDetailModal({
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

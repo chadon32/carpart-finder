@@ -149,14 +149,20 @@ function App() {
         </div>
       </main>
 
-      <footer className="border-t border-slate-200/80 bg-white/80 backdrop-blur-sm">
+      <footer className="border-t border-slate-200/80 bg-white/80">
         <div className="mx-auto max-w-6xl px-6 py-8 text-center">
           <div className="text-sm font-medium text-slate-600">CarPartsRadar</div>
-          <p className="mt-2 text-xs text-slate-400 max-w-md mx-auto">
-            We aggregate live listings from trusted third-party marketplaces. Prices and availability are set by sellers and may change.
+          <p className="mx-auto mt-2 max-w-lg text-xs text-slate-500">
+            We compare live listings from third-party marketplaces. Prices and availability are set by sellers and
+            may change — always confirm details on the retailer's site before buying.
           </p>
-          <p className="mt-3 text-[10px] text-slate-400">
-            © {new Date().getFullYear()} CarPartsRadar — Not affiliated with any retailer.
+          <p className="mx-auto mt-2 max-w-lg text-xs text-slate-500">
+            Affiliate disclosure: some outbound links are affiliate links, meaning we may earn a commission if you
+            make a purchase — at no extra cost to you. As an Amazon Associate, CarPartsRadar earns from qualifying
+            purchases.
+          </p>
+          <p className="mt-3 text-xs text-slate-500">
+            © {new Date().getFullYear()} CarPartsRadar — Not affiliated with eBay, Amazon, or any retailer listed.
           </p>
         </div>
       </footer>

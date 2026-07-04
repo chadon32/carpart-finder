@@ -61,7 +61,7 @@ export function PartSelector({
           onChange={(part) => onSelect(part)}
           allowFreeText
         />
-        <p className="mt-1.5 text-xs text-slate-400">Pick from the list, or type any part name and press Enter.</p>
+        <p className="mt-1.5 text-xs text-slate-500">Pick from the list, or type any part name and press Enter.</p>
       </div>
 
       <div className="mt-6">

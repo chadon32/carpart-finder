@@ -23,6 +23,7 @@ import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
 import { PartDetailModal } from './PartDetailModal'
+import { ComparisonModal } from './ComparisonModal'
 
 type SortKey = 'value' | 'price' | 'rating'
 type ConditionFilter = 'all' | 'new' | 'used'
@@ -112,9 +113,6 @@ export function ResultsList({
   const [filterFastDelivery, setFilterFastDelivery] = usePersistedState<boolean>('cpf-fast-shipping', false)
   const [minRating, setMinRating] = usePersistedState<number>('cpf-min-rating', 0)
 
-  // Watchlist (persisted)
-  const [watched, setWatched] = usePersistedState<string[]>('cpf-watched', [])
-
   // Comparison
   const [compareList, setCompareList] = useState<Listing[]>([])
   const [showCompareModal, setShowCompareModal] = useState(false)
@@ -192,7 +190,7 @@ export function ResultsList({
         <div className="flex items-center gap-3">
           <VehicleThumbnail make={car.make} model={car.model} className="h-11 w-16" iconSize={20} />
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{part}</h2>
+            <h1 className="text-lg font-bold text-slate-900">{part}</h1>
             <p className="text-sm text-slate-500">
               Fitting your <span className="font-medium text-slate-700">{vehicleLabel}</span>
             </p>
@@ -426,7 +424,14 @@ export function ResultsList({
                           #{i + 1}
                         </div>
                         {listing.image ? (
-                          <img src={listing.image} alt={listing.title} className="mt-3 h-24 w-24 rounded-3xl border border-slate-100 object-cover shadow-sm" />
+                          <img
+                            src={listing.image}
+                            alt={listing.title}
+                            loading="lazy"
+                            width={96}
+                            height={96}
+                            className="mt-3 h-24 w-24 rounded-3xl border border-slate-100 object-cover shadow-sm"
+                          />
                         ) : (
                           <div className="mt-3 flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-100 bg-slate-50 text-slate-300">
                             <Package size={30} strokeWidth={1.25} />
@@ -510,19 +515,6 @@ export function ResultsList({
                           >
                             {compareList.some(l => l.id === listing.id) ? 'Remove' : 'Compare'}
                           </button>
-                          <button
-                            onClick={() => {
-                              const isWatched = watched.includes(listing.id)
-                              if (isWatched) {
-                                setWatched(watched.filter(id => id !== listing.id))
-                              } else {
-                                setWatched([...watched, listing.id])
-                              }
-                            }}
-                            className="btn btn-ghost px-4 py-2 text-sm"
-                          >
-                            {watched.includes(listing.id) ? 'Watching' : 'Watch'}
-                          </button>
                         </div>
                       </div>
                     </li>
@@ -587,28 +579,8 @@ export function ResultsList({
         />
       )}
 
-      {/* Comparison Modal */}
       {showCompareModal && compareList.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowCompareModal(false)}>
-          <div className="w-full max-w-6xl rounded-3xl bg-white p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">Compare Listings</h3>
-              <button onClick={() => setShowCompareModal(false)} className="text-slate-500 hover:text-slate-700">Close</button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {compareList.map((item) => (
-                <div key={item.id} className="border rounded-2xl p-4">
-                  <div className="font-semibold text-sm mb-2">{item.title}</div>
-                  <div className="text-2xl font-bold mb-2">${item.price.toFixed(2)}</div>
-                  <div className="text-xs text-slate-500 mb-1">{item.condition} • {item.source}</div>
-                  <div className="text-xs text-slate-500">{item.seller}</div>
-                  <a href={item.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-full mt-4 text-sm">View Listing</a>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ComparisonModal listings={compareList} onClose={() => setShowCompareModal(false)} />
       )}
     </div>
   )
