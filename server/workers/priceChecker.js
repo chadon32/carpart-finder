@@ -87,7 +87,7 @@ export async function checkPriceAlerts() {
           `[PriceChecker] PRICE DROP for alert #${alert.id}: $${cheapest.total.toFixed(2)} <= target $${alert.target_price} — ${cheapest.item.title}`
         )
         update.triggered_at = new Date().toISOString()
-        await sendPriceDropNotification(alert.user_id, search, cheapest.total, cheapest.item)
+        await sendPriceDropNotification(alert, search, cheapest.total, cheapest.item)
       }
 
       await supabaseAdmin.from('price_alerts').update(update).eq('id', alert.id)
@@ -101,13 +101,56 @@ export async function checkPriceAlerts() {
 }
 
 /**
- * Send price drop notification.
- * Email delivery is not wired up yet — needs a transactional email service
- * (e.g. Resend) and its API key. Until then the trigger is recorded on the
- * alert row (triggered_at / last_price) so the UI can surface it.
+ * Send price drop notification via Resend's HTTP API.
+ * Without RESEND_API_KEY this only logs — the trigger is still recorded on
+ * the alert row (triggered_at / last_price) so the UI can surface it.
  */
-async function sendPriceDropNotification(userId, search, currentPrice, listing) {
+async function sendPriceDropNotification(alert, search, currentPrice, listing) {
+  const userId = alert.user_id
+  const vehicle = `${search.year} ${search.make} ${search.model}${search.trim ? ` ${search.trim}` : ''}`
   console.log(
-    `[Notification] User ${userId}: ${search.part} for ${search.year} ${search.make} ${search.model} now $${currentPrice.toFixed(2)} — ${listing.link}`
+    `[Notification] User ${userId}: ${search.part} for ${vehicle} now $${currentPrice.toFixed(2)} — ${listing.link}`
   )
+
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('[Notification] RESEND_API_KEY not set; skipping email delivery.')
+    return
+  }
+
+  // The alert row only stores the user id; the email lives in Supabase Auth.
+  const { data, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId)
+  const email = data?.user?.email
+  if (userError || !email) {
+    console.error(`[Notification] Could not resolve email for user ${userId}:`, userError?.message || 'no email on record')
+    return
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM || 'CarPartsRadar <onboarding@resend.dev>',
+      to: [email],
+      subject: `Price drop: ${search.part} for your ${vehicle} — now $${currentPrice.toFixed(2)}`,
+      html: `
+        <p>Good news — a <strong>${search.part}</strong> matching your saved search for a
+        <strong>${vehicle}</strong> just dropped to <strong>$${currentPrice.toFixed(2)}</strong>
+        (your target was $${Number(alert.target_price).toFixed(2)}).</p>
+        <p><a href="${listing.link}">${listing.title}</a><br/>
+        Sold by ${listing.seller}${listing.shippingCost === 0 ? ' · free shipping' : ''}</p>
+        <p style="color:#64748b;font-size:12px">You're receiving this because you set a price alert on CarPartsRadar.</p>
+      `,
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    console.error(`[Notification] Resend API error (${res.status}): ${text}`)
+  } else {
+    console.log(`[Notification] Price-drop email sent to ${email}`)
+  }
 }
