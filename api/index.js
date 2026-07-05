@@ -213,8 +213,12 @@ function pickListingForPart(results, part) {
   if (partTokens.length === 0) return results[0] || null
 
   // All tokens must appear for short names; allow one miss for longer ones
-  // ("Sway Bar End Links" should still match a "Sway Bar Link" title).
-  const required = partTokens.length >= 3 ? partTokens.length - 1 : partTokens.length
+  // ("Sway Bar End Links" should still match a "Sway Bar Link" title). Cap the
+  // requirement so a long free-text part name ("Front Left Lower Control Arm
+  // with Ball Joint Assembly") doesn't demand so many token hits that every
+  // real listing is filtered out.
+  const base = partTokens.length >= 3 ? partTokens.length - 1 : partTokens.length
+  const required = Math.min(base, 4)
   // Accessory words only disqualify a title when they're not part of what was
   // asked for (an "Oxygen Sensor" quote may of course contain "sensor").
   const blocked = QUOTE_ACCESSORY_WORDS.filter((w) => !partTokens.some((t) => t.startsWith(w) || w.startsWith(t)))

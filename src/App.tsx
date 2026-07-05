@@ -306,7 +306,7 @@ function App() {
                           <div className="space-y-2">
                             {accountData.searches.map((s: any, i: number) => (
                               <div
-                                key={i}
+                                key={s.id ?? i}
                                 className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3 hover:bg-slate-50 transition"
                               >
                                 <div className="min-w-0">
@@ -361,7 +361,7 @@ function App() {
                           <div className="space-y-2">
                             {accountData.alerts.map((a: any, i: number) => (
                               <div
-                                key={i}
+                                key={a.id ?? i}
                                 className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
                               >
                                 <div className="min-w-0">
