@@ -1,5 +1,16 @@
 const API_BASE = '/api/supabase'
 
+// Error that preserves the HTTP status so callers can tell an auth failure
+// (401 — "log in") apart from a server/network problem ("try again").
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 function getAuthHeader(): Record<string, string> {
   const saved = localStorage.getItem('carpartsradar-user')
   if (!saved) return {}
@@ -43,7 +54,7 @@ export async function saveSearch(search: {
     },
     body: JSON.stringify(search)
   })
-  if (!res.ok) throw new Error('Failed to save search')
+  if (!res.ok) throw new ApiError('Failed to save search', res.status)
   return res.json()
 }
 
@@ -89,11 +100,17 @@ export async function createPriceAlert(alert: {
   return res.json()
 }
 
+type AuthResponse = {
+  user?: { email?: string; user_metadata?: { full_name?: string } }
+  token?: string | null
+  confirmationRequired?: boolean
+}
+
 export async function signupUser(user: {
   email: string
   password?: string
   name?: string
-}) {
+}): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -109,7 +126,7 @@ export async function signupUser(user: {
 export async function loginUser(credentials: {
   email: string
   password?: string
-}) {
+}): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

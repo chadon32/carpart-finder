@@ -68,6 +68,25 @@ app.use('/api/search', searchLimiter)
 // Quote runs one provider search per part, so it shares the same budget.
 app.use('/api/quote', searchLimiter)
 
+// A model year is 4 digits from 1980 to next year; make/model must be non-empty
+// and sanely short. Rejecting junk up front avoids burning rate-limited eBay
+// calls on garbage like `year=abc&model=;DROP` and keeps NHTSA lookups clean.
+const MAX_VEHICLE_FIELD = 60
+function validateYear(year) {
+  const y = Number(year)
+  return Number.isInteger(y) && y >= 1980 && y <= new Date().getFullYear() + 1
+}
+// Returns an error string, or null when the vehicle fields are acceptable.
+function vehicleError({ year, make, model }) {
+  if (!validateYear(year)) return 'A valid model year (1980–present) is required'
+  for (const [label, value] of [['make', make], ['model', model]]) {
+    const s = String(value ?? '').trim()
+    if (!s) return `${label} is required`
+    if (s.length > MAX_VEHICLE_FIELD) return `${label} is too long`
+  }
+  return null
+}
+
 app.get('/api/makes', async (req, res) => {
   try {
     const makes = await getMakes(req.query.type ? String(req.query.type) : undefined)
@@ -82,6 +101,9 @@ app.get('/api/models', async (req, res) => {
   const { make, year } = req.query
   if (!make || !year) {
     return res.status(400).json({ error: 'make and year query params are required' })
+  }
+  if (!validateYear(year)) {
+    return res.status(400).json({ error: 'A valid model year (1980–present) is required' })
   }
   try {
     const models = await getModels(String(make), String(year))
@@ -110,8 +132,9 @@ app.get('/api/prices', async (req, res) => {
 
 app.get('/api/trims', async (req, res) => {
   const { year, make, model } = req.query
-  if (!year || !make || !model) {
-    return res.status(400).json({ error: 'year, make, and model query params are required' })
+  const invalid = vehicleError({ year, make, model })
+  if (invalid) {
+    return res.status(400).json({ error: invalid })
   }
   try {
     const trims = await getTrims(String(year), String(make), String(model))
@@ -226,8 +249,12 @@ app.get('/api/quote', async (req, res) => {
     .filter(Boolean)
     .slice(0, 6)
 
-  if (!year || !make || !model || parts.length === 0) {
-    return res.status(400).json({ error: 'year, make, model, and parts query params are required' })
+  if (parts.length === 0) {
+    return res.status(400).json({ error: 'parts query param is required' })
+  }
+  const invalid = vehicleError({ year, make, model })
+  if (invalid) {
+    return res.status(400).json({ error: invalid })
   }
   const cleanZip = zip && /^\d{5}$/.test(String(zip)) ? String(zip) : undefined
 
@@ -277,8 +304,12 @@ app.get('/api/quote', async (req, res) => {
 
 app.get('/api/search', async (req, res) => {
   const { year, make, model, part, trim, zip } = req.query
-  if (!year || !make || !model || !part) {
-    return res.status(400).json({ error: 'year, make, model, and part query params are required' })
+  if (!part || !String(part).trim()) {
+    return res.status(400).json({ error: 'part query param is required' })
+  }
+  const invalid = vehicleError({ year, make, model })
+  if (invalid) {
+    return res.status(400).json({ error: invalid })
   }
   // Only accept a clean 5-digit US ZIP; ignore anything else.
   const cleanZip = zip && /^\d{5}$/.test(String(zip)) ? String(zip) : undefined

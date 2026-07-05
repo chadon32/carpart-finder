@@ -96,9 +96,15 @@ router.post('/signup', async (req, res) => {
   })
 
   if (error) return res.status(400).json({ error: error.message })
+
+  // When the Supabase project requires email confirmation, signUp returns a
+  // user but NO session, so there's no token. Signal that clearly instead of
+  // handing back a tokenless "logged-in" state that 401s on every authed call.
+  const token = data.session?.access_token || null
   res.json({
     user: data.user,
-    token: data.session?.access_token || null
+    token,
+    confirmationRequired: !token,
   })
 })
 

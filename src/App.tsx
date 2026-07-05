@@ -49,6 +49,7 @@ function App() {
   const [signupPassword, setSignupPassword] = useState('')
   const [isRegisterMode, setIsRegisterMode] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
   const [accountTab, setAccountTab] = useState<'searches' | 'alerts'>('searches')
 
@@ -450,6 +451,12 @@ function App() {
                   </p>
                 )}
 
+                {authNotice && (
+                  <p className="mb-4 animate-fade-in rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-medium text-emerald-700">
+                    {authNotice}
+                  </p>
+                )}
+
                 {isRegisterMode && (
                   <div className="mb-3">
                     <label htmlFor="auth-name" className="field-label">Full name</label>
@@ -506,6 +513,7 @@ function App() {
 
                     setAuthLoading(true)
                     setAuthError(null)
+                    setAuthNotice(null)
 
                     try {
                       let res
@@ -513,6 +521,21 @@ function App() {
                         res = await signupUser({ email, password, name })
                       } else {
                         res = await loginUser({ email, password })
+                      }
+
+                      // No session token means the Supabase project requires
+                      // email confirmation. Persisting a tokenless user would
+                      // look logged-in but 401 on every authed action, so
+                      // instead prompt them to confirm, then sign in.
+                      if (!res.token) {
+                        setIsRegisterMode(false)
+                        setSignupPassword('')
+                        setAuthNotice(
+                          isRegisterMode
+                            ? 'Account created! Check your email to confirm your address, then sign in.'
+                            : 'Please confirm your email address, then sign in.'
+                        )
+                        return
                       }
 
                       const newUser = {
@@ -529,6 +552,7 @@ function App() {
                       setSignupEmail('')
                       setSignupPassword('')
                       setAuthError(null)
+                      setAuthNotice(null)
                     } catch (err: any) {
                       setAuthError(err.message || 'Authentication failed.')
                     } finally {
@@ -546,6 +570,7 @@ function App() {
                     onClick={() => {
                       setIsRegisterMode(!isRegisterMode)
                       setAuthError(null)
+                      setAuthNotice(null)
                     }}
                     className="text-xs font-medium text-slate-500 transition hover:text-brand-600"
                   >

@@ -25,7 +25,7 @@ import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
 import { PartDetailModal } from './PartDetailModal'
-import { saveSearch } from '../api/supabase'
+import { saveSearch, ApiError } from '../api/supabase'
 import { ComparisonModal } from './ComparisonModal'
 
 type SortKey = 'value' | 'price' | 'rating'
@@ -135,7 +135,7 @@ export function ResultsList({
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
   const [copied, setCopied] = useState(false)
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error' | 'auth'>('idle')
 
   const bestPrice = useMemo(() => {
     if (results.length === 0) return 0
@@ -291,13 +291,16 @@ export function ResultsList({
                 })
                 setSaveState('saved')
                 setTimeout(() => setSaveState('idle'), 2500)
-              } catch {
-                setSaveState('error')
+              } catch (err) {
+                // 401 = not signed in; anything else is a real server/network
+                // failure and shouldn't be mislabeled as an auth problem.
+                const isAuth = err instanceof ApiError && err.status === 401
+                setSaveState(isAuth ? 'auth' : 'error')
                 setTimeout(() => setSaveState('idle'), 3500)
               }
             }}
             className={`btn btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5 ${
-              saveState === 'error' ? 'text-rose-600' : ''
+              saveState === 'error' || saveState === 'auth' ? 'text-rose-600' : ''
             }`}
           >
             {saveState === 'saved' && <Check size={13} className="text-emerald-600 animate-scale-up" />}
@@ -306,9 +309,11 @@ export function ResultsList({
                 ? 'Saving…'
                 : saveState === 'saved'
                   ? 'Saved!'
-                  : saveState === 'error'
+                  : saveState === 'auth'
                     ? 'Log in to save'
-                    : 'Save Search'}
+                    : saveState === 'error'
+                      ? "Couldn't save — try again"
+                      : 'Save Search'}
             </span>
           </button>
           <button
