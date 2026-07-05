@@ -138,11 +138,11 @@ export function CartPanel({
   return (
     <div className="card p-6 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-lg font-bold text-slate-900">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-            <Bookmark size={18} strokeWidth={2.2} />
+        <h2 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-slate-900">
+          <span className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">
+            <Bookmark size={17} strokeWidth={2.2} />
           </span>
-          Compare Watchlist
+          Watchlist
           {items.length > 0 && <span className="text-sm font-medium text-slate-400">({items.length})</span>}
         </h2>
         <div className="flex items-center gap-1">

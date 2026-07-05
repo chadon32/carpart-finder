@@ -105,27 +105,29 @@ function App() {
   return (
     <div className="app-bg flex min-h-screen flex-col text-slate-900 dark:text-slate-100">
       <header ref={headroomRef} className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
-          <button type="button" onClick={goHome} className="group flex items-center gap-3.5">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-700 text-white shadow-lg shadow-brand-900/20 transition-all group-hover:scale-[1.02]">
-              <CarIcon size={23} strokeWidth={2.5} />
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <button type="button" onClick={goHome} className="group flex min-w-0 items-center gap-2.5 sm:gap-3.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-700 text-white shadow-lg shadow-brand-900/20 transition-all group-hover:scale-[1.02] sm:h-11 sm:w-11 sm:rounded-2xl">
+              <CarIcon size={20} strokeWidth={2.5} className="sm:hidden" />
+              <CarIcon size={23} strokeWidth={2.5} className="hidden sm:block" />
             </span>
-            <div className="text-left">
-              <span className="block text-[21px] font-semibold tracking-[-0.4px] text-slate-950 dark:text-slate-50">CarPartsRadar</span>
+            <div className="min-w-0 text-left">
+              <span className="block truncate text-lg font-semibold tracking-[-0.4px] text-slate-950 dark:text-slate-50 sm:text-[21px]">CarPartsRadar</span>
               <span className="hidden text-xs font-medium tracking-[0.5px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
             </div>
           </button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowWatchlist(true)}
-              className="btn btn-secondary relative px-5 py-2.5 text-sm"
+              className="btn btn-secondary relative px-3 py-2.5 text-sm sm:px-4"
+              aria-label="Open watchlist"
             >
               <Bookmark size={17} strokeWidth={2.3} />
               <span className="hidden sm:inline">Watchlist</span>
               {watchlist.items.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-white">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
                   {watchlist.items.length}
                 </span>
               )}
@@ -133,15 +135,16 @@ function App() {
             <button
               type="button"
               onClick={() => setShowAccount(true)}
-              className="btn btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
+              className="btn btn-secondary flex items-center gap-2 px-3 py-2.5 text-sm sm:px-4"
+              aria-label="Open account"
             >
               <UserIcon size={17} strokeWidth={2.3} />
-              <span>{user ? user.name.split(' ')[0] : 'Account'}</span>
+              <span className="hidden sm:inline">{user ? user.name.split(' ')[0] : 'Account'}</span>
             </button>
             <button
               type="button"
               onClick={() => setDarkMode(!darkMode)}
-              className="btn btn-secondary p-2.5 flex items-center justify-center shrink-0"
+              className="btn btn-secondary flex shrink-0 items-center justify-center p-2.5"
               aria-label="Toggle theme"
             >
               {darkMode ? <Sun size={17} /> : <Moon size={17} />}
@@ -164,29 +167,33 @@ function App() {
             <>
               {step === 'car' && (
                 <>
-                  {/* Premium Hero */}
-                  <div className="mb-12 text-center">
-                    <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-1.5 text-xs font-semibold tracking-[1px] text-brand-700 shadow-sm ring-1 ring-brand-100">
-                      LIVE PRICES • FITMENT-FILTERED • VALUE-RANKED
+                  {/* Hero */}
+                  <div className="mb-12 pt-4 text-center sm:mb-16 sm:pt-8">
+                    <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50/60 px-4 py-1.5 text-xs font-semibold text-brand-700 dark:border-brand-900/40 dark:bg-brand-950/30 dark:text-brand-400">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-500 opacity-60" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
+                      </span>
+                      Live prices, filtered to your exact vehicle
                     </div>
 
-                    <h1 className="text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px] lg:text-7xl">
+                    <h1 className="mx-auto max-w-3xl text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px]">
                       The smartest way to buy car parts.
                     </h1>
 
-                    <p className="mx-auto mt-5 max-w-lg text-lg text-slate-600">
-                      Real-time prices from eBay and major retailers, filtered to fit your exact vehicle.
+                    <p className="mx-auto mt-5 max-w-lg text-balance text-base text-slate-600 sm:text-lg">
+                      Compare real-time listings from eBay and major retailers — matched to your year, make, model, and trim.
                     </p>
 
-                    <div className="mt-7 flex flex-wrap items-center justify-center gap-3 text-sm">
-                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-600 shadow-sm">
-                        <ShieldCheck size={15} className="text-brand-600" /> Verified fitment
+                    <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5 text-sm">
+                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
+                        <ShieldCheck size={14} className="text-brand-600" /> Fitment checked
                       </div>
-                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-600 shadow-sm">
-                        <Zap size={15} className="text-brand-600" /> Live pricing
+                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
+                        <Zap size={14} className="text-brand-600" /> Live pricing
                       </div>
-                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-slate-600 shadow-sm">
-                        <Tag size={15} className="text-brand-600" /> Best value ranked
+                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
+                        <Tag size={14} className="text-brand-600" /> Value ranked
                       </div>
                     </div>
                   </div>
@@ -228,19 +235,28 @@ function App() {
         </div>
       </main>
 
-      <footer className="border-t border-slate-200/80 bg-white/80">
-        <div className="mx-auto max-w-6xl px-6 py-8 text-center">
-          <div className="text-sm font-medium text-slate-600">CarPartsRadar</div>
-          <p className="mx-auto mt-2 max-w-lg text-xs text-slate-500">
-            We compare live listings from third-party marketplaces. Prices and availability are set by sellers and
-            may change — always confirm details on the retailer's site before buying.
-          </p>
-          <p className="mx-auto mt-2 max-w-lg text-xs text-slate-500">
-            Affiliate disclosure: some outbound links are affiliate links, meaning we may earn a commission if you
-            make a purchase — at no extra cost to you. As an Amazon Associate, CarPartsRadar earns from qualifying
-            purchases.
-          </p>
-          <p className="mt-3 text-xs text-slate-500">
+      <footer className="border-t border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/60">
+        <div className="mx-auto max-w-6xl px-6 py-10">
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-white">
+                <CarIcon size={16} strokeWidth={2.5} />
+              </span>
+              <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">CarPartsRadar</span>
+            </div>
+            <div className="max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-right">
+              <p>
+                We compare live listings from third-party marketplaces. Prices and availability are set by sellers
+                and may change — always confirm details on the retailer's site before buying.
+              </p>
+              <p>
+                Affiliate disclosure: some outbound links are affiliate links, meaning we may earn a commission if
+                you make a purchase — at no extra cost to you. As an Amazon Associate, CarPartsRadar earns from
+                qualifying purchases.
+              </p>
+            </div>
+          </div>
+          <p className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-400 dark:border-slate-800/60">
             © {new Date().getFullYear()} CarPartsRadar — Not affiliated with eBay, Amazon, or any retailer listed.
           </p>
         </div>
@@ -249,12 +265,18 @@ function App() {
       {/* Account Modal */}
       {showAccount && (
         <Modal label="Account settings" onClose={() => setShowAccount(false)} maxWidth="max-w-md">
-          <div className="p-6">
-            <h3 className="text-xl font-semibold mb-4">Account</h3>
-            
+          <div className="p-6 sm:p-7">
             {user ? (
               <div>
-                <p className="mb-4">Logged in as <strong>{user.name}</strong> ({user.email})</p>
+                <div className="mb-6 flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700 dark:bg-brand-950/40 dark:text-brand-400">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
+                    <p className="truncate text-xs text-slate-500">{user.email}</p>
+                  </div>
+                </div>
 
                 {accountData && (
                   <div className="mb-6">
@@ -263,22 +285,14 @@ function App() {
                       <button
                         type="button"
                         onClick={() => setAccountTab('searches')}
-                        className={`flex-1 pb-2.5 text-xs font-bold text-center border-b-2 transition ${
-                          accountTab === 'searches'
-                            ? 'border-brand-500 text-brand-500'
-                            : 'border-transparent text-slate-400 hover:text-slate-600'
-                        }`}
+                        className={`tab ${accountTab === 'searches' ? 'tab-active' : ''}`}
                       >
                         Saved Searches ({accountData.searches.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setAccountTab('alerts')}
-                        className={`flex-1 pb-2.5 text-xs font-bold text-center border-b-2 transition ${
-                          accountTab === 'alerts'
-                            ? 'border-brand-500 text-brand-500'
-                            : 'border-transparent text-slate-400 hover:text-slate-600'
-                        }`}
+                        className={`tab ${accountTab === 'alerts' ? 'tab-active' : ''}`}
                       >
                         Price Alerts ({accountData.alerts.length})
                       </button>
@@ -416,40 +430,69 @@ function App() {
                 </button>
               </div>
             ) : (
-              <div>
+              <form
+                onSubmit={(e) => e.preventDefault()}
+              >
+                <div className="mb-6 text-center">
+                  <h3 className="text-lg font-semibold tracking-tight text-slate-950">
+                    {isRegisterMode ? 'Create your account' : 'Welcome back'}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {isRegisterMode
+                      ? 'Save searches and get price-drop alerts.'
+                      : 'Sign in to your saved searches and alerts.'}
+                  </p>
+                </div>
+
                 {authError && (
-                  <p className="mb-3 text-xs font-semibold text-rose-600 bg-rose-50 p-3 rounded-2xl border border-rose-100 animate-fade-in">
+                  <p className="mb-4 animate-fade-in rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs font-medium text-rose-700">
                     {authError}
                   </p>
                 )}
 
                 {isRegisterMode && (
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    className="field mb-3"
-                    value={signupName}
-                    onChange={(e) => setSignupName(e.target.value)}
-                  />
+                  <div className="mb-3">
+                    <label htmlFor="auth-name" className="field-label">Full name</label>
+                    <input
+                      id="auth-name"
+                      type="text"
+                      autoComplete="name"
+                      placeholder="Jane Doe"
+                      className="field"
+                      value={signupName}
+                      onChange={(e) => setSignupName(e.target.value)}
+                    />
+                  </div>
                 )}
 
-                <input
-                  type="email"
-                  placeholder="Email"
-                  className="field mb-3"
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                />
+                <div className="mb-3">
+                  <label htmlFor="auth-email" className="field-label">Email</label>
+                  <input
+                    id="auth-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    className="field"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                  />
+                </div>
 
-                <input
-                  type="password"
-                  placeholder="Password"
-                  className="field mb-4"
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                />
+                <div className="mb-5">
+                  <label htmlFor="auth-password" className="field-label">Password</label>
+                  <input
+                    id="auth-password"
+                    type="password"
+                    autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
+                    placeholder="••••••••"
+                    className="field"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                  />
+                </div>
 
                 <button
+                  type="submit"
                   disabled={authLoading}
                   onClick={async () => {
                     const email = signupEmail.trim()
@@ -497,19 +540,23 @@ function App() {
                   {authLoading ? 'Please wait…' : isRegisterMode ? 'Create Account' : 'Sign In'}
                 </button>
 
-                <div className="mt-4 text-center">
+                <div className="mt-5 border-t border-slate-100 pt-4 text-center dark:border-slate-800/60">
                   <button
                     type="button"
                     onClick={() => {
                       setIsRegisterMode(!isRegisterMode)
                       setAuthError(null)
                     }}
-                    className="text-xs font-semibold text-brand-600 hover:text-brand-700 underline"
+                    className="text-xs font-medium text-slate-500 transition hover:text-brand-600"
                   >
-                    {isRegisterMode ? 'Already have an account? Sign In' : "Don't have an account? Register"}
+                    {isRegisterMode ? (
+                      <>Already have an account? <span className="font-semibold text-brand-600">Sign in</span></>
+                    ) : (
+                      <>Don't have an account? <span className="font-semibold text-brand-600">Create one</span></>
+                    )}
                   </button>
                 </div>
-              </div>
+              </form>
             )}
           </div>
         </Modal>
@@ -521,54 +568,49 @@ function App() {
 
 export default App
 
+// Honest value props only — no invented stats or testimonials. Everything
+// stated here is something the product actually does.
 function TrustBanner() {
+  const steps = [
+    {
+      icon: CarIcon,
+      title: 'Tell us your vehicle',
+      body: 'Year, make, and model come straight from the national NHTSA vehicle database — every trim, back to 1980.',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'We filter for fitment',
+      body: "Listings are matched against eBay's compatibility data for your exact vehicle, and we label anything we can't verify.",
+    },
+    {
+      icon: Tag,
+      title: 'Compare and buy direct',
+      body: 'Live prices with shipping and delivery estimates, ranked by value. You buy from the seller — we never mark up.',
+    },
+  ]
+
   return (
-    <div className="mt-16 border-t border-slate-200/60 pt-12">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 text-center sm:text-left">
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <div className="text-3xl font-extrabold tracking-tight text-slate-950">500,000+</div>
-          <div className="mt-1 text-sm font-semibold text-slate-500 uppercase tracking-wider">Parts compared daily</div>
-          <p className="mt-2 text-xs text-slate-500">Live inventory scans from top marketplaces and auto retailers.</p>
-        </div>
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <div className="text-3xl font-extrabold tracking-tight text-slate-950">NHTSA-Verified</div>
-          <div className="mt-1 text-sm font-semibold text-slate-500 uppercase tracking-wider">Fitment accuracy</div>
-          <p className="mt-2 text-xs text-slate-500">OEM specs cross-referenced with national vehicle manufacturer databases.</p>
-        </div>
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <div className="text-3xl font-extrabold tracking-tight text-slate-950">Real-Time</div>
-          <div className="mt-1 text-sm font-semibold text-slate-500 uppercase tracking-wider">Price updates</div>
-          <p className="mt-2 text-xs text-slate-500">Prices updated instantly. In-memory queries prevent slow loads.</p>
-        </div>
+    <div className="mt-20 border-t border-slate-200/60 pt-14 dark:border-slate-800/60">
+      <div className="text-center">
+        <p className="eyebrow text-brand-600 dark:text-brand-400">How it works</p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+          From vehicle to best price in three steps
+        </h2>
       </div>
 
-      {/* Customer Reviews Section */}
-      <div className="mt-16 text-center">
-        <h3 className="text-xs font-bold tracking-[1.5px] text-brand-600 uppercase">User Testimonials</h3>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-950 mt-2">Loved by DIYers & Professionals</h2>
-        
-        <div className="mt-8 grid gap-6 md:grid-cols-2 text-left">
-          <blockquote className="rounded-3xl bg-slate-50 p-6 border border-slate-200/50">
-            <p className="text-sm italic text-slate-700 leading-relaxed">
-              "CarPartsRadar saved me over $120 on front brake rotors for my Lexus LX. It scanned eBay, mapped it to my exact trim, and let me buy direct from a highly rated seller."
-            </p>
-            <cite className="mt-4 block not-italic">
-              <span className="block text-sm font-semibold text-slate-900">Arthur M.</span>
-              <span className="block text-xs text-slate-400">DIY Mechanic & Car Owner</span>
-            </cite>
-          </blockquote>
-          
-          <blockquote className="rounded-3xl bg-slate-50 p-6 border border-slate-200/50">
-            <p className="text-sm italic text-slate-700 leading-relaxed">
-              "As a mobile mechanic, I use this tool on my tablet to compare prices for clients right in their driveways. The fitment checks have kept me from ordering wrong parts."
-            </p>
-            <cite className="mt-4 block not-italic">
-              <span className="block text-sm font-semibold text-slate-900">Sarah K.</span>
-              <span className="block text-xs text-slate-400">Mobile Auto Technician</span>
-            </cite>
-          </blockquote>
-        </div>
+      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+        {steps.map((s, i) => (
+          <div key={s.title} className="card relative p-6">
+            <span className="absolute right-5 top-5 text-4xl font-semibold tracking-tight text-slate-100 dark:text-slate-800" aria-hidden>
+              {i + 1}
+            </span>
+            <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">
+              <s.icon size={18} strokeWidth={2} />
+            </div>
+            <h3 className="mt-4 text-sm font-semibold text-slate-900">{s.title}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{s.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   )

@@ -165,8 +165,8 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
 
       {/* My Garage */}
       {garage.length > 0 && (
-        <div className="mb-6 border-b border-slate-100 pb-5">
-          <h3 className="text-xs font-bold tracking-[1.2px] text-slate-400 uppercase mb-3">My Garage</h3>
+        <div className="mt-6 border-b border-slate-100 pb-6 dark:border-slate-800/60">
+          <h3 className="eyebrow mb-3">My Garage</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {garage.map((c, i) => (
               <div
@@ -207,13 +207,14 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       )}
 
       {error && (
-        <p className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          <AlertCircle size={15} /> {error}
+        <p className="mt-4 flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700">
+          <AlertCircle size={15} className="shrink-0" />
+          Couldn't load vehicle data — check your connection and try again.
         </p>
       )}
 
-      <div className="mt-5">
-        <label className="mb-1.5 block text-sm font-semibold text-slate-700">Vehicle type</label>
+      <div className="mt-6">
+        <label className="field-label">Vehicle type</label>
         <div className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {vehicleTypeOptions.map((opt) => (
             <button
@@ -241,7 +242,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
           onChange={(v) => setYear(v)}
         />
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-slate-700">Make</label>
+          <label className="field-label">Make</label>
 
           {/* Single dropdown with Popular Makes at the top, then All Makes */}
           <Combobox
@@ -267,8 +268,8 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       </div>
 
       <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between">
-          <label className="block text-sm font-semibold text-slate-700">Trim (optional)</label>
+        <div className="mb-1.5 flex items-center justify-between">
+          <label className="field-label mb-0">Trim (optional)</label>
           {trim && (
             <button type="button" onClick={() => setTrim('')} className="text-xs font-medium text-brand-600 hover:text-brand-700">
               Clear selection
@@ -286,8 +287,10 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
                 <button
                   type="button"
                   onClick={() => setTrim('')}
-                  className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                    !trim ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 hover:border-slate-300'
+                  className={`rounded-xl border px-4 py-2.5 text-left text-sm font-medium transition ${
+                    !trim
+                      ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
+                      : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
                   Any trim
@@ -297,8 +300,10 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
                     key={t}
                     type="button"
                     onClick={() => setTrim(t)}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                      trim === t ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 hover:border-slate-300'
+                    className={`rounded-xl border px-4 py-2.5 text-left text-sm font-medium transition ${
+                      trim === t
+                        ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
+                        : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
                     {t}
@@ -337,7 +342,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
             type="button"
             onClick={() => addToGarage({ year, make, model, trim })}
             disabled={garage.some(c => c.year === year && c.make === make && c.model === model && c.trim === trim)}
-            className="btn btn-secondary px-3 py-1.5 text-xs shrink-0 self-center sm:self-end disabled:opacity-40"
+            className="btn btn-secondary btn-sm shrink-0 self-center sm:self-end disabled:opacity-40"
           >
             Save to Garage
           </button>
@@ -348,10 +353,10 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
         type="button"
         disabled={!canConfirm}
         onClick={() => onConfirm({ year, make, model, trim: trim.trim() })}
-        className="btn btn-primary mt-6 w-full px-6 py-3 sm:w-auto"
+        className="btn btn-primary btn-lg mt-6 w-full sm:w-auto"
       >
         Continue to parts
-        <ArrowRight size={16} strokeWidth={2.4} />
+        <ArrowRight size={16} strokeWidth={2.4} className="transition-transform group-hover:translate-x-0.5" />
       </button>
     </div>
   )

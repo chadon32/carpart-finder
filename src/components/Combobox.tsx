@@ -161,7 +161,7 @@ export function Combobox({
 
   return (
     <div className="relative">
-      {label && <label className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</label>}
+      {label && <label className="field-label">{label}</label>}
       <div className="relative">
         <input
           type="text"

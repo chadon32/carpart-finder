@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* The theme toggle sets .dark on <html>; make every dark: utility follow
+   that class instead of the OS media query so there's one source of truth. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
@@ -58,6 +62,56 @@ body {
 
 .dark body {
   @apply text-slate-200 bg-slate-950;
+}
+
+/* Respect users who prefer less motion: collapse all animation to instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Subtle, product-quality scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+.dark * {
+  scrollbar-color: rgb(51 65 85) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background-color: rgb(203 213 225);
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(51 65 85);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Brand-tinted selection */
+::selection {
+  background: rgb(15 118 110 / 0.15);
+}
+
+/* One consistent keyboard-focus treatment everywhere. Buttons/fields add
+   their own rings; this catches links, pills, and custom controls. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 @layer components {
@@ -149,12 +203,70 @@ body {
     @apply bg-brand-500 text-white shadow-sm hover:bg-brand-600;
   }
 
+  /* Button size modifiers — use instead of ad-hoc px/py per call site */
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-sm rounded-xl;
+  }
+
   .field {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-50;
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-50;
   }
 
   .dark .field {
     @apply border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-brand-500;
+  }
+
+  /* Form label — one source of truth for every input label in the app */
+  .field-label {
+    @apply mb-1.5 block text-sm font-semibold text-slate-700;
+  }
+
+  .dark .field-label {
+    @apply text-slate-300;
+  }
+
+  /* Section eyebrow — small uppercase heading above grouped content */
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-400;
+  }
+
+  /* Underline tab — used by PartSelector and the Account modal */
+  .tab {
+    @apply flex-1 border-b-2 border-transparent pb-2.5 text-center text-xs font-semibold text-slate-400 transition hover:text-slate-600;
+  }
+
+  .dark .tab {
+    @apply hover:text-slate-300;
+  }
+
+  .tab-active {
+    @apply border-brand-500 text-brand-600;
+  }
+
+  .dark .tab-active {
+    @apply text-brand-400;
+  }
+
+  /* Filter pill — the white ring-bordered controls in the results toolbar */
+  .filter-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 transition;
+  }
+
+  .dark .filter-pill {
+    @apply bg-slate-900 text-slate-400 ring-slate-800;
+  }
+
+  .filter-pill-active {
+    @apply bg-brand-600 text-white ring-brand-600;
+  }
+
+  /* Icon tile — the small rounded square holding an icon next to a heading */
+  .icon-tile {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl;
   }
 
   .badge {

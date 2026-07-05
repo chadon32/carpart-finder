@@ -122,26 +122,18 @@ export function PartSelector({
       )}
 
       {/* Switcher Tab */}
-      <div className="mt-6 flex border-b border-slate-100 mb-5">
+      <div className="mt-6 mb-5 flex border-b border-slate-100 dark:border-slate-800/60">
         <button
           type="button"
           onClick={() => setSearchMethod('name')}
-          className={`flex-1 pb-2.5 text-xs font-bold text-center border-b-2 transition ${
-            searchMethod === 'name'
-              ? 'border-brand-500 text-brand-500'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
+          className={`tab ${searchMethod === 'name' ? 'tab-active' : ''}`}
         >
           Search by Part Name
         </button>
         <button
           type="button"
           onClick={() => setSearchMethod('code')}
-          className={`flex-1 pb-2.5 text-xs font-bold text-center border-b-2 transition ${
-            searchMethod === 'code'
-              ? 'border-brand-500 text-brand-500'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
+          className={`tab ${searchMethod === 'code' ? 'tab-active' : ''}`}
         >
           Search by Error Code (OBD-II)
         </button>
@@ -162,7 +154,7 @@ export function PartSelector({
           </div>
 
           <div className="mt-6">
-            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Popular parts</p>
+            <p className="eyebrow mb-2.5">Popular parts</p>
             <div className="flex flex-wrap gap-2">
               {popularPartTypes.map((part) => (
                 <button key={part.name} type="button" onClick={() => onSelect(part.name)} className="chip">
@@ -175,8 +167,8 @@ export function PartSelector({
       ) : (
         <div className="space-y-5">
           <div>
-            <label htmlFor="dtc-input" className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">
-              DTC Error Code
+            <label htmlFor="dtc-input" className="field-label">
+              DTC error code
             </label>
             <div className="relative">
               <input
@@ -206,8 +198,8 @@ export function PartSelector({
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-3">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recommended Replacement Parts</div>
+              <div className="border-t border-slate-100 pt-3 dark:border-slate-800/60">
+                <div className="eyebrow mb-2">Recommended replacement parts</div>
                 <div className="flex flex-col gap-1.5">
                   {matchedDtc.parts.map((partName) => (
                     <button

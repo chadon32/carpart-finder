@@ -13,21 +13,21 @@ export function RecentSearches({
   if (searches.length === 0) return null
 
   return (
-    <div className="mt-8">
+    <div className="mt-10">
       <div className="mb-3 flex items-center justify-between px-1">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
           <Clock size={15} className="text-slate-400" />
           Recent searches
         </div>
-        <button 
-          type="button" 
-          onClick={onClear} 
-          className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-xs font-medium text-slate-500 transition-colors hover:text-slate-800 dark:hover:text-slate-200"
         >
           Clear all
         </button>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {searches.map((s) => (
           <button
             key={`${s.car.year}-${s.car.make}-${s.car.model}-${s.car.trim}-${s.part}-${s.at}`}

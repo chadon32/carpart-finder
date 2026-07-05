@@ -78,13 +78,13 @@ function isUsed(l: Listing) {
 
 function SkeletonCard() {
   return (
-    <li className="rounded-3xl border border-slate-200 bg-white p-5">
+    <li className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800">
       <div className="flex gap-5">
-        <div className="h-24 w-24 shrink-0 animate-shimmer rounded-3xl bg-slate-200" />
+        <div className="h-24 w-24 shrink-0 animate-shimmer rounded-xl bg-slate-200" />
         <div className="flex-1 space-y-3 py-1">
           <div className="h-4 w-3/4 animate-shimmer rounded bg-slate-200" />
           <div className="h-3 w-1/2 animate-shimmer rounded bg-slate-100" />
-          <div className="mt-4 h-8 w-2/3 animate-shimmer rounded-2xl bg-slate-100" />
+          <div className="mt-4 h-8 w-2/3 animate-shimmer rounded-lg bg-slate-100" />
         </div>
       </div>
     </li>
@@ -380,13 +380,13 @@ export function ResultsList({
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               {/* Condition Filter */}
-              <div className="inline-flex gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+              <div className="inline-flex gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
                 {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => setCondition(c)}
-                    className={`rounded-xl px-4 py-1.5 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}`}
+                    className={`rounded-full px-3.5 py-1 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
                   >
                     {c === 'all' ? 'All' : c}
                   </button>
@@ -394,7 +394,7 @@ export function ResultsList({
               </div>
 
               {/* Hide Overseas */}
-              <label className="flex cursor-pointer items-center gap-1.5 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
+              <label className="filter-pill cursor-pointer">
                 <input
                   type="checkbox"
                   checked={hideOverseas}
@@ -408,18 +408,14 @@ export function ResultsList({
               <button
                 type="button"
                 onClick={() => setFilterFastDelivery(!filterFastDelivery)}
-                className={`rounded-2xl px-4 py-1.5 text-xs font-semibold shadow-sm ring-1 transition ${
-                  filterFastDelivery
-                    ? 'bg-brand-500 text-white ring-brand-500'
-                    : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'
-                }`}
+                className={`filter-pill font-semibold ${filterFastDelivery ? 'filter-pill-active' : 'hover:bg-slate-50'}`}
               >
                 Arrives within a week
               </button>
 
               {/* Minimum Seller Rating */}
-              <div className="flex items-center gap-2 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
-                <span>Min Rating</span>
+              <div className="filter-pill gap-2">
+                <span>Min rating</span>
                 <input
                   type="range"
                   min="0"
@@ -430,12 +426,12 @@ export function ResultsList({
                   aria-label="Minimum seller rating percentage"
                   className="w-20 accent-brand-600"
                 />
-                <span className="font-mono w-8 text-right">{minRating}%</span>
+                <span className="w-8 text-right font-mono">{minRating}%</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-2xl bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200">
+              <div className="filter-pill">
                 <Truck size={14} className="text-slate-400" />
                 <input
                   type="text"
@@ -477,7 +473,7 @@ export function ResultsList({
             <div className="md:col-span-7 xl:col-span-8">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
                 <div>
-                  <div className="text-xs font-semibold tracking-[1.5px] text-brand-600">LIVE EBAY LISTINGS</div>
+                  <div className="eyebrow text-brand-600 dark:text-brand-400">Live eBay listings</div>
                   <div className="text-2xl font-semibold tracking-[-0.4px] text-slate-950">
                     {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
                     {priceRange && (
@@ -549,8 +545,8 @@ export function ResultsList({
                       )}
 
                       <div className="relative shrink-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-slate-900 text-[10px] font-bold text-white shadow">
-                          #{i + 1}
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
+                          {i + 1}
                         </div>
                         {listing.image ? (
                           <img
@@ -559,10 +555,10 @@ export function ResultsList({
                             loading="lazy"
                             width={96}
                             height={96}
-                            className="mt-3 h-24 w-24 rounded-3xl border border-slate-100 object-cover shadow-sm"
+                            className="mt-3 h-24 w-24 rounded-xl border border-slate-100 object-cover shadow-sm"
                           />
                         ) : (
-                          <div className="mt-3 flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-100 bg-slate-50 text-slate-300">
+                          <div className="mt-3 flex h-24 w-24 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-slate-300">
                             <Package size={30} strokeWidth={1.25} />
                           </div>
                         )}
@@ -592,7 +588,7 @@ export function ResultsList({
                         </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                          <span className="rounded-xl bg-slate-900 px-3 py-px text-xs font-semibold text-white">{listing.condition}</span>
+                          <span className="badge bg-slate-100 text-slate-700 px-2.5 py-0.5 text-[11px]">{listing.condition}</span>
                           <span className="font-medium">{listing.seller} · {listing.source}</span>
                           {listing.sellerFeedbackPercentage && (
                             <span className="inline-flex items-center gap-1 text-amber-600">
@@ -668,12 +664,12 @@ export function ResultsList({
             </div>
 
             <aside className="md:col-span-5 xl:col-span-4 space-y-6">
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="card p-6">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white"><Store size={18} /></div>
+                  <div className="icon-tile bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"><Store size={17} /></div>
                   <div>
                     <div className="font-semibold tracking-tight text-slate-950">Compare at other stores</div>
-                    <div className="text-xs text-slate-500">Opens search for your exact part</div>
+                    <div className="text-xs text-slate-500">Opens each store's search for this part</div>
                   </div>
                 </div>
 
@@ -688,20 +684,16 @@ export function ResultsList({
                         href={retailer.buildUrl(searchQuery)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                        className="group flex items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-700"
                       >
                         <span className="flex items-center gap-3">
                           <Icon size={17} className={retailer.color} />
                           {retailer.name}
                         </span>
-                        <ExternalLink size={15} className="text-slate-400 transition group-hover:text-brand-500" />
+                        <ExternalLink size={14} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
                       </a>
                     )
                   })}
-                </div>
-
-                <div className="mt-4 text-center text-xs text-slate-500">
-                  Opens each store's search for this exact part in a new tab
                 </div>
               </div>
 
@@ -798,10 +790,10 @@ function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: string; ta
   }
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="card p-6">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-          <Mail size={18} />
+        <div className="icon-tile bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
+          <Mail size={17} />
         </div>
         <div>
           <div className="font-semibold tracking-tight text-slate-950">Price drop alerts</div>
