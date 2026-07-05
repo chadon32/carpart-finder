@@ -11,8 +11,11 @@ import { getMakes, getModels } from '../server/nhtsa.js'
 import { getTrims } from '../server/ebayCompatibility.js'
 import { getCurrentPrices } from '../server/providers/ebay.js'
 import { getVehicleImage } from '../server/vehicleImages.js'
+import supabaseRoutes from '../server/routes/supabase.js'
+import { checkPriceAlerts } from '../server/workers/priceChecker.js'
 
 const app = express()
+app.use(express.json())
 
 // Secure CORS configuration
 const allowedOrigins = [
@@ -31,8 +34,8 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'))
   },
   credentials: true,
-  methods: ['GET'],
-  allowedHeaders: ['Content-Type'],
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 
 app.use((_req, res, next) => {
@@ -130,6 +133,26 @@ app.get('/api/vehicle-image', async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(502).json({ error: 'Failed to fetch data' })
+  }
+})
+
+// Supabase-backed routes (accounts, saved searches, price alerts)
+app.use('/api/supabase', supabaseRoutes)
+
+// Vercel Cron target (see vercel.json "crons"). Vercel sends
+// "Authorization: Bearer ${CRON_SECRET}" when that env var is set; reject
+// everything else so random visitors can't burn eBay quota on demand.
+app.get('/api/cron/check-alerts', async (req, res) => {
+  const secret = process.env.CRON_SECRET
+  if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  try {
+    const result = await checkPriceAlerts()
+    res.json(result)
+  } catch (err) {
+    console.error('[Cron] check-alerts failed:', err)
+    res.status(500).json({ error: 'Price check failed' })
   }
 })
 
