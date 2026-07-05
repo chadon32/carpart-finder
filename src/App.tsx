@@ -10,7 +10,7 @@ import { useCart } from './hooks/useCart'
 import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
 import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
-import { getSavedSearches, getPriceAlerts, signupUser, loginUser, deleteSavedSearch, deletePriceAlert } from './api/supabase'
+import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert } from './api/supabase'
 import { Modal } from './components/Modal'
 
 function App() {
@@ -41,7 +41,20 @@ function App() {
 
   const [user, setUser] = useState<{ name: string; email: string } | null>(() => {
     const saved = localStorage.getItem('carpartsradar-user')
-    return saved ? JSON.parse(saved) : null
+    if (!saved) return null
+    try {
+      const parsed = JSON.parse(saved)
+      // Pre-migration sessions stored a bearer token in localStorage; those
+      // can't authenticate under the httpOnly-cookie scheme. Drop them so the
+      // user re-logs in cleanly instead of appearing logged-in but broken.
+      if (parsed && 'token' in parsed) {
+        localStorage.removeItem('carpartsradar-user')
+        return null
+      }
+      return parsed
+    } catch {
+      return null
+    }
   })
   const [accountData, setAccountData] = useState<{ searches: any[]; alerts: any[] } | null>(null)
   const [signupName, setSignupName] = useState('')
@@ -420,6 +433,7 @@ function App() {
 
                 <button
                   onClick={() => {
+                    logoutUser() // clears the httpOnly auth cookie server-side
                     localStorage.removeItem('carpartsradar-user')
                     setUser(null)
                     setShowAccount(false)
@@ -523,11 +537,11 @@ function App() {
                         res = await loginUser({ email, password })
                       }
 
-                      // No session token means the Supabase project requires
-                      // email confirmation. Persisting a tokenless user would
-                      // look logged-in but 401 on every authed action, so
-                      // instead prompt them to confirm, then sign in.
-                      if (!res.token) {
+                      // No session (cookie) means the Supabase project requires
+                      // email confirmation. Persisting a user with no auth
+                      // cookie would look logged-in but 401 on every authed
+                      // action, so instead prompt them to confirm, then sign in.
+                      if (res.confirmationRequired) {
                         setIsRegisterMode(false)
                         setSignupPassword('')
                         setAuthNotice(
@@ -538,10 +552,11 @@ function App() {
                         return
                       }
 
+                      // The auth token is in an httpOnly cookie; localStorage
+                      // holds only non-sensitive display info.
                       const newUser = {
                         name: res.user?.user_metadata?.full_name || email.split('@')[0] || 'User',
                         email: res.user?.email || email,
-                        token: res.token
                       }
 
                       localStorage.setItem('carpartsradar-user', JSON.stringify(newUser))

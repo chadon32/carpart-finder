@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Listing } from '../api/client'
 
 export type CartItem = Listing & {
@@ -26,8 +26,33 @@ function loadCart(userEmail?: string): CartItem[] {
 export function useCart(userEmail?: string) {
   const [items, setItems] = useState<CartItem[]>(() => loadCart(userEmail))
 
-  // Refresh cart list when active user changes (e.g. login/logout)
+  const prevEmailRef = useRef<string | undefined>(userEmail)
+
+  // React to the active user changing (login/logout). On login specifically,
+  // fold any watchlist the visitor built as a guest into their account cart so
+  // items added before signing in aren't orphaned; then empty the guest key.
   useEffect(() => {
+    const prev = prevEmailRef.current
+    prevEmailRef.current = userEmail
+
+    if (!prev && userEmail) {
+      const guestItems = loadCart(undefined)
+      if (guestItems.length > 0) {
+        const userItems = loadCart(userEmail)
+        const merged = [...userItems]
+        for (const g of guestItems) {
+          if (!merged.some((u) => u.id === g.id)) merged.push(g)
+        }
+        setItems(merged)
+        try {
+          localStorage.removeItem(getStorageKey(undefined))
+        } catch {
+          /* ignore storage errors */
+        }
+        return
+      }
+    }
+
     setItems(loadCart(userEmail))
   }, [userEmail])
 

@@ -1,9 +1,35 @@
 import express from 'express'
 import crypto from 'node:crypto'
 import { supabase, supabaseAdmin, isMockMode } from '../supabase.js'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, AUTH_COOKIE } from '../middleware/auth.js'
 
 const router = express.Router()
+
+const AUTH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+// The auth token lives ONLY in an httpOnly cookie so page JavaScript (and thus
+// any XSS) can never read it. secure is on in production (HTTPS); off locally
+// so the cookie still works over http://localhost. sameSite=lax blocks it from
+// cross-site POSTs, which mitigates CSRF for these state-changing routes.
+function setAuthCookie(res, token) {
+  res.cookie(AUTH_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: AUTH_COOKIE_MAX_AGE,
+    path: '/',
+  })
+}
+
+function clearAuthCookie(res) {
+  // Match the attributes used when setting it so browsers reliably delete it.
+  res.clearCookie(AUTH_COOKIE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  })
+}
 
 // In-memory mock database for local development without Supabase keys
 const mockSavedSearches = []
@@ -82,7 +108,8 @@ router.post('/signup', async (req, res) => {
       email,
       user_metadata: { full_name: name || email.split('@')[0] || 'Mock User' }
     }
-    return res.json({ user: newUser, token: email })
+    setAuthCookie(res, email)
+    return res.json({ user: newUser })
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -101,9 +128,9 @@ router.post('/signup', async (req, res) => {
   // user but NO session, so there's no token. Signal that clearly instead of
   // handing back a tokenless "logged-in" state that 401s on every authed call.
   const token = data.session?.access_token || null
+  if (token) setAuthCookie(res, token)
   res.json({
     user: data.user,
-    token,
     confirmationRequired: !token,
   })
 })
@@ -123,7 +150,8 @@ router.post('/login', async (req, res) => {
       email,
       user_metadata: { full_name: email.split('@')[0] || 'Mock User' }
     }
-    return res.json({ user, token: email })
+    setAuthCookie(res, email)
+    return res.json({ user })
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -132,10 +160,19 @@ router.post('/login', async (req, res) => {
   })
 
   if (error) return res.status(400).json({ error: error.message })
+  const token = data.session?.access_token || null
+  if (token) setAuthCookie(res, token)
   res.json({
     user: data.user,
-    token: data.session?.access_token || null
+    confirmationRequired: !token,
   })
+})
+
+// Clear the auth cookie. Public (no requireAuth) so an expired session can
+// still log out cleanly.
+router.post('/logout', (_req, res) => {
+  clearAuthCookie(res)
+  res.json({ success: true })
 })
 
 // All routes below require authentication

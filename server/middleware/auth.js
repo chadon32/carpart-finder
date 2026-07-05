@@ -1,13 +1,27 @@
 import { supabase, isMockMode } from '../supabase.js'
 
-export async function requireAuth(req, res, next) {
+export const AUTH_COOKIE = 'cpf_token'
+
+// Prefer the httpOnly auth cookie (JS-unreadable, so safe from XSS token
+// theft). Fall back to the Authorization header for any client that hasn't
+// migrated yet. Returns the raw token string, or null.
+export function getAuthToken(req) {
+  const rawCookie = req.headers.cookie || ''
+  const match = rawCookie.match(/(?:^|;\s*)cpf_token=([^;]+)/)
+  if (match) return decodeURIComponent(match[1])
+
   const authHeader = req.headers.authorization
+  if (authHeader) return authHeader.replace('Bearer ', '').trim()
 
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Missing authorization header' })
+  return null
+}
+
+export async function requireAuth(req, res, next) {
+  const token = getAuthToken(req)
+
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' })
   }
-
-  const token = authHeader.replace('Bearer ', '')
 
   if (isMockMode) {
     // In mock mode, treat the token (email) as mock user info.

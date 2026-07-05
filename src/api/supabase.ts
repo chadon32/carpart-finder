@@ -11,31 +11,20 @@ export class ApiError extends Error {
   }
 }
 
-function getAuthHeader(): Record<string, string> {
-  const saved = localStorage.getItem('carpartsradar-user')
-  if (!saved) return {}
-  try {
-    const user = JSON.parse(saved)
-    const token = user.token || user.email || ''
-    return { 'Authorization': `Bearer ${token}` }
-  } catch {
-    return {}
-  }
-}
+// Auth is carried by an httpOnly cookie the server sets on login/signup, so
+// every request that needs it just has to opt into sending cookies. The token
+// is never exposed to JS, so there's no Authorization header to build here.
+const withCreds: RequestInit = { credentials: 'include' }
 
 export async function getCurrentUser() {
-  const res = await fetch(`${API_BASE}/me`, {
-    headers: { ...getAuthHeader() }
-  })
-  if (!res.ok) throw new Error('Failed to fetch user')
+  const res = await fetch(`${API_BASE}/me`, { ...withCreds })
+  if (!res.ok) throw new ApiError('Failed to fetch user', res.status)
   return res.json()
 }
 
 export async function getSavedSearches() {
-  const res = await fetch(`${API_BASE}/saved-searches`, {
-    headers: { ...getAuthHeader() }
-  })
-  if (!res.ok) throw new Error('Failed to fetch saved searches')
+  const res = await fetch(`${API_BASE}/saved-searches`, { ...withCreds })
+  if (!res.ok) throw new ApiError('Failed to fetch saved searches', res.status)
   return res.json()
 }
 
@@ -47,11 +36,9 @@ export async function saveSearch(search: {
   part: string
 }) {
   const res = await fetch(`${API_BASE}/saved-searches`, {
+    ...withCreds,
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeader()
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(search)
   })
   if (!res.ok) throw new ApiError('Failed to save search', res.status)
@@ -60,27 +47,25 @@ export async function saveSearch(search: {
 
 export async function deleteSavedSearch(id: string) {
   const res = await fetch(`${API_BASE}/saved-searches/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { ...getAuthHeader() }
+    ...withCreds,
+    method: 'DELETE'
   })
-  if (!res.ok) throw new Error('Failed to delete saved search')
+  if (!res.ok) throw new ApiError('Failed to delete saved search', res.status)
   return res.json()
 }
 
 export async function deletePriceAlert(id: string) {
   const res = await fetch(`${API_BASE}/price-alerts/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { ...getAuthHeader() }
+    ...withCreds,
+    method: 'DELETE'
   })
-  if (!res.ok) throw new Error('Failed to delete price alert')
+  if (!res.ok) throw new ApiError('Failed to delete price alert', res.status)
   return res.json()
 }
 
 export async function getPriceAlerts() {
-  const res = await fetch(`${API_BASE}/price-alerts`, {
-    headers: { ...getAuthHeader() }
-  })
-  if (!res.ok) throw new Error('Failed to fetch price alerts')
+  const res = await fetch(`${API_BASE}/price-alerts`, { ...withCreds })
+  if (!res.ok) throw new ApiError('Failed to fetch price alerts', res.status)
   return res.json()
 }
 
@@ -89,20 +74,17 @@ export async function createPriceAlert(alert: {
   target_price: number
 }) {
   const res = await fetch(`${API_BASE}/price-alerts`, {
+    ...withCreds,
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeader()
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(alert)
   })
-  if (!res.ok) throw new Error('Failed to create price alert')
+  if (!res.ok) throw new ApiError('Failed to create price alert', res.status)
   return res.json()
 }
 
 type AuthResponse = {
   user?: { email?: string; user_metadata?: { full_name?: string } }
-  token?: string | null
   confirmationRequired?: boolean
 }
 
@@ -112,6 +94,7 @@ export async function signupUser(user: {
   name?: string
 }): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/signup`, {
+    ...withCreds,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(user),
@@ -128,6 +111,7 @@ export async function loginUser(credentials: {
   password?: string
 }): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/login`, {
+    ...withCreds,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials),
@@ -137,4 +121,14 @@ export async function loginUser(credentials: {
     throw new Error(errorData.error || 'Failed to log in')
   }
   return res.json()
+}
+
+// Clears the server-side auth cookie. Best-effort: a network failure here
+// shouldn't block the client-side logout.
+export async function logoutUser(): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/logout`, { ...withCreds, method: 'POST' })
+  } catch {
+    /* ignore — client state is cleared regardless */
+  }
 }
