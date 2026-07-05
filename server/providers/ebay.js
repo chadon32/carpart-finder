@@ -51,14 +51,17 @@ export async function getCurrentPrices(ids) {
 const BASE_FILTER =
   'buyingOptions:{FIXED_PRICE},itemLocationCountry:US,deliveryCountry:US,conditionIds:{1000|1500|2000|2500|3000}'
 
-async function runSearch(token, { q, categoryId, compatibilityFilter, zip }) {
+async function runSearch(token, { q, categoryId, compatibilityFilter, zip, sort = 'price' }) {
   const params = new URLSearchParams({
     q,
-    sort: 'price',
     limit: '50',
     fieldgroups: 'EXTENDED',
     filter: BASE_FILTER,
   })
+  // Omitting the sort param gives eBay's Best Match relevance ranking, which
+  // buries the cheap accessory spam (screw kits, covers) that dominates a
+  // price-ascending page. Quotes use this; the browse UI keeps price sort.
+  if (sort !== 'relevance') params.set('sort', 'price')
   if (categoryId) params.set('category_ids', categoryId)
   if (compatibilityFilter) params.set('compatibility_filter', compatibilityFilter)
 
@@ -123,7 +126,7 @@ function mapItem(item, { verifiedFitment }) {
 }
 
 // ctx: { year, make, model, trim, part, query }
-export async function search(ctx, { limit = 10 } = {}) {
+export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
   const token = await getAccessToken()
 
   const categoryId = ctx.part ? categoryForPart(ctx.part) : undefined
@@ -139,9 +142,9 @@ export async function search(ctx, { limit = 10 } = {}) {
   // for vehicles/parts eBay has thin fitment data on.
   const zip = ctx.zip
   const attempts = [
-    { q, categoryId, compatibilityFilter, zip },
-    { q, categoryId, zip },
-    { q: ctx.query, categoryId: undefined, compatibilityFilter: undefined, zip },
+    { q, categoryId, compatibilityFilter, zip, sort },
+    { q, categoryId, zip, sort },
+    { q: ctx.query, categoryId: undefined, compatibilityFilter: undefined, zip, sort },
   ]
 
   let items = []

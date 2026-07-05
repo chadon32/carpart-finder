@@ -13,6 +13,7 @@ import { getCurrentPrices } from '../server/providers/ebay.js'
 import { getVehicleImage } from '../server/vehicleImages.js'
 import supabaseRoutes from '../server/routes/supabase.js'
 import { checkPriceAlerts } from '../server/workers/priceChecker.js'
+import { diagnoseSymptom } from '../server/symptoms.js'
 
 const app = express()
 app.use(express.json())
@@ -64,6 +65,8 @@ const searchLimiter = rateLimit({
 })
 
 app.use('/api/search', searchLimiter)
+// Quote runs one provider search per part, so it shares the same budget.
+app.use('/api/quote', searchLimiter)
 
 app.get('/api/makes', async (req, res) => {
   try {
@@ -153,6 +156,122 @@ app.get('/api/cron/check-alerts', async (req, res) => {
   } catch (err) {
     console.error('[Cron] check-alerts failed:', err)
     res.status(500).json({ error: 'Price check failed' })
+  }
+})
+
+// Free-text symptom → likely parts. Pure local keyword matching against a
+// curated knowledge base (server/symptoms.js) — instant, no external calls.
+app.get('/api/diagnose', (req, res) => {
+  const symptom = String(req.query.symptom || '').trim()
+  if (!symptom) {
+    return res.status(400).json({ error: 'symptom query param is required' })
+  }
+  res.json({ matches: diagnoseSymptom(symptom) })
+})
+
+// The cheapest raw search hit is often an accessory (a $7 "rotor screw" for a
+// "Brake Rotors" search), so a quote that auto-picks one listing must check
+// the title actually names the part. Tokens match by prefix so "pad" ≈ "pads".
+const QUOTE_STOPWORDS = new Set(['and', 'the', 'of', 'for', 'with', 'kit', 'set'])
+const QUOTE_ACCESSORY_WORDS = [
+  'screw', 'bolt', 'clip', 'pin', 'washer', 'retainer', 'grommet', 'bracket',
+  'decal', 'sticker', 'emblem', 'shim', 'grease', 'cleaner', 'paint', 'tool',
+  'gauge', 'sensor', 'switch', 'connector', 'wire', 'harness', 'relay', 'fuse', 'cap',
+  // Novelty/cosmetic add-ons and damaged goods that undercut real parts
+  'cover', 'universal', 'pedal', 'defect', 'damaged', 'broken', 'cracked',
+]
+
+function pickListingForPart(results, part) {
+  const partTokens = part
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2 && !QUOTE_STOPWORDS.has(t))
+    .map((t) => t.replace(/s$/, ''))
+  if (partTokens.length === 0) return results[0] || null
+
+  // All tokens must appear for short names; allow one miss for longer ones
+  // ("Sway Bar End Links" should still match a "Sway Bar Link" title).
+  const required = partTokens.length >= 3 ? partTokens.length - 1 : partTokens.length
+  // Accessory words only disqualify a title when they're not part of what was
+  // asked for (an "Oxygen Sensor" quote may of course contain "sensor").
+  const blocked = QUOTE_ACCESSORY_WORDS.filter((w) => !partTokens.some((t) => t.startsWith(w) || w.startsWith(t)))
+
+  const candidates = results.filter((r) => {
+    // Never quote broken/for-parts listings, however cheap.
+    if (/parts only|not working/i.test(r.condition || '')) return false
+    const titleTokens = r.title.toLowerCase().split(/[^a-z0-9]+/).map((t) => t.replace(/s$/, ''))
+    const hits = partTokens.filter((pt) => titleTokens.some((tt) => tt.startsWith(pt))).length
+    if (hits < required) return false
+    return !titleTokens.some((tt) => blocked.includes(tt))
+  })
+
+  if (candidates.length === 0) return null
+  // Prefer listings eBay's compatibility engine verified for this exact
+  // vehicle; only fall back to unverified keyword matches when there are none.
+  const verified = candidates.filter((r) => r.verifiedFitment !== false)
+  const pool = verified.length > 0 ? verified : candidates
+  return pool.reduce((best, r) => {
+    const total = r.price + (r.shippingCost || 0)
+    return total < best.total ? { total, listing: r } : best
+  }, { total: Infinity, listing: null }).listing
+}
+
+// Price a list of parts for one vehicle: cheapest fitting listing per part
+// (by price + shipping, matching how the results UI ranks value) plus totals.
+app.get('/api/quote', async (req, res) => {
+  const { year, make, model, trim, zip } = req.query
+  const parts = String(req.query.parts || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+
+  if (!year || !make || !model || parts.length === 0) {
+    return res.status(400).json({ error: 'year, make, model, and parts query params are required' })
+  }
+  const cleanZip = zip && /^\d{5}$/.test(String(zip)) ? String(zip) : undefined
+
+  try {
+    const items = await Promise.all(
+      parts.map(async (part) => {
+        try {
+          const { results } = await searchCheapestListings({
+            year: String(year),
+            make: String(make),
+            model: String(model),
+            trim: trim ? String(trim) : undefined,
+            part,
+            zip: cleanZip,
+            // Take the provider's full page (eBay returns 50 per call no
+            // matter what): the relevance filter below discards cheap
+            // accessory listings (screw kits, covers), so we want the
+            // deepest candidate pool the same single API call can give.
+            limit: 50,
+            // Best Match ranking: a price-ascending page for parts like
+            // rotors is 100% screw kits — real parts never appear at all.
+            sort: 'relevance',
+          })
+          return { part, listing: pickListingForPart(results, part) }
+        } catch {
+          return { part, listing: null, error: true }
+        }
+      })
+    )
+
+    const priced = items.filter((i) => i.listing)
+    const subtotal = priced.reduce((s, i) => s + i.listing.price, 0)
+    const shipping = priced.reduce((s, i) => s + (i.listing.shippingCost || 0), 0)
+
+    res.json({
+      items,
+      subtotal: Number(subtotal.toFixed(2)),
+      shipping: Number(shipping.toFixed(2)),
+      total: Number((subtotal + shipping).toFixed(2)),
+      currency: 'USD',
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
 

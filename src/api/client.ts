@@ -75,6 +75,55 @@ export function fetchPrices(ids: string[]): Promise<{ prices: Record<string, Pri
   return getJson(`/api/prices?${params.toString()}`)
 }
 
+export type SymptomPart = {
+  name: string
+  why: string
+  priority: 'likely' | 'possible'
+}
+
+export type DiagnosisMatch = {
+  id: string
+  title: string
+  system: string
+  summary: string
+  safety: string | null
+  score: number
+  parts: SymptomPart[]
+}
+
+export function diagnoseProblem(symptom: string): Promise<{ matches: DiagnosisMatch[] }> {
+  const params = new URLSearchParams({ symptom })
+  return getJson(`/api/diagnose?${params.toString()}`)
+}
+
+export type QuoteItem = {
+  part: string
+  listing: Listing | null
+  error?: boolean
+}
+
+export type QuoteResponse = {
+  items: QuoteItem[]
+  subtotal: number
+  shipping: number
+  total: number
+  currency: string
+}
+
+export function fetchQuote(
+  year: string,
+  make: string,
+  model: string,
+  parts: string[],
+  trim?: string,
+  zip?: string
+): Promise<QuoteResponse> {
+  const params = new URLSearchParams({ year, make, model, parts: parts.join(',') })
+  if (trim) params.set('trim', trim)
+  if (zip) params.set('zip', zip)
+  return getJson(`/api/quote?${params.toString()}`)
+}
+
 export function searchParts(
   year: string,
   make: string,

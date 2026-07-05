@@ -27,12 +27,13 @@ function evictOldestIfNeeded() {
 
 
 // ==================== MAIN SEARCH FUNCTION ====================
-export async function searchCheapestListings({ year, make, model, trim, part, zip, limit = 15 }) {
+export async function searchCheapestListings({ year, make, model, trim, part, zip, limit = 15, sort = 'price' }) {
   const query = `${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part}`.trim()
   const ctx = { year, make, model, trim, part, zip, query }
 
-  // Delivery estimates vary by ZIP, so the cache key must include it.
-  const cacheKey = `${query}::${limit}::${zip || ''}`.toLowerCase()
+  // Delivery estimates vary by ZIP and the result set varies by sort, so the
+  // cache key must include both.
+  const cacheKey = `${query}::${limit}::${zip || ''}::${sort}`.toLowerCase()
   const cached = cache.get(cacheKey)
 
   if (cached && Date.now() < cached.expiresAt) {
@@ -60,7 +61,7 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
       }
 
       // Fetch more than we need per provider so the merged, deduped list can still fill `limit`.
-      const settled = await Promise.allSettled(active.map((p) => p.module.search(ctx, { limit: limit + 10 })))
+      const settled = await Promise.allSettled(active.map((p) => p.module.search(ctx, { limit: limit + 10, sort })))
 
       const providerErrors = {}
       let allResults = []
