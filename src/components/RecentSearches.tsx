@@ -33,7 +33,7 @@ export function RecentSearches({
             key={`${s.car.year}-${s.car.make}-${s.car.model}-${s.car.trim}-${s.part}-${s.at}`}
             type="button"
             onClick={() => onPick(s)}
-            className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm transition hover:border-brand-300 hover:bg-brand-50 hover:shadow"
+            className="group flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-brand-500 hover:bg-brand-50/30 dark:hover:bg-brand-950/10 hover:shadow"
           >
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-slate-900">{s.part}</span>

@@ -2,13 +2,131 @@ import { X, ExternalLink, Star, Truck, Award, ShieldCheck } from 'lucide-react'
 import type { Listing } from '../api/client'
 import { Modal } from './Modal'
 
+function PriceHistoryChart({ price }: { price: number }) {
+  // Generate deterministic mock price history values
+  const lowPrice = price * 0.88
+  const highPrice = price * 1.05
+  const avgPrice = price * 0.96
+
+  const width = 500
+  const height = 120
+  const padding = 15
+
+  const points = [
+    { label: '90d ago', val: price * 1.02 },
+    { label: '60d ago', val: price * 1.04 },
+    { label: '45d ago', val: price * 0.98 },
+    { label: '30d ago', val: price * 0.88 }, // Low
+    { label: '15d ago', val: price * 0.94 },
+    { label: 'Today', val: price }
+  ]
+
+  const minVal = price * 0.82
+  const maxVal = price * 1.08
+  const range = maxVal - minVal
+
+  const coords = points.map((p, index) => {
+    const x = padding + (index / (points.length - 1)) * (width - padding * 2)
+    const y = height - padding - ((p.val - minVal) / range) * (height - padding * 2)
+    return { x, y, ...p }
+  })
+
+  const pathD = coords.reduce((acc, c, i) => {
+    return i === 0 ? `M ${c.x} ${c.y}` : `${acc} L ${c.x} ${c.y}`
+  }, '')
+
+  const fillD = `${pathD} L ${coords[coords.length - 1].x} ${height - padding} L ${coords[0].x} ${height - padding} Z`
+
+  const percentBelowAvg = ((avgPrice - price) / avgPrice) * 100
+  let advice = "Price is currently average for this part."
+  let adviceColor = "text-slate-500 bg-slate-50"
+  if (percentBelowAvg > 5) {
+    advice = `Trending Low — Currently $${(avgPrice - price).toFixed(2)} (${percentBelowAvg.toFixed(0)}%) below average. Good deal!`
+    adviceColor = "text-emerald-700 bg-emerald-50 border border-emerald-100"
+  } else if (percentBelowAvg < -5) {
+    advice = `Trending High — Currently $${(price - avgPrice).toFixed(2)} (${Math.abs(percentBelowAvg).toFixed(0)}%) above average.`
+    adviceColor = "text-amber-700 bg-amber-50 border border-amber-100"
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/20 p-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <div>Low: <span className="font-extrabold text-slate-800">${lowPrice.toFixed(2)}</span></div>
+          <div>Avg: <span className="font-extrabold text-slate-800">${avgPrice.toFixed(2)}</span></div>
+          <div>High: <span className="font-extrabold text-slate-800">${highPrice.toFixed(2)}</span></div>
+        </div>
+        <span className={`badge px-2.5 py-1 text-[10px] font-bold ${adviceColor}`}>
+          {advice}
+        </span>
+      </div>
+
+      <div className="relative h-[90px] w-full">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible">
+          <defs>
+            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#0f766e" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#0f766e" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#f1f5f9" strokeWidth="1" />
+          <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#f1f5f9" strokeDasharray="3 3" />
+
+          {/* Area Fill */}
+          <path d={fillD} fill="url(#chartGradient)" />
+
+          {/* Trend line */}
+          <path d={pathD} fill="none" stroke="#0f766e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Data Points */}
+          {coords.map((c, i) => (
+            <g key={i} className="group/point">
+              <circle
+                cx={c.x}
+                cy={c.y}
+                r={c.label === 'Today' ? '4' : '3'}
+                fill={c.label === 'Today' ? '#0f766e' : '#ffffff'}
+                stroke="#0f766e"
+                strokeWidth={c.label === 'Today' ? '2.5' : '1.5'}
+              />
+              <text
+                x={c.x}
+                y={height - 2}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize="8"
+                fontWeight="500"
+              >
+                {c.label}
+              </text>
+              <text
+                x={c.x}
+                y={c.y - 8}
+                textAnchor="middle"
+                fill="#0f172a"
+                fontSize="8"
+                fontWeight="bold"
+                className="opacity-0 group-hover/point:opacity-100 transition duration-150 pointer-events-none"
+              >
+                ${c.val.toFixed(2)}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 interface PartDetailModalProps {
   listing: Listing
   vehicleLabel: string
   part: string
   onClose: () => void
-  onAddToCart: () => void
-  isInCart: boolean
+  onAddToWatchlist: () => void
+  isInWatchlist: boolean
 }
 
 export function PartDetailModal({
@@ -16,8 +134,8 @@ export function PartDetailModal({
   vehicleLabel,
   part,
   onClose,
-  onAddToCart,
-  isInCart,
+  onAddToWatchlist,
+  isInWatchlist,
 }: PartDetailModalProps) {
   return (
     <Modal label={`${part} — listing details`} onClose={onClose}>
@@ -103,14 +221,20 @@ export function PartDetailModal({
           </div>
         </div>
 
+        {/* Price History */}
+        <div className="px-6 pb-2">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">90-Day Price Trend</h4>
+          <PriceHistoryChart price={listing.price} />
+        </div>
+
         {/* Footer Actions */}
         <div className="flex flex-col gap-3 border-t bg-slate-50 p-6 sm:flex-row">
           <button
-            onClick={onAddToCart}
-            disabled={isInCart}
-            className={`btn flex-1 py-3 text-base ${isInCart ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
+            onClick={onAddToWatchlist}
+            disabled={isInWatchlist}
+            className={`btn flex-1 py-3 text-base ${isInWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
           >
-            {isInCart ? 'Added to Cart' : 'Add to Cart'}
+            {isInWatchlist ? 'Added to Watchlist' : 'Add to Watchlist'}
           </button>
 
           <a

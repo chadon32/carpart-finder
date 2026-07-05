@@ -8,23 +8,34 @@ export type CartItem = Listing & {
   part: string
 }
 
-const STORAGE_KEY = 'car-part-finder-cart'
+function getStorageKey(userEmail?: string): string {
+  const cleanEmail = userEmail ? userEmail.replace(/[^a-zA-Z0-9]/g, '_') : 'guest'
+  return `car-part-finder-cart-${cleanEmail}`
+}
 
-function loadCart(): CartItem[] {
+function loadCart(userEmail?: string): CartItem[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const key = getStorageKey(userEmail)
+    const raw = localStorage.getItem(key)
     return raw ? JSON.parse(raw) : []
   } catch {
     return []
   }
 }
 
-export function useCart() {
-  const [items, setItems] = useState<CartItem[]>(() => loadCart())
+export function useCart(userEmail?: string) {
+  const [items, setItems] = useState<CartItem[]>(() => loadCart(userEmail))
 
+  // Refresh cart list when active user changes (e.g. login/logout)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-  }, [items])
+    setItems(loadCart(userEmail))
+  }, [userEmail])
+
+  // Save changes whenever items list or user changes
+  useEffect(() => {
+    const key = getStorageKey(userEmail)
+    localStorage.setItem(key, JSON.stringify(items))
+  }, [items, userEmail])
 
   const addItem = (listing: Listing, carLabel: string, part: string) => {
     setItems((prev) => {

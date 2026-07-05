@@ -16,6 +16,8 @@ import {
   Store,
   Package,
   ShieldCheck,
+  Share2,
+  Mail,
 } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { searchParts, type Listing } from '../api/client'
@@ -23,6 +25,7 @@ import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
 import { PartDetailModal } from './PartDetailModal'
+import { saveSearch } from '../api/supabase'
 import { ComparisonModal } from './ComparisonModal'
 
 type SortKey = 'value' | 'price' | 'rating'
@@ -41,16 +44,23 @@ const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric
 
 function deliveryLabel(l: Listing) {
   if (!l.deliveryMin && !l.deliveryMax) return null
-  const min = l.deliveryMin ? new Date(l.deliveryMin) : null
-  const max = l.deliveryMax ? new Date(l.deliveryMax) : null
-  if (min && max && min.toDateString() !== max.toDateString()) {
-    if (min.getMonth() === max.getMonth()) {
-      return `Arrives ${dateFmt.format(min)}–${max.getDate()}`
+  try {
+    const min = l.deliveryMin ? new Date(l.deliveryMin) : null
+    const max = l.deliveryMax ? new Date(l.deliveryMax) : null
+    if (min && isNaN(min.getTime())) return null
+    if (max && isNaN(max.getTime())) return null
+
+    if (min && max && min.toDateString() !== max.toDateString()) {
+      if (min.getMonth() === max.getMonth()) {
+        return `Arrives ${dateFmt.format(min)}–${max.getDate()}`
+      }
+      return `Arrives ${dateFmt.format(min)}–${dateFmt.format(max)}`
     }
-    return `Arrives ${dateFmt.format(min)}–${dateFmt.format(max)}`
+    const d = max || min
+    return d ? `Arrives ${dateFmt.format(d)}` : null
+  } catch {
+    return null
   }
-  const d = max || min
-  return d ? `Arrives ${dateFmt.format(d)}` : null
 }
 
 function shippingLabel(l: Listing) {
@@ -86,15 +96,15 @@ export function ResultsList({
   part,
   onBackToPart,
   onBackToCar,
-  onAddToCart,
-  isInCart,
+  onAddToWatchlist,
+  isInWatchlist,
 }: {
   car: Car
   part: string
   onBackToPart: () => void
   onBackToCar: () => void
-  onAddToCart: (listing: Listing) => void
-  isInCart: (listingId: string) => boolean
+  onAddToWatchlist: (listing: Listing) => void
+  isInWatchlist: (listingId: string) => boolean
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +117,12 @@ export function ResultsList({
   const [condition, setCondition] = usePersistedState<ConditionFilter>('cpf-condition', 'all')
   const [hideOverseas, setHideOverseas] = usePersistedState<boolean>('cpf-hide-overseas', false)
   const [zip, setZip] = usePersistedState<string>('cpf-zip', '')
+  const [zipInput, setZipInput] = useState(zip)
+
+  // Sync if zip is changed externally (e.g. clear filters)
+  useEffect(() => {
+    setZipInput(zip)
+  }, [zip])
 
   // Real filters only: fast delivery uses eBay's actual delivery estimates,
   // min rating uses real seller feedback percentages.
@@ -118,6 +134,12 @@ export function ResultsList({
   const [showCompareModal, setShowCompareModal] = useState(false)
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const bestPrice = useMemo(() => {
+    if (results.length === 0) return 0
+    return Math.min(...results.map((r) => r.price))
+  }, [results])
 
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
 
@@ -142,6 +164,53 @@ export function ResultsList({
       cancelled = true
     }
   }, [car, part, reloadKey, effectiveZip])
+
+  // Dynamic JSON-LD Structured Schema Injection for SEO snippets
+  useEffect(() => {
+    if (results.length === 0) return
+
+    const prices = results.map((r) => r.price)
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      'name': `${car.year} ${car.make} ${car.model} ${part}`,
+      'description': `Compare real-time price offers for ${part} on ${car.year} ${car.make} ${car.model} across multiple auto parts stores.`,
+      'offers': {
+        '@type': 'AggregateOffer',
+        'priceCurrency': 'USD',
+        'lowPrice': minPrice.toFixed(2),
+        'highPrice': maxPrice.toFixed(2),
+        'offerCount': results.length,
+        'offers': results.map((r) => ({
+          '@type': 'Offer',
+          'price': r.price.toFixed(2),
+          'priceCurrency': 'USD',
+          'url': r.link,
+          'itemCondition': r.condition === 'new' ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition',
+          'seller': {
+            '@type': 'Organization',
+            'name': r.seller || r.source
+          }
+        }))
+      }
+    }
+
+    const script = document.createElement('script')
+    script.id = 'jsonld-schema'
+    script.type = 'application/ld+json'
+    script.innerHTML = JSON.stringify(schema)
+    document.head.appendChild(script)
+
+    return () => {
+      const existing = document.getElementById('jsonld-schema')
+      if (existing) {
+        document.head.removeChild(existing)
+      }
+    }
+  }, [results, car, part])
 
   const bestValueId = useMemo(() => {
     if (results.length === 0) return null
@@ -202,6 +271,37 @@ export function ResultsList({
           </button>
           <button type="button" onClick={onBackToCar} className="btn btn-ghost px-2.5 py-1.5">
             Vehicle
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                await saveSearch({
+                  year: car.year,
+                  make: car.make,
+                  model: car.model,
+                  trim: car.trim || '',
+                  part
+                })
+                alert('Search saved successfully!')
+              } catch {
+                alert('Failed to save search')
+              }
+            }}
+            className="btn btn-ghost px-3 py-1.5 text-xs"
+          >
+            Save Search
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="btn btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5"
+          >
+            {copied ? <Check size={13} className="text-emerald-600 animate-scale-up" /> : <Share2 size={13} />}
+            <span>{copied ? 'Copied!' : 'Share'}</span>
           </button>
         </div>
       </div>
@@ -293,7 +393,7 @@ export function ResultsList({
                 onClick={() => setFilterFastDelivery(!filterFastDelivery)}
                 className={`rounded-2xl px-4 py-1.5 text-xs font-semibold shadow-sm ring-1 transition ${
                   filterFastDelivery
-                    ? 'bg-brand-600 text-white ring-brand-600'
+                    ? 'bg-brand-500 text-white ring-brand-500'
                     : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -324,8 +424,20 @@ export function ResultsList({
                   type="text"
                   inputMode="numeric"
                   maxLength={5}
-                  value={zip}
-                  onChange={(e) => setZip(e.target.value.replace(/\D/g, ''))}
+                  value={zipInput}
+                  onChange={(e) => setZipInput(e.target.value.replace(/\D/g, ''))}
+                  onBlur={() => {
+                    if (zipInput === '' || /^\d{5}$/.test(zipInput)) {
+                      setZip(zipInput)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (zipInput === '' || /^\d{5}$/.test(zipInput)) {
+                        setZip(zipInput)
+                      }
+                    }
+                  }}
                   placeholder="ZIP"
                   aria-label="Delivery ZIP code"
                   className="w-14 border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
@@ -403,7 +515,7 @@ export function ResultsList({
 
               <ul className="flex flex-col gap-4">
                 {visible.map((listing, i) => {
-                  const inCart = isInCart(listing.id)
+                  const inWatchlist = isInWatchlist(listing.id)
                   const isBestValue = listing.id === bestValueId
                   return (
                     <li
@@ -441,9 +553,16 @@ export function ResultsList({
 
                       <div className="min-w-0 flex-1 pt-1">
                         <div className="flex flex-col gap-y-1 pr-1 sm:flex-row sm:items-start sm:justify-between">
-                          <h3 className="text-[15px] font-semibold leading-tight tracking-[-0.1px] text-slate-950 group-hover:text-brand-700">
-                            {listing.title}
-                          </h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-[15px] font-semibold leading-tight tracking-[-0.1px] text-slate-950 group-hover:text-brand-700">
+                              {listing.title}
+                            </h3>
+                            {isBestValue && (
+                              <span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 font-extrabold uppercase tracking-wider px-2 py-0.5 text-[9px] shrink-0">
+                                Best Value
+                              </span>
+                            )}
+                          </div>
                           <div className="mt-1 shrink-0 text-right sm:mt-0">
                             {listing.originalPrice && (
                               <div className="text-xs text-emerald-600 font-medium">↓ Price dropped</div>
@@ -484,7 +603,15 @@ export function ResultsList({
                           ) : (
                             <span className="badge bg-emerald-100 text-emerald-800"><ShieldCheck size={12} /> Verified fitment</span>
                           )}
-                          {isBestValue && <span className="badge bg-emerald-100 text-emerald-800"><Sparkles size={12} /> Recommended</span>}
+                          {isBestValue && (
+                            <span className="group relative badge bg-emerald-100 text-emerald-800 cursor-help">
+                              <Sparkles size={12} /> Recommended (Best Value)
+                              <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-normal leading-normal text-white opacity-0 shadow-xl transition-all duration-200 group-hover:opacity-100">
+                                <strong>Best Value Deal:</strong> Calculated by weighing total price (with shipping), seller feedback, and vehicle fitment compatibility.
+                                <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 bg-slate-950 rotate-45" />
+                              </span>
+                            </span>
+                          )}
                           {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={12} /> Top Rated</span>}
                           {listing.bestOfferAccepted && <span className="badge bg-slate-100 text-slate-700">Best Offer</span>}
                           {listing.originalPrice && listing.discountPercentage && <span className="badge bg-rose-100 text-rose-700"><Tag size={12} /> {listing.discountPercentage}% off</span>}
@@ -496,11 +623,11 @@ export function ResultsList({
                           </a>
                           <button
                             type="button"
-                            disabled={inCart}
-                            onClick={() => onAddToCart(listing)}
-                            className={`btn px-5 py-2 text-sm ${inCart ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
+                            disabled={inWatchlist}
+                            onClick={() => onAddToWatchlist(listing)}
+                            className={`btn px-5 py-2 text-sm ${inWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
                           >
-                            {inCart ? <><Check size={15} /> Added</> : <><Plus size={15} /> Add to cart</>}
+                            {inWatchlist ? <><Check size={15} /> Watching</> : <><Plus size={15} /> Watch part</>}
                           </button>
                           <button
                             onClick={() => {
@@ -523,8 +650,8 @@ export function ResultsList({
               </ul>
             </div>
 
-            <aside className="md:col-span-5 xl:col-span-4">
-              <div className="sticky top-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <aside className="md:col-span-5 xl:col-span-4 space-y-6">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white"><Store size={18} /></div>
                   <div>
@@ -560,6 +687,10 @@ export function ResultsList({
                   Opens each store's search for this exact part in a new tab
                 </div>
               </div>
+
+              {bestPrice > 0 && (
+                <PriceAlertCard car={car} part={part} targetPrice={bestPrice} />
+              )}
             </aside>
           </div>
         </>
@@ -571,16 +702,122 @@ export function ResultsList({
           vehicleLabel={vehicleLabel}
           part={part}
           onClose={() => setSelectedListing(null)}
-          onAddToCart={() => {
-            onAddToCart(selectedListing)
+          onAddToWatchlist={() => {
+            onAddToWatchlist(selectedListing)
             setSelectedListing(null)
           }}
-          isInCart={isInCart(selectedListing.id)}
+          isInWatchlist={isInWatchlist(selectedListing.id)}
         />
       )}
 
       {showCompareModal && compareList.length > 0 && (
         <ComparisonModal listings={compareList} onClose={() => setShowCompareModal(false)} />
+      )}
+
+      {compareList.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 animate-slide-up items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-950/20 max-w-sm sm:max-w-md w-[calc(100%-2rem)]">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-[11px] font-extrabold text-white">
+              {compareList.length}
+            </span>
+            <span className="text-xs font-semibold text-slate-200 sm:text-sm">
+              part{compareList.length === 1 ? '' : 's'} selected to compare
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCompareList([])}
+              className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900 transition"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCompareModal(true)}
+              className="btn btn-primary rounded-xl px-4 py-1.5 text-xs font-bold"
+            >
+              Compare Now
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: string; targetPrice: number }) {
+  const [email, setEmail] = useState('')
+  const [subscribed, setSubscribed] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim() || targetPrice <= 0) return
+    setSubscribing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/supabase/price-alerts/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          year: car.year,
+          make: car.make,
+          model: car.model,
+          trim: car.trim || '',
+          part,
+          target_price: targetPrice,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to subscribe')
+      setSubscribed(true)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+          <Mail size={18} />
+        </div>
+        <div>
+          <div className="font-semibold tracking-tight text-slate-950">Price drop alerts</div>
+          <div className="text-xs text-slate-500">Get notified when this part gets cheaper</div>
+        </div>
+      </div>
+
+      {subscribed ? (
+        <div className="mt-4 rounded-2xl bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 animate-scale-up">
+          ✓ Alert active! We'll email you if prices drop below ${targetPrice.toFixed(2)}.
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Target alert threshold set to the best value price of <strong>${targetPrice.toFixed(2)}</strong>.
+          </p>
+          <input
+            type="email"
+            placeholder="your.email@example.com"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="field py-2 text-xs"
+          />
+          <button
+            type="submit"
+            disabled={subscribing}
+            className="btn btn-primary w-full py-2.5 text-xs font-bold"
+          >
+            {subscribing ? 'Creating alert…' : 'Notify Me'}
+          </button>
+          {error && <p className="text-[11px] text-rose-600">{error}</p>}
+        </form>
       )}
     </div>
   )

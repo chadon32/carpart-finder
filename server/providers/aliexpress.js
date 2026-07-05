@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { fetchWithRetry } from '../httpClient.js'
 
 // AliExpress Open Platform uses the classic "TOP" (Taobao Open Platform) signing
 // convention: sort all request params by key, concatenate key+value pairs, wrap
@@ -53,7 +54,11 @@ export async function search(ctx, { limit = 10 } = {}) {
 
   params.sign = sign(params, appSecret)
 
-  const res = await fetch(`${GATEWAY_URL}?${new URLSearchParams(params).toString()}`)
+  const res = await fetchWithRetry(
+    `${GATEWAY_URL}?${new URLSearchParams(params).toString()}`,
+    {},
+    { timeoutMs: 7000, retries: 1 }
+  )
 
   if (!res.ok) {
     const text = await res.text()

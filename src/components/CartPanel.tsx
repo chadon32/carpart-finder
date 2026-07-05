@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import {
-  ShoppingCart,
+  Bookmark,
   ChevronLeft,
   RefreshCw,
   Columns3,
@@ -140,9 +140,9 @@ export function CartPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2.5 text-lg font-bold text-slate-900">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-            <ShoppingCart size={18} strokeWidth={2.2} />
+            <Bookmark size={18} strokeWidth={2.2} />
           </span>
-          Your cart
+          Compare Watchlist
           {items.length > 0 && <span className="text-sm font-medium text-slate-400">({items.length})</span>}
         </h2>
         <div className="flex items-center gap-1">
@@ -171,9 +171,16 @@ export function CartPanel({
 
       {items.length === 0 ? (
         <div className="mt-8 flex flex-col items-center rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center">
-          <ShoppingCart className="text-slate-300" size={32} />
-          <p className="mt-3 font-semibold text-slate-700">Your cart is empty</p>
-          <p className="mt-1 text-sm text-slate-500">Add parts from your search results to keep track of them here.</p>
+          <Bookmark className="text-slate-300" size={32} />
+          <p className="mt-3 font-semibold text-slate-700">Your Watchlist is empty</p>
+          <p className="mt-1 text-sm text-slate-500 mb-4">Add parts from your search results to compare and check for price drops.</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-primary"
+          >
+            Start Searching Parts
+          </button>
         </div>
       ) : compare ? (
         <CompareTable items={items} />
@@ -204,13 +211,13 @@ export function CartPanel({
                       rel="noopener noreferrer"
                       className="btn btn-primary px-3 py-1.5 text-xs"
                     >
-                      Buy <ExternalLink size={13} />
+                      Buy on {item.source} <ExternalLink size={13} />
                     </a>
                     <button
                       type="button"
                       onClick={() => onRemove(item.cartId)}
                       className="btn btn-secondary px-2.5 py-1.5 text-xs hover:border-red-300 hover:text-red-600"
-                      aria-label="Remove from cart"
+                      aria-label="Remove from Watchlist"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -223,16 +230,16 @@ export function CartPanel({
           <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
             <div>
               <p className="text-xs text-slate-500">
-                {items.length} item{items.length === 1 ? '' : 's'} · each bought separately on its retailer
+                {items.length} item{items.length === 1 ? '' : 's'} · bought directly from each seller
               </p>
-              <p className="text-xl font-extrabold text-slate-900">Est. total: ${total.toFixed(2)}</p>
+              <p className="text-xl font-extrabold text-slate-900">Total of watched items: ${total.toFixed(2)}</p>
             </div>
             <button
               type="button"
               onClick={onClear}
               className="text-sm font-semibold text-slate-500 transition hover:text-red-600"
             >
-              Clear cart
+              Clear Watchlist
             </button>
           </div>
         </>

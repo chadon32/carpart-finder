@@ -16,6 +16,7 @@ const USER_AGENT = 'CarPartFinder/1.0 (personal project; contact via GitHub)'
 // and "no match found" is just as stable, so we cache both outcomes.
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const cache = new Map()
+const imagePromises = new Map()
 
 async function resolveTitle(query) {
   const params = new URLSearchParams({ action: 'opensearch', search: query, limit: '1', format: 'json' })
@@ -75,15 +76,24 @@ export async function getVehicleImage(make, model) {
     return cached.imageUrl
   }
 
-  let imageUrl = null
-  try {
-    imageUrl = (await fromWikipediaArticle(make, model)) || (await fromCommonsSearch(make, model))
-  } catch {
-    // Treat any failure as "no image available" rather than surfacing an error —
-    // this is a cosmetic enhancement, not core functionality.
-    imageUrl = null
+  if (imagePromises.has(key)) {
+    return imagePromises.get(key)
   }
 
-  cache.set(key, { imageUrl, expiresAt: Date.now() + CACHE_TTL_MS })
-  return imageUrl
+  const promise = (async () => {
+    let imageUrl = null
+    try {
+      imageUrl = (await fromWikipediaArticle(make, model)) || (await fromCommonsSearch(make, model))
+    } catch {
+      // Treat any failure as "no image available" rather than surfacing an error —
+      // this is a cosmetic enhancement, not core functionality.
+      imageUrl = null
+    }
+
+    cache.set(key, { imageUrl, expiresAt: Date.now() + CACHE_TTL_MS })
+    return imageUrl
+  })()
+
+  imagePromises.set(key, promise)
+  return promise
 }

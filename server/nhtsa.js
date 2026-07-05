@@ -4,6 +4,8 @@ const BASE_URL = 'https://vpic.nhtsa.dot.gov/api/vehicles'
 
 const makesCache = new Map()
 const modelsCache = new Map()
+const makesPromises = new Map()
+const modelsPromises = new Map()
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -33,14 +35,27 @@ export async function getMakes(type) {
     return cached.data
   }
 
-  const nhtsaTypes = cacheKey === 'all' ? Object.values(VEHICLE_TYPES) : [VEHICLE_TYPES[cacheKey]]
-  const results = await Promise.all(nhtsaTypes.map(fetchMakesForType))
-  const allResults = results.flat()
+  if (makesPromises.has(cacheKey)) {
+    return makesPromises.get(cacheKey)
+  }
 
-  const makes = Array.from(new Set(allResults.map((r) => r.MakeName?.trim()).filter(Boolean))).sort()
+  const promise = (async () => {
+    try {
+      const nhtsaTypes = cacheKey === 'all' ? Object.values(VEHICLE_TYPES) : [VEHICLE_TYPES[cacheKey]]
+      const results = await Promise.all(nhtsaTypes.map(fetchMakesForType))
+      const allResults = results.flat()
 
-  makesCache.set(cacheKey, { data: makes, expiresAt: Date.now() + CACHE_TTL_MS })
-  return makes
+      const makes = Array.from(new Set(allResults.map((r) => r.MakeName?.trim()).filter(Boolean))).sort()
+
+      makesCache.set(cacheKey, { data: makes, expiresAt: Date.now() + CACHE_TTL_MS })
+      return makes
+    } finally {
+      makesPromises.delete(cacheKey)
+    }
+  })()
+
+  makesPromises.set(cacheKey, promise)
+  return promise
 }
 
 export async function getModels(make, year) {
@@ -50,18 +65,31 @@ export async function getModels(make, year) {
     return cached.data
   }
 
-  const res = await fetchWithRetry(
-    `${BASE_URL}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}?format=json`,
-    {},
-    { timeoutMs: 10000, retries: 2 }
-  )
-  if (!res.ok) throw new Error(`NHTSA models lookup failed (${res.status})`)
-  const data = await res.json()
+  if (modelsPromises.has(key)) {
+    return modelsPromises.get(key)
+  }
 
-  const models = Array.from(
-    new Set((data.Results || []).map((r) => r.Model_Name?.trim()).filter(Boolean))
-  ).sort()
+  const promise = (async () => {
+    try {
+      const res = await fetchWithRetry(
+        `${BASE_URL}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}?format=json`,
+        {},
+        { timeoutMs: 10000, retries: 2 }
+      )
+      if (!res.ok) throw new Error(`NHTSA models lookup failed (${res.status})`)
+      const data = await res.json()
 
-  modelsCache.set(key, { data: models, expiresAt: Date.now() + CACHE_TTL_MS })
-  return models
+      const models = Array.from(
+        new Set((data.Results || []).map((r) => r.Model_Name?.trim()).filter(Boolean))
+      ).sort()
+
+      modelsCache.set(key, { data: models, expiresAt: Date.now() + CACHE_TTL_MS })
+      return models
+    } finally {
+      modelsPromises.delete(key)
+    }
+  })()
+
+  modelsPromises.set(key, promise)
+  return promise
 }

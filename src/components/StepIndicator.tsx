@@ -25,30 +25,30 @@ export function StepIndicator({ current }: { current: Step }) {
                 <div
                   aria-hidden
                   className={`mx-2 h-0.5 w-10 transition-colors sm:w-20 ${
-                    done || active ? 'bg-brand-400' : 'bg-slate-200'
+                    done || active ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-850'
                   }`}
                 />
               )}
               <div
-                className={`flex items-center gap-2 rounded-full px-1 py-0.5 transition ${
-                  active ? 'bg-brand-50' : ''
+                className={`flex items-center gap-2 rounded-full px-1.5 py-0.5 transition ${
+                  active ? 'bg-brand-50/40 dark:bg-brand-900/10' : ''
                 }`}
                 aria-current={active ? 'step' : undefined}
               >
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
                     done
-                      ? 'bg-brand-600 text-white'
+                      ? 'bg-brand-500 text-white'
                       : active
-                        ? 'bg-brand-600 text-white shadow-md shadow-brand-600/25 ring-4 ring-brand-100'
-                        : 'border border-slate-200 bg-white text-slate-400'
+                        ? 'bg-brand-500 text-white shadow-md shadow-brand-500/20 ring-4 ring-brand-100 dark:ring-brand-900/20'
+                        : 'border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {done ? <Check size={15} strokeWidth={2.5} /> : <Icon size={15} strokeWidth={2.2} />}
                 </span>
                 <span
                   className={`hidden text-sm font-semibold sm:block ${
-                    active ? 'text-slate-900' : done ? 'text-brand-700' : 'text-slate-400'
+                    active ? 'text-slate-900 dark:text-slate-100' : done ? 'text-brand-500' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {step.shortLabel}
@@ -58,7 +58,7 @@ export function StepIndicator({ current }: { current: Step }) {
           )
         })}
       </ol>
-      <p className="mt-2 text-center text-xs text-slate-500 sm:hidden">{steps[currentIndex]?.label}</p>
+      <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400 sm:hidden">{steps[currentIndex]?.label}</p>
     </nav>
   )
 }

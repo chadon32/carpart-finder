@@ -55,7 +55,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-slate-950/45 backdrop-blur-[2px] p-4"
       onClick={onClose}
     >
       <div
@@ -66,7 +66,7 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
-        className={`max-h-[90vh] w-full ${maxWidth} animate-slide-up overflow-y-auto rounded-3xl bg-white shadow-2xl outline-none`}
+        className={`max-h-[90vh] w-full ${maxWidth} animate-slide-up overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-100 outline-none`}
       >
         {children}
       </div>

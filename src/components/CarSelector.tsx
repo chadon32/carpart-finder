@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, AlertCircle } from 'lucide-react'
+import { ArrowRight, AlertCircle, X } from 'lucide-react'
 import { fetchMakes, fetchModels, fetchTrims, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
 import { VehicleThumbnail } from './VehicleThumbnail'
@@ -38,6 +38,38 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   const [make, setMake] = useState('')
   const [model, setModel] = useState('')
   const [trim, setTrim] = useState('')
+
+  const [garage, setGarage] = useState<Car[]>(() => {
+    try {
+      const raw = localStorage.getItem('carpartsradar-garage')
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  })
+
+  useEffect(() => {
+    localStorage.setItem('carpartsradar-garage', JSON.stringify(garage))
+  }, [garage])
+
+  const addToGarage = (carToAdd: Car) => {
+    setGarage((prev) => {
+      const exists = prev.some(
+        (c) =>
+          c.year === carToAdd.year &&
+          c.make === carToAdd.make &&
+          c.model === carToAdd.model &&
+          c.trim === carToAdd.trim
+      )
+      if (exists) return prev
+      return [...prev, carToAdd]
+    })
+  }
+
+  const removeFromGarage = (indexToRemove: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setGarage((prev) => prev.filter((_, i) => i !== indexToRemove))
+  }
 
   const [makes, setMakes] = useState<string[]>([])
 
@@ -130,6 +162,49 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
         <h2 className="text-xl font-semibold tracking-tight text-slate-950">Select your vehicle</h2>
         <p className="mt-1 text-sm text-slate-600">We filter listings to fit the exact vehicle you pick.</p>
       </div>
+
+      {/* My Garage */}
+      {garage.length > 0 && (
+        <div className="mb-6 border-b border-slate-100 pb-5">
+          <h3 className="text-xs font-bold tracking-[1.2px] text-slate-400 uppercase mb-3">My Garage</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {garage.map((c, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  setYear(c.year)
+                  setMake(c.make)
+                  setModel(c.model)
+                  setTrim(c.trim)
+                }}
+                className={`group flex items-center justify-between gap-3 cursor-pointer rounded-xl border p-3 transition-all ${
+                  year === c.year && make === c.make && model === c.model && trim === c.trim
+                    ? 'border-brand-500 bg-brand-50/20'
+                    : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <VehicleThumbnail make={c.make} model={c.model} className="h-9 w-14 rounded-lg" iconSize={16} />
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-900 truncate text-xs">
+                      {c.year} {c.make} {c.model}
+                    </div>
+                    {c.trim && <div className="text-[10px] text-slate-400 truncate">{c.trim}</div>}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => removeFromGarage(i, e)}
+                  aria-label="Remove vehicle"
+                  className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-rose-600 transition"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -247,15 +322,25 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       </div>
 
       {make && model && (
-        <div className="mt-6 flex flex-col items-center gap-4 rounded-3xl border border-brand-200/70 bg-gradient-to-br from-brand-50/60 via-white to-white p-5 shadow-sm sm:flex-row">
-          <VehicleThumbnail make={make} model={model} className="h-24 w-40 sm:h-28 sm:w-48" iconSize={42} />
-          <div className="min-w-0 text-center sm:text-left">
-            <p className="text-xs font-semibold uppercase tracking-[1px] text-brand-600">Your Vehicle</p>
-            <p className="mt-1 text-lg font-bold tracking-tight text-slate-950">
-              {year} {make} {model}
-            </p>
-            {trim && <p className="text-sm text-slate-600">{trim}</p>}
+        <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-brand-200/50 bg-gradient-to-br from-brand-50/40 via-white to-white p-4 shadow-sm sm:flex-row items-center justify-between">
+          <div className="flex flex-col items-center gap-4 sm:flex-row min-w-0">
+            <VehicleThumbnail make={make} model={model} className="h-20 w-32 sm:h-24 sm:w-40" iconSize={36} />
+            <div className="min-w-0 text-center sm:text-left">
+              <p className="text-[10px] font-bold uppercase tracking-[1px] text-brand-600">Active Vehicle</p>
+              <p className="mt-1 text-base font-bold tracking-tight text-slate-950">
+                {year} {make} {model}
+              </p>
+              {trim && <p className="text-xs text-slate-500">{trim}</p>}
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => addToGarage({ year, make, model, trim })}
+            disabled={garage.some(c => c.year === year && c.make === make && c.model === model && c.trim === trim)}
+            className="btn btn-secondary px-3 py-1.5 text-xs shrink-0 self-center sm:self-end disabled:opacity-40"
+          >
+            Save to Garage
+          </button>
         </div>
       )}
 

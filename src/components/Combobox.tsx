@@ -13,6 +13,31 @@ type Entry =
   | { kind: 'header'; label: string }
   | { kind: 'item'; index: number; value: string; isFree: boolean }
 
+function translateObd2(query: string): string | null {
+  const code = query.trim().toUpperCase()
+  if (!/^[P]\d{4}$/.test(code)) return null
+
+  if (/^P03\d{2}$/.test(code)) {
+    return 'Spark Plugs & Ignition Coils'
+  }
+  if (code === 'P0171' || code === 'P0174') {
+    return 'Oxygen Sensor & Mass Airflow Sensor'
+  }
+  if (code === 'P0420' || code === 'P0430') {
+    return 'Catalytic Converter & O2 Sensors'
+  }
+  if (code === 'P0440' || code === 'P0442' || code === 'P0455' || code === 'P0456') {
+    return 'Gas Cap & Evap Purge Valve'
+  }
+  if (/^P011[5-9]$/.test(code)) {
+    return 'Coolant Temperature Sensor'
+  }
+  if (code === 'P0100' || code === 'P0101' || code === 'P0102') {
+    return 'Mass Airflow Sensor (MAF)'
+  }
+  return null
+}
+
 export function Combobox({
   label,
   placeholder,
@@ -45,10 +70,16 @@ export function Combobox({
     const entries: Entry[] = []
     const items: Extract<Entry, { kind: 'item' }>[] = []
 
-    const pushItem = (value: string, isFree = false) => {
-      const item = { kind: 'item' as const, index: items.length, value, isFree }
+    const pushItem = (val: string, isFree = false) => {
+      const item = { kind: 'item' as const, index: items.length, value: val, isFree }
       items.push(item)
       entries.push(item)
+    }
+
+    const obdMatch = translateObd2(trimmedQuery)
+    if (obdMatch) {
+      entries.push({ kind: 'header', label: `Diagnostic Code ${trimmedQuery.toUpperCase()}` })
+      pushItem(obdMatch)
     }
 
     const allOptions = groups ? groups.flatMap((g) => g.options) : options
@@ -59,15 +90,18 @@ export function Combobox({
 
     if (showFreeText) pushItem(trimmedQuery, true)
 
+    const isExactMatchSelected = value && trimmedQuery.toLowerCase() === value.toLowerCase()
+    const filterQuery = isExactMatchSelected ? '' : q
+
     if (groups) {
       for (const group of groups) {
-        const matches = q ? group.options.filter((o) => o.toLowerCase().includes(q)) : group.options
+        const matches = filterQuery ? group.options.filter((o) => o.toLowerCase().includes(filterQuery)) : group.options
         if (matches.length === 0) continue
         entries.push({ kind: 'header', label: group.label })
         matches.forEach((m) => pushItem(m))
       }
     } else {
-      const matches = q ? options.filter((o) => o.toLowerCase().includes(q)) : options
+      const matches = filterQuery ? options.filter((o) => o.toLowerCase().includes(filterQuery)) : options
       matches.forEach((m) => pushItem(m))
     }
 
@@ -139,10 +173,11 @@ export function Combobox({
           disabled={disabled}
           placeholder={placeholder}
           value={open ? query : value}
-          onFocus={() => {
+          onFocus={(e) => {
             if (blurTimeout.current) clearTimeout(blurTimeout.current)
             setOpen(true)
-            setQuery('')
+            setQuery(value)
+            e.currentTarget.select()
           }}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -176,7 +211,7 @@ export function Combobox({
               </li>
             ) : (
               <li
-                key={entry.isFree ? '__free__' : entry.value}
+                key={entry.isFree ? '__free__' : `${entry.value}-${entry.index}`}
                 id={`${listId}-opt-${entry.index}`}
                 role="option"
                 aria-selected={entry.value === value}

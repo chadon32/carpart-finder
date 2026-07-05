@@ -33,8 +33,9 @@ export function useRecentSearches() {
   const record = (car: Car, part: string) => {
     setSearches((prev) => {
       const k = keyOf(car, part)
-      const deduped = prev.filter((s) => keyOf(s.car, s.part) !== k)
-      return [{ car, part, at: Date.now() }, ...deduped].slice(0, MAX)
+      const exists = prev.some((s) => keyOf(s.car, s.part) === k)
+      if (exists) return prev
+      return [{ car, part, at: Date.now() }, ...prev].slice(0, MAX)
     })
   }
 
