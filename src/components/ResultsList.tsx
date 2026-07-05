@@ -202,7 +202,10 @@ export function ResultsList({
     const script = document.createElement('script')
     script.id = 'jsonld-schema'
     script.type = 'application/ld+json'
-    script.innerHTML = JSON.stringify(schema)
+    // Use textContent (not innerHTML) and escape `<` so a seller-controlled
+    // listing title containing `</script>` can't break out of this tag and
+    // execute — JSON.stringify does not escape forward slashes on its own.
+    script.textContent = JSON.stringify(schema).replace(/</g, '\\u003c')
     document.head.appendChild(script)
 
     return () => {
