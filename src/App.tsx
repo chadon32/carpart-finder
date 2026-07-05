@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
+import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun, Trash2 } from 'lucide-react'
 import { CarSelector, type Car } from './components/CarSelector'
 import { PartSelector } from './components/PartSelector'
 import { ResultsList } from './components/ResultsList'
@@ -10,7 +10,7 @@ import { useCart } from './hooks/useCart'
 import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
 import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
-import { getSavedSearches, getPriceAlerts, signupUser, loginUser } from './api/supabase'
+import { getSavedSearches, getPriceAlerts, signupUser, loginUser, deleteSavedSearch, deletePriceAlert } from './api/supabase'
 import { Modal } from './components/Modal'
 
 function App() {
@@ -300,16 +300,41 @@ function App() {
                                     {s.year} {s.make} {s.model} {s.trim ? `· ${s.trim}` : ''}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowAccount(false)
-                                    runSearch({ year: s.year, make: s.make, model: s.model, trim: s.trim || '' }, s.part)
-                                  }}
-                                  className="btn btn-secondary px-2.5 py-1.5 text-[10px] shrink-0"
-                                >
-                                  Search
-                                </button>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowAccount(false)
+                                      runSearch({ year: s.year, make: s.make, model: s.model, trim: s.trim || '' }, s.part)
+                                    }}
+                                    className="btn btn-secondary px-2.5 py-1.5 text-[10px]"
+                                  >
+                                    Search
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label={`Delete saved search for ${s.part}`}
+                                    onClick={async () => {
+                                      try {
+                                        await deleteSavedSearch(s.id)
+                                        setAccountData((prev) =>
+                                          prev
+                                            ? {
+                                                searches: prev.searches.filter((x) => x.id !== s.id),
+                                                // Deleting a search cascades to its alerts server-side.
+                                                alerts: prev.alerts.filter((a) => a.saved_search_id !== s.id),
+                                              }
+                                            : prev
+                                        )
+                                      } catch {
+                                        /* leave the row; nothing was deleted */
+                                      }
+                                    }}
+                                    className="btn btn-ghost p-1.5 text-slate-400 hover:text-rose-600"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -333,11 +358,39 @@ function App() {
                                       ? `${a.saved_searches.year} ${a.saved_searches.make} ${a.saved_searches.model}`
                                       : 'Vehicle'}
                                   </div>
+                                  {a.triggered_at ? (
+                                    <div className="mt-1 text-[10px] font-bold text-emerald-700">
+                                      ✓ Dropped to ${Number(a.last_price).toFixed(2)}
+                                    </div>
+                                  ) : a.last_price != null ? (
+                                    <div className="mt-1 text-[10px] font-medium text-slate-500">
+                                      Last checked: ${Number(a.last_price).toFixed(2)}
+                                    </div>
+                                  ) : null}
                                 </div>
-                                <div className="shrink-0 text-right">
+                                <div className="flex items-center gap-1 shrink-0">
                                   <span className="badge bg-brand-50 text-brand-500 font-extrabold px-2.5 py-1">
                                     Target: ${a.target_price}
                                   </span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Delete price alert for ${a.saved_searches?.part || 'part'}`}
+                                    onClick={async () => {
+                                      try {
+                                        await deletePriceAlert(a.id)
+                                        setAccountData((prev) =>
+                                          prev
+                                            ? { ...prev, alerts: prev.alerts.filter((x) => x.id !== a.id) }
+                                            : prev
+                                        )
+                                      } catch {
+                                        /* leave the row; nothing was deleted */
+                                      }
+                                    }}
+                                    className="btn btn-ghost p-1.5 text-slate-400 hover:text-rose-600"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
                                 </div>
                               </div>
                             ))}

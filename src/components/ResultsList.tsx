@@ -135,6 +135,7 @@ export function ResultsList({
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
   const [copied, setCopied] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const bestPrice = useMemo(() => {
     if (results.length === 0) return 0
@@ -273,7 +274,10 @@ export function ResultsList({
             Vehicle
           </button>
           <button
+            type="button"
+            disabled={saveState === 'saving'}
             onClick={async () => {
+              setSaveState('saving')
               try {
                 await saveSearch({
                   year: car.year,
@@ -282,14 +286,27 @@ export function ResultsList({
                   trim: car.trim || '',
                   part
                 })
-                alert('Search saved successfully!')
+                setSaveState('saved')
+                setTimeout(() => setSaveState('idle'), 2500)
               } catch {
-                alert('Failed to save search')
+                setSaveState('error')
+                setTimeout(() => setSaveState('idle'), 3500)
               }
             }}
-            className="btn btn-ghost px-3 py-1.5 text-xs"
+            className={`btn btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5 ${
+              saveState === 'error' ? 'text-rose-600' : ''
+            }`}
           >
-            Save Search
+            {saveState === 'saved' && <Check size={13} className="text-emerald-600 animate-scale-up" />}
+            <span>
+              {saveState === 'saving'
+                ? 'Saving…'
+                : saveState === 'saved'
+                  ? 'Saved!'
+                  : saveState === 'error'
+                    ? 'Log in to save'
+                    : 'Save Search'}
+            </span>
           </button>
           <button
             type="button"

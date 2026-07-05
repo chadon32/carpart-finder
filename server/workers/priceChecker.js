@@ -3,11 +3,33 @@
  *
  * Re-runs each active alert's saved search against eBay and compares the
  * cheapest live listing (price + shipping) to the alert's target price.
+ * Covers both account alerts (price_alerts) and guest email subscriptions
+ * (guest_alerts). Alerts are one-shot: a trigger deactivates the alert so
+ * the same drop doesn't fire an email every day.
  * Scheduled via Vercel Cron hitting /api/cron/check-alerts (see vercel.json).
  */
 
 import { supabaseAdmin, isMockMode } from '../supabase.js'
 import { search as ebaySearch, isConfigured as ebayConfigured } from '../providers/ebay.js'
+
+// Runs one alert's search and returns the cheapest out-of-pocket option,
+// matching what the UI shows (price + shipping). null = no live listings.
+async function findCheapest(searchLike) {
+  const ctx = {
+    year: searchLike.year,
+    make: searchLike.make,
+    model: searchLike.model,
+    trim: searchLike.trim || undefined,
+    part: searchLike.part,
+    query: `${searchLike.year} ${searchLike.make} ${searchLike.model} ${searchLike.part}`.trim(),
+  }
+  const listings = await ebaySearch(ctx, { limit: 3 })
+  if (listings.length === 0) return null
+  return listings.reduce((best, item) => {
+    const total = item.price + (item.shippingCost || 0)
+    return total < best.total ? { total, item } : best
+  }, { total: Infinity, item: null })
+}
 
 export async function checkPriceAlerts() {
   console.log('[PriceChecker] Starting price check...')
@@ -22,6 +44,10 @@ export async function checkPriceAlerts() {
     return { checked: 0, triggered: 0, skipped: 'ebay not configured' }
   }
 
+  let checked = 0
+  let triggered = 0
+
+  // ---- Account alerts (price_alerts joined to saved_searches) ----
   const { data: alerts, error } = await supabaseAdmin
     .from('price_alerts')
     .select('*, saved_searches(*)')
@@ -29,65 +55,32 @@ export async function checkPriceAlerts() {
 
   if (error) {
     console.error('[PriceChecker] Error fetching alerts:', error)
-    return { checked: 0, triggered: 0, error: error.message }
   }
-
-  if (!alerts || alerts.length === 0) {
-    console.log('[PriceChecker] No active alerts found.')
-    return { checked: 0, triggered: 0 }
-  }
-
-  console.log(`[PriceChecker] Checking ${alerts.length} active alerts...`)
-
-  let checked = 0
-  let triggered = 0
 
   // Sequential on purpose: parallel fan-out would burn the eBay rate limit
   // and each search already runs its own internal retry/relaxation tiers.
-  for (const alert of alerts) {
+  for (const alert of alerts || []) {
     const search = alert.saved_searches
     if (!search) continue
 
     try {
-      const ctx = {
-        year: search.year,
-        make: search.make,
-        model: search.model,
-        trim: search.trim || undefined,
-        part: search.part,
-        query: `${search.year} ${search.make} ${search.model} ${search.part}`.trim(),
-      }
-
-      const listings = await ebaySearch(ctx, { limit: 3 })
+      const cheapest = await findCheapest(search)
       checked++
 
-      if (listings.length === 0) {
-        console.log(`[PriceChecker] Alert #${alert.id}: no live listings found for "${ctx.query}"`)
-        await supabaseAdmin
-          .from('price_alerts')
-          .update({ last_checked_at: new Date().toISOString() })
-          .eq('id', alert.id)
-        continue
-      }
+      const update = { last_checked_at: new Date().toISOString() }
 
-      // Compare on true out-of-pocket cost, matching what the UI shows.
-      const cheapest = listings.reduce((best, item) => {
-        const total = item.price + (item.shippingCost || 0)
-        return total < best.total ? { total, item } : best
-      }, { total: Infinity, item: null })
-
-      const update = {
-        last_checked_at: new Date().toISOString(),
-        last_price: cheapest.total,
-      }
-
-      if (cheapest.total <= Number(alert.target_price)) {
-        triggered++
-        console.log(
-          `[PriceChecker] PRICE DROP for alert #${alert.id}: $${cheapest.total.toFixed(2)} <= target $${alert.target_price} — ${cheapest.item.title}`
-        )
-        update.triggered_at = new Date().toISOString()
-        await sendPriceDropNotification(alert, search, cheapest.total, cheapest.item)
+      if (cheapest) {
+        update.last_price = cheapest.total
+        if (cheapest.total <= Number(alert.target_price)) {
+          triggered++
+          console.log(
+            `[PriceChecker] PRICE DROP for alert #${alert.id}: $${cheapest.total.toFixed(2)} <= target $${alert.target_price} — ${cheapest.item.title}`
+          )
+          update.triggered_at = new Date().toISOString()
+          update.is_active = false
+          const email = await resolveUserEmail(alert.user_id)
+          if (email) await sendPriceDropEmail(email, alert.target_price, search, cheapest.total, cheapest.item)
+        }
       }
 
       await supabaseAdmin.from('price_alerts').update(update).eq('id', alert.id)
@@ -96,33 +89,71 @@ export async function checkPriceAlerts() {
     }
   }
 
+  // ---- Guest alerts (email-only, no account) ----
+  const { data: guestAlerts, error: guestError } = await supabaseAdmin
+    .from('guest_alerts')
+    .select('*')
+    .eq('is_active', true)
+
+  if (guestError) {
+    console.error('[PriceChecker] Error fetching guest alerts:', guestError)
+  }
+
+  for (const alert of guestAlerts || []) {
+    try {
+      const cheapest = await findCheapest(alert)
+      checked++
+
+      const update = { last_checked_at: new Date().toISOString() }
+
+      if (cheapest) {
+        update.last_price = cheapest.total
+        if (cheapest.total <= Number(alert.target_price)) {
+          triggered++
+          console.log(
+            `[PriceChecker] PRICE DROP for guest alert #${alert.id}: $${cheapest.total.toFixed(2)} <= target $${alert.target_price} — ${cheapest.item.title}`
+          )
+          update.triggered_at = new Date().toISOString()
+          update.is_active = false
+          await sendPriceDropEmail(alert.email, alert.target_price, alert, cheapest.total, cheapest.item)
+        }
+      }
+
+      await supabaseAdmin.from('guest_alerts').update(update).eq('id', alert.id)
+    } catch (err) {
+      console.error(`[PriceChecker] Error checking guest alert #${alert.id}:`, err.message)
+    }
+  }
+
   console.log(`[PriceChecker] Done. Checked ${checked}, triggered ${triggered}.`)
   return { checked, triggered }
 }
 
+// Account alerts only store the user id; the email lives in Supabase Auth.
+async function resolveUserEmail(userId) {
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId)
+  const email = data?.user?.email
+  if (error || !email) {
+    console.error(`[Notification] Could not resolve email for user ${userId}:`, error?.message || 'no email on record')
+    return null
+  }
+  return email
+}
+
 /**
- * Send price drop notification via Resend's HTTP API.
+ * Send a price-drop email via Resend's HTTP API.
  * Without RESEND_API_KEY this only logs — the trigger is still recorded on
  * the alert row (triggered_at / last_price) so the UI can surface it.
  */
-async function sendPriceDropNotification(alert, search, currentPrice, listing) {
-  const userId = alert.user_id
-  const vehicle = `${search.year} ${search.make} ${search.model}${search.trim ? ` ${search.trim}` : ''}`
+async function sendPriceDropEmail(email, targetPrice, searchLike, currentPrice, listing) {
+  const vehicle = `${searchLike.year} ${searchLike.make} ${searchLike.model}${searchLike.trim ? ` ${searchLike.trim}` : ''}`
   console.log(
-    `[Notification] User ${userId}: ${search.part} for ${vehicle} now $${currentPrice.toFixed(2)} — ${listing.link}`
+    `[Notification] ${email}: ${searchLike.part} for ${vehicle} now $${currentPrice.toFixed(2)} — ${listing.link}`
   )
 
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
     console.warn('[Notification] RESEND_API_KEY not set; skipping email delivery.')
-    return
-  }
-
-  // The alert row only stores the user id; the email lives in Supabase Auth.
-  const { data, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId)
-  const email = data?.user?.email
-  if (userError || !email) {
-    console.error(`[Notification] Could not resolve email for user ${userId}:`, userError?.message || 'no email on record')
     return
   }
 
@@ -135,14 +166,15 @@ async function sendPriceDropNotification(alert, search, currentPrice, listing) {
     body: JSON.stringify({
       from: process.env.RESEND_FROM || 'CarPartsRadar <onboarding@resend.dev>',
       to: [email],
-      subject: `Price drop: ${search.part} for your ${vehicle} — now $${currentPrice.toFixed(2)}`,
+      subject: `Price drop: ${searchLike.part} for your ${vehicle} — now $${currentPrice.toFixed(2)}`,
       html: `
-        <p>Good news — a <strong>${search.part}</strong> matching your saved search for a
+        <p>Good news — a <strong>${searchLike.part}</strong> matching your price alert for a
         <strong>${vehicle}</strong> just dropped to <strong>$${currentPrice.toFixed(2)}</strong>
-        (your target was $${Number(alert.target_price).toFixed(2)}).</p>
+        (your target was $${Number(targetPrice).toFixed(2)}).</p>
         <p><a href="${listing.link}">${listing.title}</a><br/>
         Sold by ${listing.seller}${listing.shippingCost === 0 ? ' · free shipping' : ''}</p>
-        <p style="color:#64748b;font-size:12px">You're receiving this because you set a price alert on CarPartsRadar.</p>
+        <p style="color:#64748b;font-size:12px">You're receiving this because you set a price alert on CarPartsRadar.
+        This alert has now been fulfilled and won't email you again.</p>
       `,
     }),
   })

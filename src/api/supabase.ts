@@ -47,6 +47,24 @@ export async function saveSearch(search: {
   return res.json()
 }
 
+export async function deleteSavedSearch(id: string) {
+  const res = await fetch(`${API_BASE}/saved-searches/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeader() }
+  })
+  if (!res.ok) throw new Error('Failed to delete saved search')
+  return res.json()
+}
+
+export async function deletePriceAlert(id: string) {
+  const res = await fetch(`${API_BASE}/price-alerts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeader() }
+  })
+  if (!res.ok) throw new Error('Failed to delete price alert')
+  return res.json()
+}
+
 export async function getPriceAlerts() {
   const res = await fetch(`${API_BASE}/price-alerts`, {
     headers: { ...getAuthHeader() }

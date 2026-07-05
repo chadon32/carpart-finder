@@ -1,6 +1,6 @@
 import express from 'express'
 import crypto from 'node:crypto'
-import { supabase, isMockMode } from '../supabase.js'
+import { supabase, supabaseAdmin, isMockMode } from '../supabase.js'
 import { requireAuth } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -17,9 +17,16 @@ router.post('/price-alerts/subscribe', async (req, res) => {
   if (!email || !year || !make || !model || !part || !target_price) {
     return res.status(400).json({ error: 'Missing required fields' })
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
+    return res.status(400).json({ error: 'Invalid email address' })
+  }
+  const price = Number(target_price)
+  if (!Number.isFinite(price) || price <= 0) {
+    return res.status(400).json({ error: 'Invalid target price' })
+  }
 
   if (isMockMode) {
-    console.log(`[Alert Subscription] Guest ${email} subscribed to alerts for ${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part} at target price $${target_price}`)
+    console.log(`[Alert Subscription] Guest ${email} subscribed to alerts for ${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part} at target price $${price}`)
     mockGuestSubscriptions.push({
       id: crypto.randomUUID(),
       email,
@@ -28,13 +35,35 @@ router.post('/price-alerts/subscribe', async (req, res) => {
       model,
       trim,
       part,
-      target_price: Number(target_price),
+      target_price: price,
       created_at: new Date().toISOString()
     })
     return res.json({ success: true, message: 'Alert subscription created (Local Mock)!' })
   }
 
-  // Real Supabase implementation: In production, save guest alert info
+  // Service-role client: guest_alerts has RLS with no anon policies on purpose.
+  // Upsert so re-subscribing updates the target instead of erroring.
+  const { error } = await supabaseAdmin
+    .from('guest_alerts')
+    .upsert(
+      {
+        email: String(email).toLowerCase(),
+        year,
+        make,
+        model,
+        trim: trim || null,
+        part,
+        target_price: price,
+        is_active: true,
+        triggered_at: null,
+      },
+      { onConflict: 'email,year,make,model,part' }
+    )
+
+  if (error) {
+    console.error('[Alert Subscription] Failed to save guest alert:', error.message)
+    return res.status(500).json({ error: 'Could not create alert subscription' })
+  }
   res.json({ success: true, message: 'Alert subscription created!' })
 })
 
@@ -123,7 +152,10 @@ router.get('/saved-searches', async (req, res) => {
     return res.json({ searches: data })
   }
 
-  const { data, error } = await supabase
+  // supabaseAdmin everywhere below: the server validates the JWT in
+  // requireAuth and scopes every query by user_id explicitly. The anon client
+  // would be blocked by RLS since auth.uid() is unset server-side.
+  const { data, error } = await supabaseAdmin
     .from('saved_searches')
     .select('*')
     .eq('user_id', user.id)
@@ -152,7 +184,7 @@ router.post('/saved-searches', async (req, res) => {
     return res.json({ search: newSearch })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('saved_searches')
     .insert({
       user_id: req.user.id,
@@ -167,6 +199,51 @@ router.post('/saved-searches', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message })
   res.json({ search: data })
+})
+
+// Delete a saved search (cascades to its price alerts via FK)
+router.delete('/saved-searches/:id', async (req, res) => {
+  const { id } = req.params
+
+  if (isMockMode) {
+    const idx = mockSavedSearches.findIndex((s) => s.id === id && s.user_id === req.user.id)
+    if (idx === -1) return res.status(404).json({ error: 'Not found' })
+    mockSavedSearches.splice(idx, 1)
+    for (let i = mockPriceAlerts.length - 1; i >= 0; i--) {
+      if (mockPriceAlerts[i].saved_search_id === id) mockPriceAlerts.splice(i, 1)
+    }
+    return res.json({ success: true })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('saved_searches')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', req.user.id)
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
+})
+
+// Delete a price alert
+router.delete('/price-alerts/:id', async (req, res) => {
+  const { id } = req.params
+
+  if (isMockMode) {
+    const idx = mockPriceAlerts.findIndex((a) => a.id === id && a.user_id === req.user.id)
+    if (idx === -1) return res.status(404).json({ error: 'Not found' })
+    mockPriceAlerts.splice(idx, 1)
+    return res.json({ success: true })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('price_alerts')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', req.user.id)
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
 })
 
 // Get user's price alerts
@@ -185,7 +262,7 @@ router.get('/price-alerts', async (req, res) => {
     return res.json({ alerts: data })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('price_alerts')
     .select('*, saved_searches(*)')
     .eq('user_id', req.user.id)
@@ -219,7 +296,7 @@ router.post('/price-alerts', async (req, res) => {
   }
 
   // Verify that the saved search belongs to this user before allowing alert creation
-  const { data: searchCheck, error: searchCheckError } = await supabase
+  const { data: searchCheck, error: searchCheckError } = await supabaseAdmin
     .from('saved_searches')
     .select('id')
     .eq('id', saved_search_id)
@@ -230,7 +307,7 @@ router.post('/price-alerts', async (req, res) => {
     return res.status(403).json({ error: 'Forbidden: search query does not belong to user or does not exist' })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('price_alerts')
     .insert({
       user_id: req.user.id,

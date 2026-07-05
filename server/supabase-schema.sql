@@ -68,8 +68,37 @@ create policy "Users can delete own price alerts"
   using (auth.uid() = user_id);
 
 -- ============================================
+-- GUEST ALERTS (email-only price alerts, no account)
+-- ============================================
+-- Written only by the server with the service-role key; RLS is enabled with
+-- no policies so the anon key can neither read nor write these rows.
+create table if not exists public.guest_alerts (
+  id uuid primary key default uuid_generate_v4(),
+  email text not null,
+  year text not null,
+  make text not null,
+  model text not null,
+  trim text,
+  part text not null,
+  target_price numeric not null,
+  is_active boolean default true,
+  last_checked_at timestamptz,
+  last_price numeric,
+  triggered_at timestamptz,
+  created_at timestamptz default now()
+);
+
+alter table public.guest_alerts enable row level security;
+
+-- One alert per email + search combination (the server lowercases email
+-- before insert, and upserts against this index to update the target price).
+create unique index if not exists idx_guest_alerts_unique
+  on public.guest_alerts (email, year, make, model, part);
+
+-- ============================================
 -- INDEXES
 -- ============================================
 create index if not exists idx_saved_searches_user_id on public.saved_searches(user_id);
 create index if not exists idx_price_alerts_user_id on public.price_alerts(user_id);
 create index if not exists idx_price_alerts_saved_search_id on public.price_alerts(saved_search_id);
+create index if not exists idx_guest_alerts_active on public.guest_alerts(is_active);
