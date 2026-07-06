@@ -170,14 +170,18 @@ export function CartPanel({
       )}
 
       {items.length === 0 ? (
-        <div className="mt-8 flex flex-col items-center rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center">
-          <Bookmark className="text-slate-300" size={32} />
-          <p className="mt-3 font-semibold text-slate-700">Your Watchlist is empty</p>
-          <p className="mt-1 text-sm text-slate-500 mb-4">Add parts from your search results to compare and check for price drops.</p>
+        <div className="mt-8 flex flex-col items-center rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-slate-800 dark:bg-slate-900/20">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white text-slate-300 shadow-sm ring-1 ring-slate-100 dark:bg-slate-800 dark:text-slate-600 dark:ring-slate-700/50">
+            <Bookmark size={36} strokeWidth={1.5} />
+          </div>
+          <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Your Watchlist is empty</h3>
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400 mb-6">
+            Keep track of the parts you need. Add items from your search results to compare options and check for price drops over time.
+          </p>
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-primary"
+            className="btn btn-primary px-6"
           >
             Start Searching Parts
           </button>

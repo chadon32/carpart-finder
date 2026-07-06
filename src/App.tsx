@@ -1,70 +1,30 @@
-import { useEffect, useState } from 'react'
-import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun, Trash2 } from 'lucide-react'
+import { useEffect, useState, Suspense, lazy } from 'react'
+import { Toaster } from 'sonner'
+import { Helmet } from 'react-helmet-async'
+import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
 import { CarSelector, type Car } from './components/CarSelector'
-import { PartSelector } from './components/PartSelector'
-import { ResultsList } from './components/ResultsList'
-import { CartPanel } from './components/CartPanel'
-import { RecentSearches } from './components/RecentSearches'
+
+const PartSelector = lazy(() => import('./components/PartSelector').then(m => ({ default: m.PartSelector })))
+const ResultsList = lazy(() => import('./components/ResultsList').then(m => ({ default: m.ResultsList })))
+const CartPanel = lazy(() => import('./components/CartPanel').then(m => ({ default: m.CartPanel })))
+const RecentSearches = lazy(() => import('./components/RecentSearches').then(m => ({ default: m.RecentSearches })))
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })))
+
 import { StepIndicator } from './components/StepIndicator'
 import { useCart } from './hooks/useCart'
 import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
 import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
-import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert } from './api/supabase'
-import { Modal } from './components/Modal'
+import { useAppContext } from './contexts/AppContext'
+import { trackSearch } from './lib/analytics'
 
 function App() {
+  const { user, darkMode, setDarkMode } = useAppContext()
   const initial = routeFromSearch(window.location.search)
-  const [step, setStep] = useState<Step>(initial.step)
+  const [step, setStep] = useState<Step | 'dashboard'>(initial.step)
   const [car, setCar] = useState<Car | null>(initial.car)
   const [part, setPart] = useState<string | null>(initial.part)
   const [showWatchlist, setShowWatchlist] = useState(false)
-  const [showAccount, setShowAccount] = useState(false)
-
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('cpf-dark-mode')
-      return saved ? JSON.parse(saved) : false
-    } catch {
-      return false
-    }
-  })
-
-  useEffect(() => {
-    localStorage.setItem('cpf-dark-mode', JSON.stringify(darkMode))
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [darkMode])
-
-  const [user, setUser] = useState<{ name: string; email: string } | null>(() => {
-    const saved = localStorage.getItem('carpartsradar-user')
-    if (!saved) return null
-    try {
-      const parsed = JSON.parse(saved)
-      // Pre-migration sessions stored a bearer token in localStorage; those
-      // can't authenticate under the httpOnly-cookie scheme. Drop them so the
-      // user re-logs in cleanly instead of appearing logged-in but broken.
-      if (parsed && 'token' in parsed) {
-        localStorage.removeItem('carpartsradar-user')
-        return null
-      }
-      return parsed
-    } catch {
-      return null
-    }
-  })
-  const [accountData, setAccountData] = useState<{ searches: any[]; alerts: any[] } | null>(null)
-  const [signupName, setSignupName] = useState('')
-  const [signupEmail, setSignupEmail] = useState('')
-  const [signupPassword, setSignupPassword] = useState('')
-  const [isRegisterMode, setIsRegisterMode] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [authNotice, setAuthNotice] = useState<string | null>(null)
-  const [authLoading, setAuthLoading] = useState(false)
-  const [accountTab, setAccountTab] = useState<'searches' | 'alerts'>('searches')
 
   const watchlist = useCart(user?.email)
   const recent = useRecentSearches()
@@ -76,11 +36,12 @@ function App() {
     setPart(r.part)
     setShowWatchlist(false)
   }
-
-  // Push a new history entry and update the view. The URL is what makes a
   // search shareable, bookmarkable, and refresh-safe.
   const navigate = (r: AppRoute) => {
-    window.history.pushState(null, '', window.location.pathname + searchFromRoute(r))
+    const newSearch = searchFromRoute(r)
+    if (window.location.search !== newSearch) {
+      window.history.pushState(null, '', window.location.pathname + newSearch)
+    }
     applyRoute(r)
   }
 
@@ -92,32 +53,30 @@ function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  const runSearch = (selectedCar: Car, selectedPart: string) => {
-    recent.record(selectedCar, selectedPart)
-    navigate({ step: 'results', car: selectedCar, part: selectedPart })
+  const runSearch = (selectedCar: { year: string, make: string, model: string, trim?: string }, selectedPart: string) => {
+    const fullCar: Car = { ...selectedCar, trim: selectedCar.trim || '' }
+    recent.record(fullCar, selectedPart)
+    trackSearch(fullCar.year, fullCar.make, fullCar.model, selectedPart)
+    navigate({ step: 'results', car: fullCar, part: selectedPart })
   }
 
-  const goHome = () => navigate({ step: 'car', car: null, part: null })
+  const goHome = () => {
+    setStep('car')
+    navigate({ step: 'car', car: null, part: null })
+  }
 
   const viewKey = showWatchlist ? 'watchlist' : step
 
-  // Fetch real account data when opening the account modal
-  useEffect(() => {
-    if (showAccount && user) {
-      Promise.all([
-        getSavedSearches().catch(() => ({ searches: [] })),
-        getPriceAlerts().catch(() => ({ alerts: [] }))
-      ]).then(([searchesRes, alertsRes]) => {
-        setAccountData({
-          searches: searchesRes.searches || [],
-          alerts: alertsRes.alerts || []
-        })
-      })
-    }
-  }, [showAccount, user])
-
   return (
     <div className="app-bg flex min-h-screen flex-col text-slate-900 dark:text-slate-100">
+      <Helmet>
+        <title>CarPartsRadar — Compare Car Part Prices & Find Cheap Auto Parts</title>
+        <meta name="description" content="Compare car part prices instantly. Find the cheapest live auto parts and listings from eBay and major retailers that fit your exact vehicle." />
+        <meta property="og:title" content="CarPartsRadar — Compare Car Part Prices & Find Cheap Auto Parts" />
+        <meta property="og:description" content="Real-time price comparison for auto parts. Compare eBay listings and major retailers instantly for your exact vehicle." />
+      </Helmet>
+      
+      <Toaster position="top-center" richColors />
       <header ref={headroomRef} className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <button type="button" onClick={goHome} className="group flex min-w-0 items-center gap-2.5 sm:gap-3.5">
@@ -148,8 +107,11 @@ function App() {
             </button>
             <button
               type="button"
-              onClick={() => setShowAccount(true)}
-              className="btn btn-secondary flex items-center gap-2 px-3 py-2.5 text-sm sm:px-4"
+              onClick={() => {
+                setStep('dashboard')
+                setShowWatchlist(false)
+              }}
+              className={`btn flex items-center gap-2 px-3 py-2.5 text-sm sm:px-4 ${step === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
               aria-label="Open account"
             >
               <UserIcon size={17} strokeWidth={2.3} />
@@ -168,15 +130,28 @@ function App() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-10 pt-8 sm:px-6">
-        {!showWatchlist && <StepIndicator current={step} />}
+        {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
         <div key={viewKey} className="animate-slide-up">
           {showWatchlist ? (
-            <CartPanel
-              items={watchlist.items}
-              onRemove={watchlist.removeItem}
-              onClear={watchlist.clear}
-              onClose={() => setShowWatchlist(false)}
-            />
+            <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+              <CartPanel
+                items={watchlist.items}
+                onRemove={watchlist.removeItem}
+                onClear={watchlist.clear}
+                onClose={() => setShowWatchlist(false)}
+              />
+            </Suspense>
+          ) : step === 'dashboard' ? (
+            <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading Dashboard...</div>}>
+              <Dashboard 
+                onClose={() => {
+                  if (car && part) setStep('results')
+                  else if (car) setStep('part')
+                  else setStep('car')
+                }} 
+                onRunSearch={runSearch} 
+              />
+            </Suspense>
           ) : (
             <>
               {step === 'car' && (
@@ -191,12 +166,12 @@ function App() {
                       Live prices, filtered to your exact vehicle
                     </div>
 
-                    <h1 className="mx-auto max-w-3xl text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px]">
-                      The smartest way to buy car parts.
+                    <h1 className="mx-auto max-w-4xl text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px]">
+                      Find the exact parts your vehicle needs, at the lowest prices.
                     </h1>
 
                     <p className="mx-auto mt-5 max-w-lg text-balance text-base text-slate-600 sm:text-lg">
-                      Compare real-time listings from eBay and major retailers — matched to your year, make, model, and trim.
+                      Compare prices across major marketplaces instantly. Fully verified fitment guaranteed.
                     </p>
 
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5 text-sm">
@@ -212,37 +187,43 @@ function App() {
                     </div>
                   </div>
 
-                  <CarSelector
-                    onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
-                  />
-                  <RecentSearches
-                    searches={recent.searches}
-                    onPick={(s) => runSearch(s.car, s.part)}
-                    onClear={recent.clear}
-                  />
-                  <TrustBanner />
+                  <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+                    <CarSelector
+                      onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
+                    />
+                    <RecentSearches
+                      searches={recent.searches}
+                      onPick={(s) => runSearch(s.car, s.part)}
+                      onClear={recent.clear}
+                    />
+                    <TrustBanner />
+                  </Suspense>
                 </>
               )}
 
               {step === 'part' && car && (
-                <PartSelector
-                  car={car}
-                  onBack={goHome}
-                  onSelect={(selectedPart) => runSearch(car, selectedPart)}
-                />
+                <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+                  <PartSelector
+                    car={car}
+                    onBack={goHome}
+                    onSelect={(selectedPart) => runSearch(car, selectedPart)}
+                  />
+                </Suspense>
               )}
 
               {step === 'results' && car && part && (
-                <ResultsList
-                  car={car}
-                  part={part}
-                  onBackToPart={() => navigate({ step: 'part', car, part: null })}
-                  onBackToCar={goHome}
-                  onAddToWatchlist={(listing) =>
-                    watchlist.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)
-                  }
-                  isInWatchlist={watchlist.isInCart}
-                />
+                <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+                  <ResultsList
+                    car={car}
+                    part={part}
+                    onBackToPart={() => navigate({ step: 'part', car, part: null })}
+                    onBackToCar={goHome}
+                    onAddToWatchlist={(listing) =>
+                      watchlist.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)
+                    }
+                    isInWatchlist={watchlist.isInCart}
+                  />
+                </Suspense>
               )}
             </>
           )}
@@ -275,333 +256,6 @@ function App() {
           </p>
         </div>
       </footer>
-
-      {/* Account Modal */}
-      {showAccount && (
-        <Modal label="Account settings" onClose={() => setShowAccount(false)} maxWidth="max-w-md">
-          <div className="p-6 sm:p-7">
-            {user ? (
-              <div>
-                <div className="mb-6 flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700 dark:bg-brand-950/40 dark:text-brand-400">
-                    {user.name.charAt(0).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
-                    <p className="truncate text-xs text-slate-500">{user.email}</p>
-                  </div>
-                </div>
-
-                {accountData && (
-                  <div className="mb-6">
-                    {/* Tab Switcher */}
-                    <div className="flex border-b border-slate-100 mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setAccountTab('searches')}
-                        className={`tab ${accountTab === 'searches' ? 'tab-active' : ''}`}
-                      >
-                        Saved Searches ({accountData.searches.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAccountTab('alerts')}
-                        className={`tab ${accountTab === 'alerts' ? 'tab-active' : ''}`}
-                      >
-                        Price Alerts ({accountData.alerts.length})
-                      </button>
-                    </div>
-
-                    {/* Tab Contents */}
-                    <div className="max-h-60 overflow-y-auto pr-1">
-                      {accountTab === 'searches' ? (
-                        accountData.searches.length > 0 ? (
-                          <div className="space-y-2">
-                            {accountData.searches.map((s: any, i: number) => (
-                              <div
-                                key={s.id ?? i}
-                                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3 hover:bg-slate-50 transition"
-                              >
-                                <div className="min-w-0">
-                                  <div className="font-bold text-slate-900 truncate text-xs">{s.part}</div>
-                                  <div className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
-                                    {s.year} {s.make} {s.model} {s.trim ? `· ${s.trim}` : ''}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setShowAccount(false)
-                                      runSearch({ year: s.year, make: s.make, model: s.model, trim: s.trim || '' }, s.part)
-                                    }}
-                                    className="btn btn-secondary px-2.5 py-1.5 text-[10px]"
-                                  >
-                                    Search
-                                  </button>
-                                  <button
-                                    type="button"
-                                    aria-label={`Delete saved search for ${s.part}`}
-                                    onClick={async () => {
-                                      try {
-                                        await deleteSavedSearch(s.id)
-                                        setAccountData((prev) =>
-                                          prev
-                                            ? {
-                                                searches: prev.searches.filter((x) => x.id !== s.id),
-                                                // Deleting a search cascades to its alerts server-side.
-                                                alerts: prev.alerts.filter((a) => a.saved_search_id !== s.id),
-                                              }
-                                            : prev
-                                        )
-                                      } catch {
-                                        /* leave the row; nothing was deleted */
-                                      }
-                                    }}
-                                    className="btn btn-ghost p-1.5 text-slate-400 hover:text-rose-600"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-slate-400 text-xs">No saved searches yet.</div>
-                        )
-                      ) : (
-                        accountData.alerts.length > 0 ? (
-                          <div className="space-y-2">
-                            {accountData.alerts.map((a: any, i: number) => (
-                              <div
-                                key={a.id ?? i}
-                                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
-                              >
-                                <div className="min-w-0">
-                                  <div className="font-bold text-slate-900 truncate text-xs">
-                                    {a.saved_searches?.part || 'Part'}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
-                                    {a.saved_searches
-                                      ? `${a.saved_searches.year} ${a.saved_searches.make} ${a.saved_searches.model}`
-                                      : 'Vehicle'}
-                                  </div>
-                                  {a.triggered_at ? (
-                                    <div className="mt-1 text-[10px] font-bold text-emerald-700">
-                                      ✓ Dropped to ${Number(a.last_price).toFixed(2)}
-                                    </div>
-                                  ) : a.last_price != null ? (
-                                    <div className="mt-1 text-[10px] font-medium text-slate-500">
-                                      Last checked: ${Number(a.last_price).toFixed(2)}
-                                    </div>
-                                  ) : null}
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className="badge bg-brand-50 text-brand-500 font-extrabold px-2.5 py-1">
-                                    Target: ${a.target_price}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    aria-label={`Delete price alert for ${a.saved_searches?.part || 'part'}`}
-                                    onClick={async () => {
-                                      try {
-                                        await deletePriceAlert(a.id)
-                                        setAccountData((prev) =>
-                                          prev
-                                            ? { ...prev, alerts: prev.alerts.filter((x) => x.id !== a.id) }
-                                            : prev
-                                        )
-                                      } catch {
-                                        /* leave the row; nothing was deleted */
-                                      }
-                                    }}
-                                    className="btn btn-ghost p-1.5 text-slate-400 hover:text-rose-600"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-slate-400 text-xs">No price alerts active yet.</div>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    logoutUser() // clears the httpOnly auth cookie server-side
-                    localStorage.removeItem('carpartsradar-user')
-                    setUser(null)
-                    setShowAccount(false)
-                    setAccountData(null)
-                  }}
-                  className="btn btn-secondary w-full"
-                >
-                  Log Out
-                </button>
-              </div>
-            ) : (
-              <form
-                onSubmit={(e) => e.preventDefault()}
-              >
-                <div className="mb-6 text-center">
-                  <h3 className="text-lg font-semibold tracking-tight text-slate-950">
-                    {isRegisterMode ? 'Create your account' : 'Welcome back'}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {isRegisterMode
-                      ? 'Save searches and get price-drop alerts.'
-                      : 'Sign in to your saved searches and alerts.'}
-                  </p>
-                </div>
-
-                {authError && (
-                  <p className="mb-4 animate-fade-in rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs font-medium text-rose-700">
-                    {authError}
-                  </p>
-                )}
-
-                {authNotice && (
-                  <p className="mb-4 animate-fade-in rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-medium text-emerald-700">
-                    {authNotice}
-                  </p>
-                )}
-
-                {isRegisterMode && (
-                  <div className="mb-3">
-                    <label htmlFor="auth-name" className="field-label">Full name</label>
-                    <input
-                      id="auth-name"
-                      type="text"
-                      autoComplete="name"
-                      placeholder="Jane Doe"
-                      className="field"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <div className="mb-3">
-                  <label htmlFor="auth-email" className="field-label">Email</label>
-                  <input
-                    id="auth-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    className="field"
-                    value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
-                  />
-                </div>
-
-                <div className="mb-5">
-                  <label htmlFor="auth-password" className="field-label">Password</label>
-                  <input
-                    id="auth-password"
-                    type="password"
-                    autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
-                    placeholder="••••••••"
-                    className="field"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  onClick={async () => {
-                    const email = signupEmail.trim()
-                    const password = signupPassword
-                    const name = signupName.trim()
-
-                    if (!email || !password) {
-                      setAuthError('Email and password are required.')
-                      return
-                    }
-
-                    setAuthLoading(true)
-                    setAuthError(null)
-                    setAuthNotice(null)
-
-                    try {
-                      let res
-                      if (isRegisterMode) {
-                        res = await signupUser({ email, password, name })
-                      } else {
-                        res = await loginUser({ email, password })
-                      }
-
-                      // No session (cookie) means the Supabase project requires
-                      // email confirmation. Persisting a user with no auth
-                      // cookie would look logged-in but 401 on every authed
-                      // action, so instead prompt them to confirm, then sign in.
-                      if (res.confirmationRequired) {
-                        setIsRegisterMode(false)
-                        setSignupPassword('')
-                        setAuthNotice(
-                          isRegisterMode
-                            ? 'Account created! Check your email to confirm your address, then sign in.'
-                            : 'Please confirm your email address, then sign in.'
-                        )
-                        return
-                      }
-
-                      // The auth token is in an httpOnly cookie; localStorage
-                      // holds only non-sensitive display info.
-                      const newUser = {
-                        name: res.user?.user_metadata?.full_name || email.split('@')[0] || 'User',
-                        email: res.user?.email || email,
-                      }
-
-                      localStorage.setItem('carpartsradar-user', JSON.stringify(newUser))
-                      setUser(newUser)
-
-                      // Clear inputs and error
-                      setSignupName('')
-                      setSignupEmail('')
-                      setSignupPassword('')
-                      setAuthError(null)
-                      setAuthNotice(null)
-                    } catch (err: any) {
-                      setAuthError(err.message || 'Authentication failed.')
-                    } finally {
-                      setAuthLoading(false)
-                    }
-                  }}
-                  className="btn btn-primary w-full"
-                >
-                  {authLoading ? 'Please wait…' : isRegisterMode ? 'Create Account' : 'Sign In'}
-                </button>
-
-                <div className="mt-5 border-t border-slate-100 pt-4 text-center dark:border-slate-800/60">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRegisterMode(!isRegisterMode)
-                      setAuthError(null)
-                      setAuthNotice(null)
-                    }}
-                    className="text-xs font-medium text-slate-500 transition hover:text-brand-600"
-                  >
-                    {isRegisterMode ? (
-                      <>Already have an account? <span className="font-semibold text-brand-600">Sign in</span></>
-                    ) : (
-                      <>Don't have an account? <span className="font-semibold text-brand-600">Create one</span></>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </Modal>
-      )}
-
     </div>
   )
 }
@@ -632,6 +286,9 @@ function TrustBanner() {
   return (
     <div className="mt-20 border-t border-slate-200/60 pt-14 dark:border-slate-800/60">
       <div className="text-center">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400 shadow-sm">
+          <ShieldCheck size={16} /> Over 45,000 parts compared daily
+        </div>
         <p className="eyebrow text-brand-600 dark:text-brand-400">How it works</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
           From vehicle to best price in three steps

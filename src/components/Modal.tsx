@@ -55,7 +55,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-slate-950/45 backdrop-blur-[2px] p-4"
+      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-slate-950/45 backdrop-blur-[2px] px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={onClose}
     >
       <div

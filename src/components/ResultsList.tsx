@@ -2,23 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronLeft,
   Wrench,
-  Star,
-  Award,
-  Tag,
-  Sparkles,
-  MapPin,
   AlertTriangle,
   ExternalLink,
   Check,
-  Plus,
   RotateCw,
   Truck,
   Store,
-  Package,
-  ShieldCheck,
   Share2,
-  Mail,
 } from 'lucide-react'
+import { Helmet } from 'react-helmet-async'
 import type { Car } from './CarSelector'
 import { searchParts, type Listing } from '../api/client'
 import { usePersistedState } from '../hooks/usePersistedState'
@@ -28,57 +20,16 @@ import { PartDetailModal } from './PartDetailModal'
 import { saveSearch, ApiError } from '../api/supabase'
 import { ComparisonModal } from './ComparisonModal'
 
+import { PriceAlertCard } from './PriceAlertCard'
+import { ListingCard } from './ListingCard'
+import { isNew, isUsed, valueScore } from '../lib/listingHelpers'
+
 type SortKey = 'value' | 'price' | 'rating'
 type ConditionFilter = 'all' | 'new' | 'used'
 
-function valueScore(l: Listing) {
-  const pct = l.sellerFeedbackPercentage ? Number(l.sellerFeedbackPercentage) : 92
-  const trust = Math.min(100, Math.max(80, pct))
-  const penalty = (100 - trust) / 100
-  let effective = l.price * (1 + penalty)
-  if (l.topRatedSeller) effective *= 0.95
-  return effective
-}
-
-const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
-
-function deliveryLabel(l: Listing) {
-  if (!l.deliveryMin && !l.deliveryMax) return null
-  try {
-    const min = l.deliveryMin ? new Date(l.deliveryMin) : null
-    const max = l.deliveryMax ? new Date(l.deliveryMax) : null
-    if (min && isNaN(min.getTime())) return null
-    if (max && isNaN(max.getTime())) return null
-
-    if (min && max && min.toDateString() !== max.toDateString()) {
-      if (min.getMonth() === max.getMonth()) {
-        return `Arrives ${dateFmt.format(min)}–${max.getDate()}`
-      }
-      return `Arrives ${dateFmt.format(min)}–${dateFmt.format(max)}`
-    }
-    const d = max || min
-    return d ? `Arrives ${dateFmt.format(d)}` : null
-  } catch {
-    return null
-  }
-}
-
-function shippingLabel(l: Listing) {
-  if (l.shippingCost == null) return null
-  return l.shippingCost === 0 ? 'Free shipping' : `+$${l.shippingCost.toFixed(2)} shipping`
-}
-
-function isNew(l: Listing) {
-  return l.condition?.toLowerCase().startsWith('new')
-}
-function isUsed(l: Listing) {
-  const c = l.condition?.toLowerCase() ?? ''
-  return c.includes('used') || c.includes('refurb')
-}
-
 function SkeletonCard() {
   return (
-    <li className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800">
+    <li className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 min-h-[160px]">
       <div className="flex gap-5">
         <div className="h-24 w-24 shrink-0 animate-shimmer rounded-xl bg-slate-200" />
         <div className="flex-1 space-y-3 py-1">
@@ -248,6 +199,11 @@ export function ResultsList({
 
   }, [results, sortBy, condition, hideOverseas, filterFastDelivery, minRating])
 
+  const cheapestId = useMemo(() => {
+    if (visible.length === 0) return null
+    return [...visible].sort((a, b) => (a.price + (a.shippingCost || 0)) - (b.price + (b.shippingCost || 0)))[0].id
+  }, [visible])
+
   const priceRange = useMemo(() => {
     if (visible.length === 0) return null
     const prices = visible.map((l) => l.price)
@@ -256,14 +212,29 @@ export function ResultsList({
 
   const failedProviders = Object.keys(providerErrors)
   const vehicleLabel = `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`
+  const pageTitle = `${vehicleLabel} ${part} — Compare Prices on CarPartsRadar`
+  const pageDescription = `Compare real-time prices for ${part} on a ${vehicleLabel}. Find the cheapest listings with verified fitment across top marketplaces.`
 
   return (
+    <>
+    <Helmet>
+      <title>{pageTitle}</title>
+      <meta name="description" content={pageDescription} />
+      <meta property="og:title" content={pageTitle} />
+      <meta property="og:description" content={pageDescription} />
+    </Helmet>
+    
     <div className="card p-6 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <VehicleThumbnail make={car.make} model={car.model} className="h-11 w-16" iconSize={20} />
           <div>
-            <h1 className="text-lg font-bold text-slate-900">{part}</h1>
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              {part}
+              {part.toLowerCase().includes('kit') && (
+                <span className="badge bg-brand-600 text-white shadow-sm px-2">Bundle Deal</span>
+              )}
+            </h1>
             <p className="text-sm text-slate-500">
               Fitting your <span className="font-medium text-slate-700">{vehicleLabel}</span>
             </p>
@@ -299,8 +270,8 @@ export function ResultsList({
                 setTimeout(() => setSaveState('idle'), 3500)
               }
             }}
-            className={`btn btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5 ${
-              saveState === 'error' || saveState === 'auth' ? 'text-rose-600' : ''
+            className={`btn btn-accent px-4 py-2 text-xs flex items-center gap-1.5 shadow-md ${
+              saveState === 'error' || saveState === 'auth' ? 'bg-rose-600 hover:bg-rose-700' : ''
             }`}
           >
             {saveState === 'saved' && <Check size={13} className="text-emerald-600 animate-scale-up" />}
@@ -538,134 +509,28 @@ export function ResultsList({
                 {visible.map((listing, i) => {
                   const inWatchlist = isInWatchlist(listing.id)
                   const isBestValue = listing.id === bestValueId
+                  const isCheapest = listing.id === cheapestId
                   return (
-                    <li
+                    <ListingCard
                       key={listing.id}
-                      onClick={(e) => {
-                        // Open the detail view unless an inner button/link was the target.
-                        if ((e.target as HTMLElement).closest('a,button')) return
-                        setSelectedListing(listing)
+                      listing={listing}
+                      index={i}
+                      isBestValue={isBestValue}
+                      isCheapest={isCheapest}
+                      inWatchlist={inWatchlist}
+                      isComparing={compareList.some(l => l.id === listing.id)}
+                      effectiveZip={effectiveZip}
+                      onSelect={setSelectedListing}
+                      onAddToWatchlist={onAddToWatchlist}
+                      onToggleCompare={(l) => {
+                        const isComparing = compareList.some(comp => comp.id === l.id)
+                        if (isComparing) {
+                          setCompareList(compareList.filter(comp => comp.id !== l.id))
+                        } else if (compareList.length < 4) {
+                          setCompareList([...compareList, l])
+                        }
                       }}
-                      className={`listing-card group flex flex-col gap-4 p-5 sm:flex-row sm:items-start cursor-pointer ${isBestValue ? 'ring-1 ring-brand-300/70' : ''}`}
-                    >
-                      {isBestValue && (
-                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-600 to-teal-600" />
-                      )}
-
-                      <div className="relative shrink-0">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
-                          {i + 1}
-                        </div>
-                        {listing.image ? (
-                          <img
-                            src={listing.image}
-                            alt={listing.title}
-                            loading="lazy"
-                            width={96}
-                            height={96}
-                            className="mt-3 h-24 w-24 rounded-xl border border-slate-100 object-cover shadow-sm"
-                          />
-                        ) : (
-                          <div className="mt-3 flex h-24 w-24 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-slate-300">
-                            <Package size={30} strokeWidth={1.25} />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-w-0 flex-1 pt-1">
-                        <div className="flex flex-col gap-y-1 pr-1 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-[15px] font-semibold leading-tight tracking-[-0.1px] text-slate-950 group-hover:text-brand-700">
-                              {listing.title}
-                            </h3>
-                            {isBestValue && (
-                              <span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 font-extrabold uppercase tracking-wider px-2 py-0.5 text-[9px] shrink-0">
-                                Best Value
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 shrink-0 text-right sm:mt-0">
-                            {listing.originalPrice && (
-                              <div className="text-xs text-emerald-600 font-medium">↓ Price dropped</div>
-                            )}
-                            {listing.originalPrice && <div className="text-xs text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</div>}
-                            <div className="font-semibold tracking-[-0.5px] text-slate-950 text-[24px] leading-none">
-                              ${listing.price.toFixed(2)}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                          <span className="badge bg-slate-100 text-slate-700 px-2.5 py-0.5 text-[11px]">{listing.condition}</span>
-                          <span className="font-medium">{listing.seller} · {listing.source}</span>
-                          {listing.sellerFeedbackPercentage && (
-                            <span className="inline-flex items-center gap-1 text-amber-600">
-                              <Star size={13} className="fill-current" /> {listing.sellerFeedbackPercentage}%
-                              {listing.sellerFeedbackScore && <span className="text-slate-400">({listing.sellerFeedbackScore.toLocaleString()})</span>}
-                            </span>
-                          )}
-                        </div>
-
-                        {listing.itemLocation && <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500"><MapPin size={13} /> {listing.itemLocation}</div>}
-
-                        {(shippingLabel(listing) || deliveryLabel(listing)) && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm text-slate-600">
-                            <span className="inline-flex items-center gap-1 font-medium">
-                              <Truck size={13} className="text-slate-400" />
-                              {shippingLabel(listing) === 'Free shipping' ? <span className="font-semibold text-emerald-600">Free shipping</span> : shippingLabel(listing)}
-                            </span>
-                            {deliveryLabel(listing) && <span className="text-slate-500">· {deliveryLabel(listing)}{effectiveZip && ` to ${effectiveZip}`}</span>}
-                          </div>
-                        )}
-
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {listing.verifiedFitment === false ? (
-                            <span className="badge bg-amber-100 text-amber-800"><AlertTriangle size={12} /> Fitment not verified</span>
-                          ) : (
-                            <span className="badge bg-emerald-100 text-emerald-800"><ShieldCheck size={12} /> Verified fitment</span>
-                          )}
-                          {isBestValue && (
-                            <span className="group relative badge bg-emerald-100 text-emerald-800 cursor-help">
-                              <Sparkles size={12} /> Recommended (Best Value)
-                              <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-normal leading-normal text-white opacity-0 shadow-xl transition-all duration-200 group-hover:opacity-100">
-                                <strong>Best Value Deal:</strong> Calculated by weighing total price (with shipping), seller feedback, and vehicle fitment compatibility.
-                                <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 bg-slate-950 rotate-45" />
-                              </span>
-                            </span>
-                          )}
-                          {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={12} /> Top Rated</span>}
-                          {listing.bestOfferAccepted && <span className="badge bg-slate-100 text-slate-700">Best Offer</span>}
-                          {listing.originalPrice && listing.discountPercentage && <span className="badge bg-rose-100 text-rose-700"><Tag size={12} /> {listing.discountPercentage}% off</span>}
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <a href={listing.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary px-5 py-2 text-sm">
-                            View on {listing.source} <ExternalLink size={14} />
-                          </a>
-                          <button
-                            type="button"
-                            disabled={inWatchlist}
-                            onClick={() => onAddToWatchlist(listing)}
-                            className={`btn px-5 py-2 text-sm ${inWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
-                          >
-                            {inWatchlist ? <><Check size={15} /> Watching</> : <><Plus size={15} /> Watch part</>}
-                          </button>
-                          <button
-                            onClick={() => {
-                              const isComparing = compareList.some(l => l.id === listing.id)
-                              if (isComparing) {
-                                setCompareList(compareList.filter(l => l.id !== listing.id))
-                              } else if (compareList.length < 4) {
-                                setCompareList([...compareList, listing])
-                              }
-                            }}
-                            className="btn btn-ghost px-4 py-2 text-sm"
-                          >
-                            {compareList.some(l => l.id === listing.id) ? 'Remove' : 'Compare'}
-                          </button>
-                        </div>
-                      </div>
-                    </li>
+                    />
                   )
                 })}
               </ul>
@@ -760,82 +625,6 @@ export function ResultsList({
         </div>
       )}
     </div>
-  )
-}
-
-function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: string; targetPrice: number }) {
-  const [email, setEmail] = useState('')
-  const [subscribed, setSubscribed] = useState(false)
-  const [subscribing, setSubscribing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email.trim() || targetPrice <= 0) return
-    setSubscribing(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/supabase/price-alerts/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          year: car.year,
-          make: car.make,
-          model: car.model,
-          trim: car.trim || '',
-          part,
-          target_price: targetPrice,
-        }),
-      })
-      if (!res.ok) throw new Error('Failed to subscribe')
-      setSubscribed(true)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setSubscribing(false)
-    }
-  }
-
-  return (
-    <div className="card p-6">
-      <div className="flex items-center gap-3">
-        <div className="icon-tile bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
-          <Mail size={17} />
-        </div>
-        <div>
-          <div className="font-semibold tracking-tight text-slate-950">Price drop alerts</div>
-          <div className="text-xs text-slate-500">Get notified when this part gets cheaper</div>
-        </div>
-      </div>
-
-      {subscribed ? (
-        <div className="mt-4 rounded-2xl bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 animate-scale-up">
-          ✓ Alert active! We'll email you if prices drop below ${targetPrice.toFixed(2)}.
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Target alert threshold set to the best value price of <strong>${targetPrice.toFixed(2)}</strong>.
-          </p>
-          <input
-            type="email"
-            placeholder="your.email@example.com"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="field py-2 text-xs"
-          />
-          <button
-            type="submit"
-            disabled={subscribing}
-            className="btn btn-primary w-full py-2.5 text-xs font-bold"
-          >
-            {subscribing ? 'Creating alert…' : 'Notify Me'}
-          </button>
-          {error && <p className="text-[11px] text-rose-600">{error}</p>}
-        </form>
-      )}
-    </div>
+    </>
   )
 }

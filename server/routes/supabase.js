@@ -9,13 +9,13 @@ const AUTH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 // The auth token lives ONLY in an httpOnly cookie so page JavaScript (and thus
 // any XSS) can never read it. secure is on in production (HTTPS); off locally
-// so the cookie still works over http://localhost. sameSite=lax blocks it from
-// cross-site POSTs, which mitigates CSRF for these state-changing routes.
+// so the cookie still works over http://localhost. sameSite=strict blocks it from
+// cross-site POSTs and GETs, which mitigates CSRF for these state-changing routes.
 function setAuthCookie(res, token) {
   res.cookie(AUTH_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     maxAge: AUTH_COOKIE_MAX_AGE,
     path: '/',
   })
@@ -26,7 +26,7 @@ function clearAuthCookie(res) {
   res.clearCookie(AUTH_COOKIE, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     path: '/',
   })
 }

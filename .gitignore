@@ -23,6 +23,13 @@ server/.env.*
 # Vercel
 .vercel
 
+# Local scratch data for server/scripts/generateMappings.js — large eBay
+# category dumps, not read by any runtime code. Regenerate locally if needed.
+server/categories.json
+server/leaves.json
+server/models.json
+server/generated_mappings.json
+
 # Local AI tooling artifacts (session logs, configs)
 .claude/
 terminals/

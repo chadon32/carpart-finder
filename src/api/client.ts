@@ -137,3 +137,16 @@ export function searchParts(
   if (zip) params.set('zip', zip)
   return getJson(`/api/search?${params.toString()}`)
 }
+
+export function identifyPartFromImage(base64Image: string): Promise<{ partName: string; confidence: number }> {
+  return fetch('/api/identify-part', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64Image }),
+  }).then(async (res) => {
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to identify part')
+    return data
+  })
+}
+

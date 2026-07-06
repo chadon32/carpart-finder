@@ -1,6 +1,9 @@
-import { X, ExternalLink, Star, Truck, Award, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { X, ExternalLink, Star, Truck, Award, ShieldCheck, Sparkles } from 'lucide-react'
 import type { Listing } from '../api/client'
 import { Modal } from './Modal'
+import { RepairGuideModal } from './RepairGuideModal'
+import { trackAddedToWatchlist } from '../lib/analytics'
 
 function PriceHistoryChart({ price }: { price: number }) {
   // Generate deterministic mock price history values
@@ -137,7 +140,10 @@ export function PartDetailModal({
   onAddToWatchlist,
   isInWatchlist,
 }: PartDetailModalProps) {
+  const [showGuideModal, setShowGuideModal] = useState(false)
+
   return (
+    <>
     <Modal label={`${part} — listing details`} onClose={onClose}>
       {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
@@ -218,6 +224,28 @@ export function PartDetailModal({
                 <ShieldCheck size={14} /> Verified to fit {vehicleLabel}
               </div>
             )}
+            
+            {/* AI Repair Guide Section */}
+            <div className="mt-8 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/50 to-brand-50/20 p-5 shadow-sm">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sparkles size={16} className="text-brand-600" />
+                    <h4 className="font-bold text-slate-900 tracking-tight">Need help replacing this?</h4>
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    Get a custom step-by-step AI repair guide for your {vehicleLabel}.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowGuideModal(true)}
+                  className="btn btn-primary whitespace-nowrap px-4 py-2 text-sm shadow-sm hover:shadow transition-shadow w-full sm:w-auto"
+                >
+                  Generate AI Guide
+                </button>
+              </div>
+            </div>
+            
           </div>
         </div>
 
@@ -228,9 +256,12 @@ export function PartDetailModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex flex-col gap-3 border-t bg-slate-50 p-6 sm:flex-row">
+        <div className="flex flex-col gap-3 border-t bg-slate-50 p-6 sm:flex-row mt-4">
           <button
-            onClick={onAddToWatchlist}
+            onClick={() => {
+              onAddToWatchlist()
+              trackAddedToWatchlist(part, listing.price, listing.source)
+            }}
             disabled={isInWatchlist}
             className={`btn flex-1 py-3 text-base ${isInWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
           >
@@ -251,5 +282,14 @@ export function PartDetailModal({
           </button>
         </div>
     </Modal>
+    
+    {showGuideModal && (
+      <RepairGuideModal
+        vehicleLabel={vehicleLabel}
+        part={part}
+        onClose={() => setShowGuideModal(false)}
+      />
+    )}
+    </>
   )
 }

@@ -14,9 +14,15 @@ import { getVehicleImage } from '../server/vehicleImages.js'
 import supabaseRoutes from '../server/routes/supabase.js'
 import { checkPriceAlerts } from '../server/workers/priceChecker.js'
 import { diagnoseSymptom } from '../server/symptoms.js'
+import { generateRepairGuide } from '../server/routes/ai.js'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const app = express()
-app.use(express.json())
+// 100kb is fine for every JSON body except the AI photo-identify endpoint,
+// whose base64 image (client-downscaled to ~1024px JPEG) can land higher.
+// 2mb comfortably covers that while still well under Vercel's serverless
+// request-body ceiling (~4.5mb) and rate-limiting oversized abuse.
+app.use(express.json({ limit: '2mb' }))
 
 // Secure CORS configuration
 const allowedOrigins = [
@@ -29,6 +35,14 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true)
+    
+    // In dev, allow local network IPs for mobile testing
+    if (process.env.NODE_ENV !== 'production') {
+      if (origin.startsWith('http://192.168.') || origin.startsWith('http://10.')) {
+        return callback(null, true)
+      }
+    }
+    
     if (allowedOrigins.includes(origin)) {
       return callback(null, true)
     }
@@ -46,6 +60,11 @@ app.use((_req, res, next) => {
   res.set('X-Frame-Options', 'DENY')
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:")
+  
+  if (process.env.NODE_ENV === 'production') {
+    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+  
   next()
 })
 
@@ -77,11 +96,14 @@ function validateYear(year) {
   return Number.isInteger(y) && y >= 1980 && y <= new Date().getFullYear() + 1
 }
 // Returns an error string, or null when the vehicle fields are acceptable.
-function vehicleError({ year, make, model }) {
+function vehicleError({ year, make, model, trim, part }) {
   if (!validateYear(year)) return 'A valid model year (1980–present) is required'
-  for (const [label, value] of [['make', make], ['model', model]]) {
-    const s = String(value ?? '').trim()
-    if (!s) return `${label} is required`
+  const fields = { make, model, trim, part }
+  const required = ['make', 'model']
+  for (const [label, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    const s = String(value).trim()
+    if (required.includes(label) && !s) return `${label} is required`
     if (s.length > MAX_VEHICLE_FIELD) return `${label} is too long`
   }
   return null
@@ -129,6 +151,8 @@ app.get('/api/prices', async (req, res) => {
     res.status(502).json({ error: 'Failed to fetch data' })
   }
 })
+
+app.post('/api/ai/repair-guide', generateRepairGuide)
 
 app.get('/api/trims', async (req, res) => {
   const { year, make, model } = req.query
@@ -256,7 +280,7 @@ app.get('/api/quote', async (req, res) => {
   if (parts.length === 0) {
     return res.status(400).json({ error: 'parts query param is required' })
   }
-  const invalid = vehicleError({ year, make, model })
+  const invalid = vehicleError({ year, make, model, trim })
   if (invalid) {
     return res.status(400).json({ error: invalid })
   }
@@ -306,12 +330,63 @@ app.get('/api/quote', async (req, res) => {
   }
 })
 
+app.post('/api/identify-part', async (req, res) => {
+  const { image } = req.body
+  if (!image) {
+    return res.status(400).json({ error: 'image body param is required' })
+  }
+  
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'Gemini API key is not configured' })
+    }
+
+    const match = image.match(/^data:(image\/[a-zA-Z0-9+-]+);base64,(.+)$/)
+    if (!match) {
+      return res.status(400).json({ error: 'Invalid image format. Expected base64 Data URL.' })
+    }
+    const mimeType = match[1]
+    const base64Data = match[2]
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    
+    // First, try the fast and cheap Flash model
+    const flashModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const prompt = "You are an expert automotive mechanic. Identify the car part in this image. Return ONLY the exact, standard name of the part in Title Case. Do not include any other text, descriptions, or punctuation. If you cannot clearly identify the part or are unsure, you MUST return exactly the word 'UNKNOWN'."
+    
+    let result = await flashModel.generateContent([
+      prompt,
+      { inlineData: { data: base64Data, mimeType } }
+    ])
+    
+    let partName = result.response.text().trim().replace(/['"]/g, '')
+    
+    // If Flash couldn't identify it, escalate to the Pro model
+    if (partName.toUpperCase() === 'UNKNOWN') {
+      console.log('[AI] Flash failed to identify part. Escalating to Pro model...')
+      const proModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
+      const proPrompt = "You are an expert automotive mechanic analyzing a difficult, dirty, or obscured image. Identify the car part in this image. Return ONLY the exact, standard name of the part in Title Case. Do not include any other text."
+      
+      result = await proModel.generateContent([
+        proPrompt,
+        { inlineData: { data: base64Data, mimeType } }
+      ])
+      partName = result.response.text().trim().replace(/['"]/g, '')
+    }
+    
+    res.json({ partName, confidence: 0.95 })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to identify image' })
+  }
+})
+
 app.get('/api/search', async (req, res) => {
   const { year, make, model, part, trim, zip } = req.query
   if (!part || !String(part).trim()) {
     return res.status(400).json({ error: 'part query param is required' })
   }
-  const invalid = vehicleError({ year, make, model })
+  const invalid = vehicleError({ year, make, model, trim, part })
   if (invalid) {
     return res.status(400).json({ error: invalid })
   }

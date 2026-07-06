@@ -1,16 +1,97 @@
 import { useState } from 'react'
-import { Zap, AlertTriangle, Search, ArrowRight, Wrench, ExternalLink } from 'lucide-react'
+import { Zap, AlertTriangle, Search, ArrowRight, Wrench, ExternalLink, Disc, Cog, Thermometer, Box, Camera, Image as ImageIcon, CheckCircle2 } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { Combobox } from './Combobox'
 import { partTypesForVehicle, popularPartTypesForVehicle } from '../data/partTypes'
 import { isElectricVehicle } from '../data/electricVehicles'
-import { diagnoseProblem, fetchQuote, type DiagnosisMatch, type QuoteResponse } from '../api/client'
+import { diagnoseProblem, fetchQuote, identifyPartFromImage, type DiagnosisMatch, type QuoteResponse } from '../api/client'
+
+// Phone camera photos are routinely 3-8MB raw, but the AI model only needs
+// enough resolution to recognize a part, and the request has to fit under
+// Vercel's ~4.5MB serverless body limit regardless of server-side config.
+// Downscale to a max dimension and re-encode as JPEG before ever sending it.
+const MAX_PHOTO_DIMENSION = 1024
+const PHOTO_JPEG_QUALITY = 0.82
+
+function downscaleImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('Canvas is not supported in this browser'))
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', PHOTO_JPEG_QUALITY))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Could not read that image'))
+    }
+    img.src = objectUrl
+  })
+}
 
 const SYMPTOM_EXAMPLES = [
   'Grinding noise when I press the brake pedal',
   "Car won't start, just rapid clicking",
   'Squealing from the engine on cold mornings',
   'Clunking over bumps and potholes',
+]
+
+const MAINTENANCE_KITS = [
+  {
+    title: 'Complete Brake Job',
+    search: 'Brake Pad and Rotor Kit',
+    desc: 'Includes front & rear brake pads and rotors.',
+    icon: Disc,
+    color: 'text-blue-600',
+    bg: 'bg-blue-50 dark:bg-blue-900/20'
+  },
+  {
+    title: 'Engine Tune-Up',
+    search: 'Ignition Coil Spark Plug Kit',
+    desc: 'Includes spark plugs, ignition coils, and boots.',
+    icon: Zap,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50 dark:bg-amber-900/20'
+  },
+  {
+    title: 'Timing Service',
+    search: 'Timing Belt Water Pump Kit',
+    desc: 'Includes timing belt, water pump, pulleys, and tensioners.',
+    icon: Cog,
+    color: 'text-brand-600',
+    bg: 'bg-brand-50 dark:bg-brand-900/20'
+  },
+  {
+    title: 'Front Suspension Rebuild',
+    search: 'Control Arm Suspension Kit',
+    desc: 'Includes control arms, ball joints, and tie rods.',
+    icon: Wrench,
+    color: 'text-purple-600',
+    bg: 'bg-purple-50 dark:bg-purple-900/20'
+  },
+  {
+    title: 'Cooling System Refresh',
+    search: 'Radiator Hose Thermostat Kit',
+    desc: 'Includes radiator, main hoses, and thermostat.',
+    icon: Thermometer,
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50 dark:bg-emerald-900/20'
+  },
+  {
+    title: 'Full Filter Service',
+    search: 'Air Cabin Filter Kit',
+    desc: 'Includes engine air filter and cabin air filter.',
+    icon: Box,
+    color: 'text-slate-600',
+    bg: 'bg-slate-50 dark:bg-slate-800'
+  }
 ]
 
 const COMMON_DTCs: Record<string, { definition: string; parts: string[]; description: string }> = {
@@ -90,7 +171,7 @@ export function PartSelector({
   onSelect: (part: string) => void
   onBack: () => void
 }) {
-  const [searchMethod, setSearchMethod] = useState<'name' | 'code' | 'symptom'>('name')
+  const [searchMethod, setSearchMethod] = useState<'name' | 'kits' | 'code' | 'symptom' | 'photo'>('name')
   const [dtcInput, setDtcInput] = useState('')
 
   // "Describe a problem" tab state
@@ -103,6 +184,12 @@ export function PartSelector({
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
   const [quoting, setQuoting] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
+
+  // Photo Search state
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoScanning, setPhotoScanning] = useState(false)
+  const [photoResult, setPhotoResult] = useState<{ partName: string, confidence: number } | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   const initChecklist = (match: DiagnosisMatch) => {
     const next: Record<string, boolean> = {}
@@ -159,6 +246,30 @@ export function PartSelector({
   const partTypes = partTypesForVehicle(electric)
   const popularPartTypes = popularPartTypesForVehicle(electric)
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Reset state
+    setPhotoResult(null)
+    setPhotoError(null)
+    setPhotoScanning(true)
+
+    try {
+      // Downscale/re-encode first: phone photos are routinely several MB,
+      // which both exceeds sane request sizes and slows the AI call for no
+      // benefit — the model doesn't need full resolution to name a part.
+      const base64 = await downscaleImage(file)
+      setPhotoPreview(base64)
+      const result = await identifyPartFromImage(base64)
+      setPhotoResult(result)
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Failed to analyze image')
+    } finally {
+      setPhotoScanning(false)
+    }
+  }
+
   // Find dynamic lookup code match
   const codeKey = dtcInput.trim().toUpperCase()
   const matchedDtc = COMMON_DTCs[codeKey] || (codeKey.length >= 4 && /^[P]\d{4}$/.test(codeKey) ? {
@@ -202,10 +313,24 @@ export function PartSelector({
         </button>
         <button
           type="button"
+          onClick={() => setSearchMethod('kits')}
+          className={`tab ${searchMethod === 'kits' ? 'tab-active' : ''}`}
+        >
+          Maintenance Kits
+        </button>
+        <button
+          type="button"
           onClick={() => setSearchMethod('code')}
           className={`tab ${searchMethod === 'code' ? 'tab-active' : ''}`}
         >
           Error Code (OBD-II)
+        </button>
+        <button
+          type="button"
+          onClick={() => setSearchMethod('photo')}
+          className={`tab ${searchMethod === 'photo' ? 'tab-active' : ''}`}
+        >
+          Photo Search
         </button>
         <button
           type="button"
@@ -466,6 +591,122 @@ export function PartSelector({
             </div>
           </div>
         </>
+      ) : searchMethod === 'kits' ? (
+        <div className="animate-fade-in space-y-5">
+          <div>
+            <label className="field-label">Pre-bundled Maintenance Kits</label>
+            <p className="text-xs text-slate-500 mb-4">Save time and money by purchasing all required components for a repair job in a single bundled kit.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {MAINTENANCE_KITS.map((kit) => {
+              const Icon = kit.icon
+              return (
+                <button
+                  key={kit.title}
+                  type="button"
+                  onClick={() => onSelect(kit.search)}
+                  className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 text-left transition-all hover:border-brand-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${kit.bg} ${kit.color}`}>
+                      <Icon size={22} strokeWidth={2} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold tracking-tight text-slate-900 group-hover:text-brand-700">{kit.title}</h3>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">{kit.desc}</p>
+                    </div>
+                  </div>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-0 -translate-x-2">
+                    <ArrowRight size={18} className="text-brand-500" />
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : searchMethod === 'photo' ? (
+        <div className="animate-fade-in space-y-5">
+          <div className="text-center mb-6">
+            <h3 className="text-lg font-bold text-slate-900 tracking-tight">Don't know the part name?</h3>
+            <p className="text-sm text-slate-500 mt-1">Take a photo of the broken part and our AI will identify it.</p>
+          </div>
+          
+          {!photoPreview ? (
+            <label className="relative flex flex-col items-center justify-center w-full h-48 sm:h-64 border-2 border-slate-200 border-dashed rounded-2xl cursor-pointer bg-slate-50/50 hover:bg-slate-50 hover:border-brand-300 transition-all group dark:border-slate-800 dark:bg-slate-900/30">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <div className="h-12 w-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <Camera size={24} />
+                </div>
+                <p className="mb-1 text-sm font-semibold text-slate-700">Tap to take a photo</p>
+                <p className="text-xs text-slate-400">or upload an existing image</p>
+              </div>
+              {/* capture="environment" prefers the rear camera on mobile */}
+              <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handlePhotoUpload} />
+            </label>
+          ) : (
+            <div className="space-y-4">
+              <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-black/5 dark:border-slate-800 h-64 sm:h-80 w-full flex items-center justify-center">
+                <img src={photoPreview} alt="Uploaded part" className="max-h-full object-contain" />
+                
+                {photoScanning && (
+                  <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white z-10 animate-in fade-in duration-300">
+                    <div className="relative h-16 w-16 mb-4">
+                      <div className="absolute inset-0 border-4 border-brand-500/30 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                      <ImageIcon className="absolute inset-0 m-auto text-brand-400" size={24} />
+                    </div>
+                    <div className="font-semibold text-sm tracking-wide">AI is analyzing image...</div>
+                  </div>
+                )}
+              </div>
+              
+              {photoError && (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-sm text-rose-700">
+                  <AlertTriangle className="shrink-0 mt-0.5" size={16} />
+                  <div>
+                    <div className="font-semibold">Identification Failed</div>
+                    <div>{photoError}</div>
+                  </div>
+                </div>
+              )}
+              
+              {photoResult && (
+                <div className="p-5 rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900/30 dark:bg-emerald-950/20 animate-fade-in flex flex-col sm:flex-row items-center gap-4 justify-between">
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center">
+                      <CheckCircle2 size={22} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">Identified Part</div>
+                      <div className="text-lg font-bold text-slate-900">{photoResult.partName}</div>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => onSelect(photoResult.partName)}
+                    className="btn btn-primary w-full sm:w-auto whitespace-nowrap"
+                  >
+                    Find this part <ArrowRight size={16} />
+                  </button>
+                </div>
+              )}
+              
+              <div className="text-center pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setPhotoPreview(null)
+                    setPhotoResult(null)
+                    setPhotoError(null)
+                  }}
+                  className="text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors"
+                >
+                  Try another photo
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="space-y-5">
           <div>
