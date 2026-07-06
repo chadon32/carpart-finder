@@ -24,11 +24,20 @@ const app = express()
 // request-body ceiling (~4.5mb) and rate-limiting oversized abuse.
 app.use(express.json({ limit: '2mb' }))
 
-// Secure CORS configuration
+// Secure CORS configuration. The production domains are hardcoded rather
+// than relying solely on FRONTEND_URL: the site now serves on both the apex
+// (carpartsradar.com, primary) and www (redirects to apex), and a single
+// misconfigured/missing env var would otherwise CORS-reject every real
+// browser request (POST/DELETE always sends an Origin header, even
+// same-origin) — silently breaking login, signup, saved searches, and price
+// alerts in production while looking fine from curl (no Origin) or from
+// localhost (hardcoded below).
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
-  process.env.FRONTEND_URL, // e.g. https://yourdomain.com
+  'https://carpartsradar.com',
+  'https://www.carpartsradar.com',
+  process.env.FRONTEND_URL, // extra override, e.g. a staging domain
 ].filter(Boolean)
 
 app.use(cors({
