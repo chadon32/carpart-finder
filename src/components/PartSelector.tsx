@@ -36,6 +36,20 @@ function downscaleImage(file: File): Promise<string> {
   })
 }
 
+// Honest, human-readable confidence bands for a diagnosis match. Deliberately
+// hedged ("Likely"/"Possible") — these are common-cause suggestions, never a
+// definitive diagnosis.
+const CONFIDENCE_LABELS: Record<'strong' | 'likely' | 'possible', string> = {
+  strong: 'Strong match',
+  likely: 'Likely match',
+  possible: 'Possible match',
+}
+const CONFIDENCE_STYLES: Record<'strong' | 'likely' | 'possible', string> = {
+  strong: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
+  likely: 'bg-brand-100 text-brand-800 dark:bg-brand-950/30 dark:text-brand-400',
+  possible: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+}
+
 const SYMPTOM_EXAMPLES = [
   'Grinding noise when I press the brake pedal',
   "Car won't start, just rapid clicking",
@@ -420,8 +434,13 @@ export function PartSelector({
               <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                 <div className="flex items-start gap-2.5">
                   <span className="badge bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-400 shrink-0 mt-0.5">{activeMatch.system}</span>
-                  <div>
-                    <div className="text-sm font-semibold tracking-tight text-slate-900">{activeMatch.title}</div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-semibold tracking-tight text-slate-900">{activeMatch.title}</div>
+                      <span className={`badge shrink-0 ${CONFIDENCE_STYLES[activeMatch.confidence]}`}>
+                        {CONFIDENCE_LABELS[activeMatch.confidence]}
+                      </span>
+                    </div>
                     <p className="mt-1 text-xs leading-relaxed text-slate-500">{activeMatch.summary}</p>
                   </div>
                 </div>

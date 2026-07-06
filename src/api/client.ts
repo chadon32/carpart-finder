@@ -88,6 +88,7 @@ export type DiagnosisMatch = {
   summary: string
   safety: string | null
   score: number
+  confidence: 'strong' | 'likely' | 'possible'
   parts: SymptomPart[]
 }
 

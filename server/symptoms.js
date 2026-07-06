@@ -2189,23 +2189,44 @@ function groupMatches(text, group) {
   return group.terms.some((term) => new RegExp(`\\b${escapeRegex(term)}`, 'i').test(text))
 }
 
+// The raw additive score isn't a probability — it's a keyword-match strength.
+// Translate it into an honest, human-readable band. A high score means the
+// user hit both a distinctive symptom term AND its context (e.g. "grinding"
+// AND "brake"), which is a strong signal; a bare MIN_SCORE hit is weaker.
+function confidenceBand(score) {
+  if (score >= 8) return 'strong'
+  if (score >= 6) return 'likely'
+  return 'possible'
+}
+
 /**
  * Match a free-text problem description against the knowledge base.
- * Returns up to MAX_MATCHES entries scoring >= MIN_SCORE, best first.
+ * Returns up to MAX_MATCHES entries scoring >= MIN_SCORE, best first. Each
+ * carries a `confidence` band ('strong' | 'likely' | 'possible') derived from
+ * the match strength — never presented as a definitive diagnosis.
  */
 export function diagnoseSymptom(text) {
   const t = String(text || '').toLowerCase().slice(0, 600)
   if (!t.trim()) return []
 
   return SYMPTOMS.map((entry) => {
-    const score = entry.keywords.reduce(
-      (sum, group) => (groupMatches(t, group) ? sum + group.weight : sum),
-      0
-    )
-    return { entry, score }
+    // Count both the summed weight and how many distinct groups matched — a
+    // match across multiple groups is more trustworthy than one fat group.
+    let score = 0
+    let groupsMatched = 0
+    for (const group of entry.keywords) {
+      if (groupMatches(t, group)) {
+        score += group.weight
+        groupsMatched += 1
+      }
+    }
+    return { entry, score, groupsMatched }
   })
     .filter(({ score }) => score >= MIN_SCORE)
-    .sort((a, b) => b.score - a.score)
+    // Primary: score. Tie-break: more groups matched = more specific/reliable,
+    // so ties resolve deterministically toward the better-corroborated entry
+    // rather than by arbitrary array order.
+    .sort((a, b) => b.score - a.score || b.groupsMatched - a.groupsMatched)
     .slice(0, MAX_MATCHES)
     .map(({ entry, score }) => ({
       id: entry.id,
@@ -2214,6 +2235,7 @@ export function diagnoseSymptom(text) {
       summary: entry.summary,
       safety: entry.safety || null,
       score,
+      confidence: confidenceBand(score),
       parts: entry.parts,
     }))
 }
