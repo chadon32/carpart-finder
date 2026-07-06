@@ -50,6 +50,21 @@ const CONFIDENCE_STYLES: Record<'strong' | 'likely' | 'possible', string> = {
   possible: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
 }
 
+// Follow-up clarifiers. "When does it happen?" is the single most
+// disambiguating axis for a car symptom (a grinding noise means very
+// different things braking vs. turning vs. accelerating). Selecting one
+// appends context to the description and re-runs the same matcher — a real
+// follow-up question without having to annotate all 140 knowledge-base
+// entries.
+const WHEN_CONTEXTS: { label: string; append: string }[] = [
+  { label: 'When braking', append: 'when braking' },
+  { label: 'When turning', append: 'when turning the steering wheel' },
+  { label: 'While accelerating', append: 'while accelerating' },
+  { label: 'At idle / stopped', append: 'at idle when stopped' },
+  { label: 'At highway speed', append: 'at highway speed' },
+  { label: 'When starting', append: 'when starting the car' },
+]
+
 const SYMPTOM_EXAMPLES = [
   'Grinding noise when I press the brake pedal',
   "Car won't start, just rapid clicking",
@@ -198,6 +213,9 @@ export function PartSelector({
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
   const [quoting, setQuoting] = useState(false)
   const [quoteError, setQuoteError] = useState<string | null>(null)
+  // Active follow-up clarifier ("When braking", …), appended to the base
+  // description to refine the match. null = no refinement applied.
+  const [refineContext, setRefineContext] = useState<{ label: string; append: string } | null>(null)
 
   // Photo Search state
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -230,6 +248,24 @@ export function PartSelector({
     }
   }
 
+  // Fresh diagnosis from the textarea/examples — drops any active refinement.
+  const submitDiagnosis = (text: string) => {
+    setRefineContext(null)
+    runDiagnosis(text)
+  }
+
+  // Apply a follow-up clarifier: re-run the matcher with the context appended
+  // to the base description (e.g. "grinding noise" + "when braking").
+  const applyRefinement = (ctx: { label: string; append: string }) => {
+    setRefineContext(ctx)
+    runDiagnosis(`${symptomText} ${ctx.append}`.trim())
+  }
+
+  const clearRefinement = () => {
+    setRefineContext(null)
+    runDiagnosis(symptomText)
+  }
+
   const selectMatch = (idx: number) => {
     if (!matches) return
     setActiveMatchIdx(idx)
@@ -240,6 +276,41 @@ export function PartSelector({
 
   const activeMatch = matches && matches.length > 0 ? matches[activeMatchIdx] : null
   const selectedParts = activeMatch ? activeMatch.parts.filter((p) => checkedParts[p.name]).map((p) => p.name) : []
+
+  // A follow-up "When does it happen?" prompt. Rendered when the match is
+  // absent or not yet strong, so a vague description can be sharpened.
+  const clarifier = (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40">
+      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+        When does it happen?{' '}
+        <span className="font-normal text-slate-400">— optional, sharpens the match</span>
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {WHEN_CONTEXTS.map((c) => (
+          <button
+            key={c.label}
+            type="button"
+            disabled={diagnosing || !symptomText.trim()}
+            onClick={() => applyRefinement(c)}
+            className={`chip text-[11px] disabled:opacity-40 ${
+              refineContext?.label === c.label ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400' : ''
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {refineContext && (
+        <button
+          type="button"
+          onClick={clearRefinement}
+          className="mt-2 text-[11px] font-medium text-slate-500 transition hover:text-brand-600"
+        >
+          Clear “{refineContext.label}” ✕
+        </button>
+      )}
+    </div>
+  )
 
   const runQuote = async () => {
     if (selectedParts.length === 0 || quoting) return
@@ -360,7 +431,7 @@ export function PartSelector({
           <form
             onSubmit={(e) => {
               e.preventDefault()
-              runDiagnosis(symptomText)
+              submitDiagnosis(symptomText)
             }}
           >
             <label htmlFor="symptom-input" className="field-label">
@@ -383,7 +454,7 @@ export function PartSelector({
                     type="button"
                     onClick={() => {
                       setSymptomText(ex)
-                      runDiagnosis(ex)
+                      submitDiagnosis(ex)
                     }}
                     className="chip text-[11px]"
                   >
@@ -405,9 +476,13 @@ export function PartSelector({
           )}
 
           {matches !== null && matches.length === 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-center text-sm text-slate-500">
-              We couldn't match that description to a common cause. Try describing the <span className="font-medium text-slate-700">sound</span> and{' '}
-              <span className="font-medium text-slate-700">when it happens</span> (braking, turning, starting…) — or search by part name instead.
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/40">
+                We couldn't match that yet. Add a bit more detail — the{' '}
+                <span className="font-medium text-slate-700 dark:text-slate-300">sound or symptom</span> and{' '}
+                <span className="font-medium text-slate-700 dark:text-slate-300">when it happens</span> — or search by part name instead.
+              </div>
+              {symptomText.trim() && clarifier}
             </div>
           )}
 
@@ -430,6 +505,10 @@ export function PartSelector({
                   </div>
                 </div>
               )}
+
+              {/* Follow-up: offer to sharpen anything that isn't already a
+                  strong, unambiguous match. */}
+              {(activeMatch.confidence !== 'strong' || matches.length > 1) && clarifier}
 
               <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                 <div className="flex items-start gap-2.5">

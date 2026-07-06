@@ -53,7 +53,14 @@ const CASES = [
   ['vibration at highway speed', 'wheel-vibration-speed'],
   ['my car shakes at 65 mph', 'wheel-vibration-speed'],
 
+  // --- follow-up refinement: a vague base + a "when" clarifier disambiguates
+  //     (mirrors the UI appending context and re-running the matcher) ---
+  ['vibration when braking', 'brake-vibration'],
+  ['vibration at highway speed', 'wheel-vibration-speed'],
+  ['grinding noise when braking', 'brake-grinding'],
+
   // --- vague / junk must NOT produce a confident (mis)diagnosis ---
+  ['vibration', NO_MATCH],
   ['my car is making a weird noise', NO_MATCH],
   ['something smells bad', NO_MATCH],
   ['noise', NO_MATCH],
