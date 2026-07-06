@@ -5,9 +5,28 @@ interface User {
   email: string
 }
 
+export interface SavedSearch {
+  id: string
+  year: string
+  make: string
+  model: string
+  trim?: string | null
+  part: string
+  created_at?: string
+}
+
+export interface PriceAlert {
+  id: string
+  saved_search_id?: string
+  target_price: number
+  triggered_at?: string | null
+  last_price?: number | null
+  saved_searches?: Pick<SavedSearch, 'part' | 'year' | 'make' | 'model'> | null
+}
+
 interface AccountData {
-  searches: any[]
-  alerts: any[]
+  searches: SavedSearch[]
+  alerts: PriceAlert[]
 }
 
 interface AppContextType {

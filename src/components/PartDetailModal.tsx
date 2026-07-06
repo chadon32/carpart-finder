@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, Suspense, lazy } from 'react'
 import { X, ExternalLink, Star, Truck, Award, ShieldCheck, Sparkles } from 'lucide-react'
 import type { Listing } from '../api/client'
 import { Modal } from './Modal'
-import { RepairGuideModal } from './RepairGuideModal'
 import { trackAddedToWatchlist } from '../lib/analytics'
+
+// RepairGuideModal pulls in react-markdown (heavy) and only renders when the
+// user clicks "Generate AI Guide" — load it (and its markdown deps) on demand.
+const RepairGuideModal = lazy(() => import('./RepairGuideModal').then((m) => ({ default: m.RepairGuideModal })))
 
 function PriceHistoryChart({ price }: { price: number }) {
   // Generate deterministic mock price history values
@@ -284,11 +287,13 @@ export function PartDetailModal({
     </Modal>
     
     {showGuideModal && (
-      <RepairGuideModal
-        vehicleLabel={vehicleLabel}
-        part={part}
-        onClose={() => setShowGuideModal(false)}
-      />
+      <Suspense fallback={null}>
+        <RepairGuideModal
+          vehicleLabel={vehicleLabel}
+          part={part}
+          onClose={() => setShowGuideModal(false)}
+        />
+      </Suspense>
     )}
     </>
   )
