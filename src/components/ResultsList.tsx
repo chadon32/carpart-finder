@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, Suspense, lazy } from 'react'
 import {
   ChevronLeft,
   Wrench,
@@ -16,9 +16,11 @@ import { searchParts, type Listing } from '../api/client'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
-import { PartDetailModal } from './PartDetailModal'
 import { saveSearch, ApiError } from '../api/supabase'
-import { ComparisonModal } from './ComparisonModal'
+// Modals only render on user interaction (opening a listing / comparing), so
+// split them out of the main results bundle and load on demand.
+const PartDetailModal = lazy(() => import('./PartDetailModal').then((m) => ({ default: m.PartDetailModal })))
+const ComparisonModal = lazy(() => import('./ComparisonModal').then((m) => ({ default: m.ComparisonModal })))
 
 import { PriceAlertCard } from './PriceAlertCard'
 import { ListingCard } from './ListingCard'
@@ -579,21 +581,25 @@ export function ResultsList({
       )}
 
       {selectedListing && (
-        <PartDetailModal
-          listing={selectedListing}
-          vehicleLabel={vehicleLabel}
-          part={part}
-          onClose={() => setSelectedListing(null)}
-          onAddToWatchlist={() => {
-            onAddToWatchlist(selectedListing)
-            setSelectedListing(null)
-          }}
-          isInWatchlist={isInWatchlist(selectedListing.id)}
-        />
+        <Suspense fallback={null}>
+          <PartDetailModal
+            listing={selectedListing}
+            vehicleLabel={vehicleLabel}
+            part={part}
+            onClose={() => setSelectedListing(null)}
+            onAddToWatchlist={() => {
+              onAddToWatchlist(selectedListing)
+              setSelectedListing(null)
+            }}
+            isInWatchlist={isInWatchlist(selectedListing.id)}
+          />
+        </Suspense>
       )}
 
       {showCompareModal && compareList.length > 0 && (
-        <ComparisonModal listings={compareList} onClose={() => setShowCompareModal(false)} />
+        <Suspense fallback={null}>
+          <ComparisonModal listings={compareList} onClose={() => setShowCompareModal(false)} />
+        </Suspense>
       )}
 
       {compareList.length > 0 && (

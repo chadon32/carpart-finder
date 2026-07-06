@@ -1,25 +1,8 @@
 import { useEffect, useRef } from 'react'
-
-interface HeadroomConstructor {
-  new (element: HTMLElement, options?: HeadroomOptions): Headroom
-}
-
-interface HeadroomOptions {
-  offset?: number | { up: number; down: number }
-  tolerance?: number | { up: number; down: number }
-  zIndex?: number
-}
-
-interface Headroom {
-  init(): void
-  destroy(): void
-  pin(): void
-  unpin(): void
-  freeze(): void
-  unfreeze(): void
-}
-
-declare const Headroom: HeadroomConstructor
+// Bundled via npm rather than a CDN <script>: no extra network request, no
+// dependency on an external host, and no ReferenceError if that host is
+// blocked or slow.
+import Headroom from 'headroom.js'
 
 interface UseHeadroomOptions {
   offset?: number
