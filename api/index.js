@@ -375,35 +375,41 @@ app.post('/api/identify-part', async (req, res) => {
     const base64Data = match[2]
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-    
-    // First, try the fast and cheap Flash model
+
+    // First, try the fast, cheap Flash model.
     const flashModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     const prompt = "You are an expert automotive mechanic. Identify the car part in this image. Return ONLY the exact, standard name of the part in Title Case. Do not include any other text, descriptions, or punctuation. If you cannot clearly identify the part or are unsure, you MUST return exactly the word 'UNKNOWN'."
-    
-    let result = await flashModel.generateContent([
+
+    const result = await flashModel.generateContent([
       prompt,
       { inlineData: { data: base64Data, mimeType } }
     ])
-    
     let partName = result.response.text().trim().replace(/['"]/g, '')
-    
-    // If Flash couldn't identify it, escalate to the Pro model
+
+    // If Flash is unsure, escalate to the Pro model — but isolate it: a Pro
+    // quota/availability error must NOT fail the whole request. We simply fall
+    // back to "unidentified" instead of surfacing a 500 to the user.
     if (partName.toUpperCase() === 'UNKNOWN') {
-      console.log('[AI] Flash failed to identify part. Escalating to Pro model...')
-      const proModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
-      const proPrompt = "You are an expert automotive mechanic analyzing a difficult, dirty, or obscured image. Identify the car part in this image. Return ONLY the exact, standard name of the part in Title Case. Do not include any other text."
-      
-      result = await proModel.generateContent([
-        proPrompt,
-        { inlineData: { data: base64Data, mimeType } }
-      ])
-      partName = result.response.text().trim().replace(/['"]/g, '')
+      try {
+        const proModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
+        const proPrompt = "You are an expert automotive mechanic analyzing a difficult, dirty, or obscured image. Identify the car part in this image. Return ONLY the exact, standard name of the part in Title Case. Do not include any other text. If you still cannot identify it, return exactly the word 'UNKNOWN'."
+        const proResult = await proModel.generateContent([
+          proPrompt,
+          { inlineData: { data: base64Data, mimeType } }
+        ])
+        partName = proResult.response.text().trim().replace(/['"]/g, '')
+      } catch (proErr) {
+        console.warn('[AI] Pro escalation unavailable, falling back to unidentified:', proErr?.message)
+      }
     }
-    
-    res.json({ partName, confidence: 0.95 })
+
+    // Honest response: report whether we actually identified anything rather
+    // than fabricating a confidence score. Empty/UNKNOWN -> not identified.
+    const identified = Boolean(partName) && partName.toUpperCase() !== 'UNKNOWN'
+    res.json({ identified, partName: identified ? partName : null })
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to identify image' })
+    console.error('[AI] identify-part failed:', err?.message)
+    res.status(502).json({ error: 'The part identifier is temporarily unavailable. Please try again shortly.' })
   }
 })
 

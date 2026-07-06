@@ -15,8 +15,12 @@ export async function generateRepairGuide(req, res) {
     return res.status(400).json({ error: 'Missing required vehicle or part information.' })
   }
 
-  const vehicleInfo = `${year} ${make} ${model} ${trim || ''}`.trim()
-  const prompt = `You are a master mechanic. A user wants to replace the "${part}" on their ${vehicleInfo}.
+  // Cap each field so an oversized/garbage body can't bloat the prompt (cost)
+  // or be used to smuggle a long instruction into the model.
+  const clamp = (v) => String(v).replace(/[\r\n]+/g, ' ').trim().slice(0, 60)
+  const vehicleInfo = `${clamp(year)} ${clamp(make)} ${clamp(model)} ${trim ? clamp(trim) : ''}`.trim()
+  const safePart = clamp(part)
+  const prompt = `You are a master mechanic. A user wants to replace the "${safePart}" on their ${vehicleInfo}.
 Provide a step-by-step repair guide for replacing this part.
 
 Format your response in Markdown with the following sections:
@@ -36,7 +40,9 @@ Be concise, practical, and highly specific to automotive repair. Do not include 
     
     res.json({ guide: text })
   } catch (err) {
-    console.error('Error generating repair guide:', err)
-    res.status(500).json({ error: 'Failed to generate repair guide.' })
+    console.error('Error generating repair guide:', err?.message)
+    // 503 + friendly copy: almost always a transient Gemini quota/availability
+    // issue, not a client error. The UI can offer a retry.
+    res.status(503).json({ error: 'The AI guide is temporarily unavailable. Please try again in a few minutes.' })
   }
 }

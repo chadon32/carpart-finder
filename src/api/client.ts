@@ -138,7 +138,7 @@ export function searchParts(
   return getJson(`/api/search?${params.toString()}`)
 }
 
-export function identifyPartFromImage(base64Image: string): Promise<{ partName: string; confidence: number }> {
+export function identifyPartFromImage(base64Image: string): Promise<{ identified: boolean; partName: string | null }> {
   return fetch('/api/identify-part', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

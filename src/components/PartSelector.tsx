@@ -188,7 +188,7 @@ export function PartSelector({
   // Photo Search state
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoScanning, setPhotoScanning] = useState(false)
-  const [photoResult, setPhotoResult] = useState<{ partName: string, confidence: number } | null>(null)
+  const [photoResult, setPhotoResult] = useState<{ identified: boolean; partName: string | null } | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
 
   const initChecklist = (match: DiagnosisMatch) => {
@@ -670,24 +670,33 @@ export function PartSelector({
                 </div>
               )}
               
-              {photoResult && (
+              {photoResult && photoResult.identified && photoResult.partName && (
                 <div className="p-5 rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900/30 dark:bg-emerald-950/20 animate-fade-in flex flex-col sm:flex-row items-center gap-4 justify-between">
                   <div className="flex items-center gap-4 w-full sm:w-auto">
                     <div className="h-10 w-10 shrink-0 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center">
                       <CheckCircle2 size={22} />
                     </div>
                     <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">Identified Part</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">Best guess</div>
                       <div className="text-lg font-bold text-slate-900">{photoResult.partName}</div>
                     </div>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={() => onSelect(photoResult.partName)}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(photoResult.partName!)}
                     className="btn btn-primary w-full sm:w-auto whitespace-nowrap"
                   >
                     Find this part <ArrowRight size={16} />
                   </button>
+                </div>
+              )}
+
+              {photoResult && !photoResult.identified && (
+                <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 animate-fade-in text-center">
+                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Couldn't identify that part</div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Try a clearer, well-lit photo of just the part — or search by name instead.
+                  </p>
                 </div>
               )}
               
