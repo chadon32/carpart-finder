@@ -27,7 +27,7 @@ const SYMPTOMS = [
     safety: 'Braking is safety-critical — have this inspected and fixed as soon as possible.',
     keywords: [
       { terms: ['grind', 'scrape', 'scraping', 'metal on metal', 'metallic'], weight: 4 },
-      { terms: ['brake', 'braking', 'pedal', 'stop', 'stopping', 'slow down'], weight: 3 },
+      { terms: ['brake', 'braking', 'brake pedal', 'stop', 'stopping', 'slow down'], weight: 3 },
       { terms: ['noise', 'sound', 'squeal', 'screech'], weight: 1 },
     ],
     parts: [
@@ -45,7 +45,7 @@ const SYMPTOMS = [
     safety: 'Not an emergency yet, but plan to replace the pads soon before it becomes grinding.',
     keywords: [
       { terms: ['squeal', 'squeak', 'screech', 'high pitched', 'high-pitched'], weight: 4 },
-      { terms: ['brake', 'braking', 'pedal', 'stop', 'stopping'], weight: 3 },
+      { terms: ['brake', 'braking', 'brake pedal', 'stop', 'stopping'], weight: 3 },
     ],
     parts: [
       { name: 'Brake Pads', why: 'The wear-indicator squeal means the friction material is nearly used up.', priority: 'likely' },
@@ -61,7 +61,7 @@ const SYMPTOMS = [
     safety: 'Increases stopping distance — worth fixing promptly.',
     keywords: [
       { terms: ['shake', 'shakes', 'shaking', 'shudder', 'vibrat', 'pulsat', 'pulsing', 'wobble'], weight: 4 },
-      { terms: ['brake', 'braking', 'pedal', 'stop', 'stopping'], weight: 3 },
+      { terms: ['brake', 'braking', 'brake pedal', 'stop', 'stopping'], weight: 3 },
       { terms: ['steering wheel'], weight: 1 },
     ],
     parts: [
@@ -78,7 +78,7 @@ const SYMPTOMS = [
     safety: 'Serious safety issue — do not drive until the brake system is inspected.',
     keywords: [
       { terms: ['soft', 'spongy', 'mushy', 'sinks', 'sinking', 'to the floor', 'goes down'], weight: 4 },
-      { terms: ['brake', 'pedal'], weight: 3 },
+      { terms: ['brake', 'brake pedal'], weight: 3 },
     ],
     parts: [
       { name: 'Brake Master Cylinder', why: 'A sinking pedal with no visible leak is the classic master cylinder failure.', priority: 'likely' },
@@ -1030,11 +1030,12 @@ const SYMPTOMS = [
     summary:
       'A steering wheel shake or body vibration that only occurs at high speeds (e.g. 55-70 mph) usually indicates unbalanced tires, out-of-round tires, or loose steering linkage.',
     keywords: [
-      { terms: ['vibrates at speed', 'highway shake', 'vibrates 60 mph', 'steering wheel shakes high speed'], weight: 5 },
-      { terms: ['highway vibration', 'shaking at 70', 'highway speed'], weight: 2 }
+      { terms: ['vibrat', 'shake', 'shakes', 'shaking', 'shudder', 'wobble'], weight: 3 },
+      { terms: ['highway', 'high speed', 'at speed', 'faster', 'freeway', 'mph', '60', '65', '70', 'accelerat'], weight: 3 },
     ],
     parts: [
       { name: 'Tires', why: 'Improper tire balance is the most common cause of speed-specific vibrations.', priority: 'likely' },
+      { name: 'Wheel Bearing', why: 'A worn bearing can cause a speed-dependent vibration and growl.', priority: 'possible' },
       { name: 'Tie Rod Ends', why: 'Play in the tie rod ends lets the wheel flutter at highway speeds.', priority: 'possible' },
     ],
   },

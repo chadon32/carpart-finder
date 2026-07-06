@@ -96,6 +96,23 @@ app.use('/api/search', searchLimiter)
 // Quote runs one provider search per part, so it shares the same budget.
 app.use('/api/quote', searchLimiter)
 
+// The AI endpoints each hit Gemini (paid, with hard quotas) and are the most
+// expensive per call, so they get a much tighter, dedicated budget. Without
+// this, a single scripted client could run up the AI bill or exhaust the
+// shared quota for every other user. 20 per 15 min is generous for a genuine
+// user (who identifies a part or reads a guide occasionally) but shuts down
+// automated abuse.
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many AI requests, please try again in a few minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.use('/api/identify-part', aiLimiter)
+app.use('/api/ai', aiLimiter)
+
 // A model year is 4 digits from 1980 to next year; make/model must be non-empty
 // and sanely short. Rejecting junk up front avoids burning rate-limited eBay
 // calls on garbage like `year=abc&model=;DROP` and keeps NHTSA lookups clean.
