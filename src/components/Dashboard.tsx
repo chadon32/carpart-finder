@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Trash2, ChevronLeft, LogOut } from 'lucide-react'
+import { Trash2, ChevronLeft, LogOut, Search, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppContext } from '../contexts/AppContext'
 import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert } from '../api/supabase'
@@ -288,7 +288,16 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex h-40 items-center justify-center text-sm text-slate-500">No saved searches yet.</div>
+                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                    <div className="icon-tile mb-4 h-12 w-12 bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                      <Search size={22} />
+                    </div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">No saved searches yet</p>
+                    <p className="mt-1 max-w-xs text-sm text-slate-500">
+                      Run a search and tap <span className="font-medium text-slate-600 dark:text-slate-300">Save Search</span> to keep it here for one-click access.
+                    </p>
+                    <button type="button" onClick={onClose} className="btn btn-secondary mt-5">Start a search</button>
+                  </div>
                 )
               ) : (
                 accountData.alerts.length > 0 ? (
@@ -309,7 +318,7 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
                           </div>
                           
                           <div className="inline-flex items-center gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-2.5 py-1.5">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Target: ${a.target_price}</span>
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Target: <span className="font-data">${a.target_price}</span></span>
                           </div>
                         </div>
                         
@@ -334,11 +343,11 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
                           
                           {a.triggered_at ? (
                             <div className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-md">
-                              ✓ Dropped to ${Number(a.last_price).toFixed(2)}
+                              ✓ Dropped to <span className="font-data">${Number(a.last_price).toFixed(2)}</span>
                             </div>
                           ) : a.last_price != null ? (
-                            <div className="text-[10px] font-medium text-slate-400">
-                              Checked: ${Number(a.last_price).toFixed(2)}
+                            <div className="text-[10px] font-medium text-slate-500">
+                              Checked: <span className="font-data">${Number(a.last_price).toFixed(2)}</span>
                             </div>
                           ) : null}
                         </div>
@@ -346,13 +355,24 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex h-40 items-center justify-center text-sm text-slate-500">No price alerts active yet.</div>
+                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                    <div className="icon-tile mb-4 h-12 w-12 bg-amber-50 text-amber-500 dark:bg-amber-950/30 dark:text-amber-400">
+                      <Bell size={22} />
+                    </div>
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">No price alerts yet</p>
+                    <p className="mt-1 max-w-xs text-sm text-slate-500">
+                      Set a target price on any part and we'll email you the moment it drops below it.
+                    </p>
+                    <button type="button" onClick={onClose} className="btn btn-secondary mt-5">Find a part</button>
+                  </div>
                 )
               )}
             </div>
           </div>
         ) : (
-          <div className="flex h-40 items-center justify-center text-sm text-slate-400">Loading dashboard...</div>
+          <div className="flex h-40 items-center justify-center" role="status" aria-label="Loading your account">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 dark:border-slate-700 dark:border-t-brand-400" />
+          </div>
         )}
       </div>
     </div>
