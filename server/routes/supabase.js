@@ -2,6 +2,7 @@ import express from 'express'
 import crypto from 'node:crypto'
 import { supabase, supabaseAdmin, isMockMode } from '../supabase.js'
 import { requireAuth, AUTH_COOKIE } from '../middleware/auth.js'
+import { requireAccountsAvailable } from '../middleware/accountsAvailable.js'
 
 const router = express.Router()
 
@@ -35,6 +36,18 @@ function clearAuthCookie(res) {
 const mockSavedSearches = []
 const mockPriceAlerts = []
 const mockGuestSubscriptions = []
+
+// Defined BEFORE the gate on purpose. Logout takes no credentials and reads no
+// database; it must keep working even when accounts are disabled, so browsers
+// holding a stale cpf_token (issued by the old mock mode) can clear it.
+router.post('/logout', (_req, res) => {
+  clearAuthCookie(res)
+  res.json({ success: true })
+})
+
+// Everything below requires that accounts can actually function. When Supabase
+// is unconfigured this returns 503 rather than authenticating against nothing.
+router.use(requireAccountsAvailable)
 
 // Public endpoint for price alerts subscription (no-auth, guest conversion capture)
 router.post('/price-alerts/subscribe', async (req, res) => {
@@ -100,6 +113,11 @@ router.post('/signup', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' })
   }
+  // Mock mode must exercise the same validation shape as production, so local
+  // development cannot pass a credential that real Supabase would reject.
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' })
+  }
 
   if (isMockMode) {
     const cleanId = `mock-user-${Buffer.from(email).toString('hex').slice(0, 8)}`
@@ -142,6 +160,11 @@ router.post('/login', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' })
   }
+  // Deliberately vaguer copy than signup: never confirm which half of the
+  // credential pair was wrong.
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: 'Invalid email or password' })
+  }
 
   if (isMockMode) {
     const cleanId = `mock-user-${Buffer.from(email).toString('hex').slice(0, 8)}`
@@ -166,13 +189,6 @@ router.post('/login', async (req, res) => {
     user: data.user,
     confirmationRequired: !token,
   })
-})
-
-// Clear the auth cookie. Public (no requireAuth) so an expired session can
-// still log out cleanly.
-router.post('/logout', (_req, res) => {
-  clearAuthCookie(res)
-  res.json({ success: true })
 })
 
 // All routes below require authentication
