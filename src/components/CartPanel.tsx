@@ -138,7 +138,7 @@ export function CartPanel({
   return (
     <div className="card p-6 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-slate-900">
+        <h2 className="section-title flex items-center gap-2.5">
           <span className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">
             <Bookmark size={17} strokeWidth={2.2} />
           </span>
@@ -174,7 +174,7 @@ export function CartPanel({
           <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white text-slate-300 shadow-sm ring-1 ring-slate-100 dark:bg-slate-800 dark:text-slate-600 dark:ring-slate-700/50">
             <Bookmark size={36} strokeWidth={1.5} />
           </div>
-          <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Your Watchlist is empty</h3>
+          <h3 className="section-title dark:text-slate-100">Your Watchlist is empty</h3>
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400 mb-6">
             Keep track of the parts you need. Add items from your search results to compare options and check for price drops over time.
           </p>

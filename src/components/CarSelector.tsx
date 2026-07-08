@@ -159,7 +159,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   return (
     <div className="card p-7">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-950">Select your vehicle</h2>
+        <h2 className="section-title">Select your vehicle</h2>
         <p className="mt-1 text-sm text-slate-600">We filter listings to fit the exact vehicle you pick.</p>
       </div>
 

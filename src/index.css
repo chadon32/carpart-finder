@@ -8,22 +8,28 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   /* Every price, part number, and vehicle year in the app reads like an entry
      off a parts-catalog spec sheet — set in a technical monospace rather than
-     the body sans. This is the site's one deliberate typographic signature,
-     grounded in the actual artifact (spec plates, catalog line items) rather
-     than decoration. */
+     the body sans. Grounded in the actual artifact (spec plates, catalog line
+     items) rather than decoration. */
   --font-data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Display face for headlines: condensed grotesque in the tradition of
+     racing decals, hood numbers, and garage signage. Always set uppercase,
+     tight, and heavy — never used for body copy. */
+  --font-display: "Barlow Condensed", "Arial Narrow", ui-sans-serif, sans-serif;
 
-  /* Restrained, elite, professional palette: Slate & Charcoal neutrals, deep teal, and soft warm accents */
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-300: #5eead4;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #0f766e; /* Deep, premium teal */
-  --color-brand-600: #0d9488;
-  --color-brand-700: #115e59;
-  --color-brand-800: #134e4b;
-  --color-brand-900: #0f2d2a;
+  /* "Engineer's ink" — a drafting-blueprint cobalt, deliberately inkier and
+     less saturated than stock UI blue. Pairs with graphite spec plates and
+     the safety-orange accent, and stays clearly distinct from the emerald
+     (verified) / amber (unverified) semantic badges. */
+  --color-brand-50: #f0f5fe;
+  --color-brand-100: #dde8fc;
+  --color-brand-200: #bcd1f9;
+  --color-brand-300: #8fb0f2;
+  --color-brand-400: #5f8ae9;
+  --color-brand-500: #2050c8; /* Primary cobalt ink */
+  --color-brand-600: #1a43a8;
+  --color-brand-700: #16388b;
+  --color-brand-800: #122c6d;
+  --color-brand-900: #0c1c46;
 
   --color-accent-500: #f97316;
   --color-accent-600: #ea580c;
@@ -31,6 +37,7 @@
   --animate-fade-in: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-slide-up: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-radar: radar-spin 3.6s linear infinite;
 }
 
 @keyframes fade-in {
@@ -52,6 +59,20 @@
 @keyframes shimmer {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
+}
+
+/* The radar sweep — the site's signature motion. Used in exactly three
+   places that all mean the same thing ("scanning live prices right now"):
+   the brand mark, the hero live badge, and loading states. */
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes blip {
+  0%, 100% { opacity: 0.15; }
+  12% { opacity: 1; }
+  40% { opacity: 0.4; }
 }
 
 html {
@@ -118,7 +139,7 @@ html.dark {
 
 /* Brand-tinted selection */
 ::selection {
-  background: rgb(15 118 110 / 0.15);
+  background: rgb(32 80 200 / 0.16);
 }
 
 /* One consistent keyboard-focus treatment everywhere. Buttons/fields add
@@ -133,17 +154,26 @@ html.dark {
   .app-bg {
     background-color: #fafafa;
     background-image:
-      radial-gradient(ellipse 60% 40% at 50% -10%, rgb(15 118 110 / 0.05), transparent),
-      radial-gradient(ellipse 40% 30% at 90% 0%, rgb(15 118 110 / 0.03), transparent);
+      radial-gradient(ellipse 60% 40% at 50% -10%, rgb(32 80 200 / 0.05), transparent),
+      radial-gradient(ellipse 40% 30% at 90% 0%, rgb(32 80 200 / 0.03), transparent);
   }
 
-  /* Numeric/technical data — prices, part years, VIN-style codes. The one
-     typographic signature in the app: real catalog line items are set in a
-     monospace, so ours is too. */
+  /* Numeric/technical data — prices, part years, VIN-style codes. Real
+     catalog line items are set in a monospace, so ours are too. */
   .font-data {
     font-family: var(--font-data);
     font-feature-settings: "tnum" 1, "zero" 1;
     letter-spacing: -0.01em;
+  }
+
+  /* Display headlines — condensed, uppercase, tight leading. Racing-decal /
+     garage-signage register; use for h1/h2-level statements only. */
+  .font-display {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.005em;
+    line-height: 0.94;
+    font-weight: 700;
   }
 
   /* The one deliberate visual signature in the app: the active-vehicle
@@ -189,24 +219,47 @@ html.dark {
   /* Faint blueprint grid used once, behind the hero — the site's single
      technical texture, not repeated everywhere. */
   .blueprint-grid {
+    position: relative;
+  }
+  
+  .blueprint-grid::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background-image:
-      linear-gradient(rgb(15 118 110 / 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(15 118 110 / 0.06) 1px, transparent 1px);
+      linear-gradient(rgb(32 80 200 / 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(32 80 200 / 0.07) 1px, transparent 1px);
     background-size: 40px 40px;
     mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 40%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 40%, transparent 80%);
   }
 
-  .dark .blueprint-grid {
+  .dark .blueprint-grid::before {
     background-image:
-      linear-gradient(rgb(45 212 191 / 0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(45 212 191 / 0.08) 1px, transparent 1px);
+      linear-gradient(rgb(95 138 233 / 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(95 138 233 / 0.1) 1px, transparent 1px);
   }
 
   .dark .app-bg {
     background-color: #090d16;
     background-image:
-      radial-gradient(ellipse 65% 45% at 50% -10%, rgb(20 184 166 / 0.07), transparent),
-      radial-gradient(ellipse 40% 30% at 90% 0%, rgb(20 184 166 / 0.03), transparent);
+      radial-gradient(ellipse 65% 45% at 50% -10%, rgb(95 138 233 / 0.08), transparent),
+      radial-gradient(ellipse 40% 30% at 90% 0%, rgb(95 138 233 / 0.04), transparent);
+  }
+
+  /* Radar sweep — apply to the wedge/needle group inside the RadarMark SVG.
+     transform-box: view-box keeps the rotation centered on the scope, not
+     the wedge's own bounding box. */
+  .radar-sweep {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+    animation: var(--animate-radar);
+  }
+
+  .radar-blip {
+    animation: blip 3.6s linear infinite;
   }
 
   .card {
@@ -309,11 +362,13 @@ html.dark {
     @apply text-slate-300;
   }
 
-  /* Section eyebrow — small uppercase heading above grouped content.
+  /* Section eyebrow — small uppercase label above grouped content, set in
+     the catalog mono so every metadata label in the app shares one voice.
      slate-500, not 400: 400 on white is ~2.8:1 and fails WCAG AA for
      small text; 500 passes at ~4.6:1. */
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-wider text-slate-500;
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500;
+    font-family: var(--font-data);
   }
 
   /* Underline tab — used by PartSelector and the Account modal.
@@ -357,7 +412,12 @@ html.dark {
   }
 
   .section-title {
-    @apply text-lg font-bold tracking-tight text-slate-900 sm:text-xl;
+    @apply text-xl text-slate-900 sm:text-2xl;
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    font-weight: 700;
   }
 
   .dark .section-title {

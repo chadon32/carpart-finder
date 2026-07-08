@@ -64,7 +64,7 @@ export function RepairGuideModal({ vehicleLabel, part, onClose }: RepairGuideMod
             <Sparkles size={20} />
           </div>
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">AI Repair Guide</h2>
+            <h2 className="section-title text-lg sm:text-xl">AI Repair Guide</h2>
             <p className="text-xs text-slate-500">
               {vehicleLabel} • {part}
             </p>

@@ -2,6 +2,7 @@ import { useEffect, useState, Suspense, lazy } from 'react'
 import { Toaster } from 'sonner'
 import { Helmet } from 'react-helmet-async'
 import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
+import { RadarMark } from './components/RadarMark'
 import { CarSelector, type Car } from './components/CarSelector'
 
 const PartSelector = lazy(() => import('./components/PartSelector').then(m => ({ default: m.PartSelector })))
@@ -18,7 +19,7 @@ import { StepIndicator } from './components/StepIndicator'
 function ViewLoader() {
   return (
     <div className="flex justify-center py-24" role="status" aria-label="Loading">
-      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 dark:border-slate-700 dark:border-t-brand-400" />
+      <RadarMark className="h-8 w-8 text-brand-600 dark:text-brand-400" />
     </div>
   )
 }
@@ -91,12 +92,13 @@ function App() {
       <header ref={headroomRef} className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <button type="button" onClick={goHome} className="group flex min-w-0 items-center gap-2.5 sm:gap-3.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-700 text-white shadow-lg shadow-brand-900/20 transition-all group-hover:scale-[1.02] sm:h-11 sm:w-11 sm:rounded-2xl">
-              <CarIcon size={20} strokeWidth={2.5} className="sm:hidden" />
-              <CarIcon size={23} strokeWidth={2.5} className="hidden sm:block" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-lg shadow-brand-900/25 transition-all group-hover:scale-[1.03] sm:h-11 sm:w-11 sm:rounded-2xl">
+              <RadarMark className="h-6 w-6 sm:h-7 sm:w-7" />
             </span>
             <div className="min-w-0 text-left">
-              <span className="block truncate text-lg font-semibold tracking-[-0.4px] text-slate-950 dark:text-slate-50 sm:text-[21px]">CarPartsRadar</span>
+              <span className="font-display block truncate text-[22px] leading-none text-slate-950 dark:text-slate-50 sm:text-[26px]">
+                CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
+              </span>
               <span className="font-data hidden text-[10px] font-medium tracking-[1.5px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
             </div>
           </button>
@@ -167,31 +169,36 @@ function App() {
             <>
               {step === 'car' && (
                 <>
-                  {/* Hero — grounded in the actual artifact this tool produces: a
-                      fitment-matched line item, not an abstract marketing promise. */}
-                  <div className="blueprint-grid relative mb-12 pt-4 text-center sm:mb-16 sm:pt-8">
-                    <div className="font-data mx-auto mb-6 inline-flex items-center gap-2 rounded border border-brand-200/70 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                      Live catalog — updated per search
+                  {/* Hero — the thesis. A radar live badge, a racing-decal
+                      headline, and the honest fitment promise underneath.
+                      Elements stagger in once on load; the sweep keeps the
+                      "live scan" idea moving after the entrance settles. */}
+                  <div className="blueprint-grid relative mb-12 pt-6 text-center sm:mb-16 sm:pt-10">
+                    <div className="animate-slide-up font-data mx-auto mb-7 inline-flex items-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400">
+                      <RadarMark className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                      Live scan — prices pulled per search
                     </div>
 
-                    <h1 className="mx-auto max-w-4xl text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px]">
-                      Enter your year, make, and model. We match the part.
+                    <h1 className="font-display animate-slide-up mx-auto max-w-4xl text-balance text-5xl text-slate-950 sm:text-7xl md:text-8xl [animation-delay:90ms]">
+                      Parts that fit.
+                      <br />
+                      <span className="text-brand-600 dark:text-brand-400">Prices on radar.</span>
                     </h1>
 
-                    <p className="mx-auto mt-5 max-w-lg text-balance text-base text-slate-600 sm:text-lg">
-                      Every listing is checked against real compatibility data for your exact vehicle — and clearly labeled on the rare listing we can't verify.
+                    <p className="animate-slide-up mx-auto mt-6 max-w-lg text-balance text-base text-slate-600 sm:text-lg [animation-delay:180ms]">
+                      Pick your year, make, and model. Every listing is checked against real
+                      compatibility data for your exact vehicle — and clearly labeled on the rare one we can't verify.
                     </p>
 
-                    <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5 text-sm">
-                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                        <ShieldCheck size={14} className="text-brand-600" /> Fitment matched, not guessed
+                    <div className="animate-slide-up mt-8 flex flex-wrap items-center justify-center gap-2.5 [animation-delay:260ms]">
+                      <div className="font-data flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
+                        <ShieldCheck size={13} className="text-brand-600" /> Fitment matched, not guessed
                       </div>
-                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                        <Zap size={14} className="text-brand-600" /> Prices pulled live
+                      <div className="font-data flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
+                        <Zap size={13} className="text-brand-600" /> Prices pulled live
                       </div>
-                      <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                        <Tag size={14} className="text-brand-600" /> Ranked by real value
+                      <div className="font-data flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
+                        <Tag size={13} className="text-brand-600" /> Ranked by real value
                       </div>
                     </div>
                   </div>
@@ -243,10 +250,12 @@ function App() {
         <div className="mx-auto max-w-6xl px-6 py-10">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-white">
-                <CarIcon size={16} strokeWidth={2.5} />
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
+                <RadarMark className="h-5 w-5" />
               </span>
-              <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">CarPartsRadar</span>
+              <span className="font-display text-lg leading-none text-slate-900 dark:text-slate-100">
+                CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
+              </span>
             </div>
             <div className="max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-right">
               <p>
@@ -296,16 +305,18 @@ function TrustBanner() {
     <div className="mt-20 border-t border-slate-200/60 pt-14 dark:border-slate-800/60">
       <div className="text-center">
         <p className="eyebrow text-brand-600 dark:text-brand-400">How it works</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+        <h2 className="font-display mt-3 text-3xl text-slate-950 sm:text-4xl">
           From vehicle to best price in three steps
         </h2>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
         {steps.map((s, i) => (
-          <div key={s.title} className="card relative p-6">
-            <span className="absolute right-5 top-5 text-4xl font-semibold tracking-tight text-slate-100 dark:text-slate-800" aria-hidden>
-              {i + 1}
+          <div key={s.title} className="card group relative p-6 transition-transform duration-300 hover:-translate-y-1">
+            {/* Mono step index — this really is a sequence, so the numbering
+                carries information, not decoration. */}
+            <span className="font-data absolute right-5 top-5 text-sm font-semibold text-slate-300 transition-colors group-hover:text-brand-500 dark:text-slate-700" aria-hidden>
+              0{i + 1}
             </span>
             <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">
               <s.icon size={18} strokeWidth={2} />

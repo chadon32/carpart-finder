@@ -34,15 +34,16 @@ export function ListingCard({
         if ((e.target as HTMLElement).closest('a,button')) return
         onSelect(listing)
       }}
-      className={`listing-card group flex flex-col gap-4 p-5 sm:flex-row sm:items-start cursor-pointer ${isBestValue ? 'ring-1 ring-brand-300/70' : ''} ${listing.verifiedFitment === false ? 'ring-2 ring-amber-400 dark:ring-amber-500/50' : ''}`}
+      className={`listing-card animate-slide-up group flex flex-col gap-4 p-5 sm:flex-row sm:items-start cursor-pointer ${isBestValue ? 'ring-1 ring-brand-300/70' : ''} ${listing.verifiedFitment === false ? 'ring-2 ring-amber-400 dark:ring-amber-500/50' : ''}`}
+      style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
     >
       {isBestValue && (
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-600 to-teal-600" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-400 via-brand-600 to-brand-500" />
       )}
 
       <div className="relative shrink-0">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
-          {index + 1}
+        <div className="font-data flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
+          {String(index + 1).padStart(2, '0')}
         </div>
         {listing.image ? (
           <img

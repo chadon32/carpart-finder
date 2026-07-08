@@ -24,6 +24,7 @@ const ComparisonModal = lazy(() => import('./ComparisonModal').then((m) => ({ de
 
 import { PriceAlertCard } from './PriceAlertCard'
 import { ListingCard } from './ListingCard'
+import { RadarMark } from './RadarMark'
 import { isNew, isUsed, valueScore } from '../lib/listingHelpers'
 
 type SortKey = 'value' | 'price' | 'rating'
@@ -231,7 +232,7 @@ export function ResultsList({
         <div className="flex items-center gap-3">
           <VehicleThumbnail make={car.make} model={car.model} year={car.year} className="h-11 w-16" iconSize={20} />
           <div>
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="section-title flex items-center gap-2">
               {part}
               {part.toLowerCase().includes('kit') && (
                 <span className="badge bg-brand-600 text-white shadow-sm px-2">Bundle Deal</span>
@@ -305,11 +306,19 @@ export function ResultsList({
       </div>
 
       {loading && (
-        <ul className="mt-6 flex flex-col gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </ul>
+        <>
+          {/* The scan in progress — the radar sweep here is the same mark as
+              the logo, doing the thing the logo promises. */}
+          <div className="font-data mt-6 flex items-center justify-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 dark:text-brand-400" role="status">
+            <RadarMark className="h-5 w-5" />
+            Scanning live listings for your {car.year} {car.make} {car.model}
+          </div>
+          <ul className="mt-4 flex flex-col gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </ul>
+        </>
       )}
 
       {!loading && error && (
@@ -455,7 +464,7 @@ export function ResultsList({
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
                 <div>
                   <div className="eyebrow text-brand-600 dark:text-brand-400">Live eBay listings</div>
-                  <div className="text-2xl font-semibold tracking-[-0.4px] text-slate-950">
+                  <div className="font-display text-3xl text-slate-950">
                     {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
                     {priceRange && (
                       <span className="font-data ml-2 text-base font-normal text-slate-500">

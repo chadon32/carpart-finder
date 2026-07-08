@@ -367,7 +367,7 @@ export function PartSelector({
     <div className="card p-7">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-950">What part do you need?</h2>
+          <h2 className="section-title">What part do you need?</h2>
           <p className="mt-1 text-sm text-slate-600">
             Showing parts for{' '}
             <span className="font-medium text-slate-800">
@@ -725,7 +725,7 @@ export function PartSelector({
       ) : searchMethod === 'photo' ? (
         <div className="animate-fade-in space-y-5">
           <div className="text-center mb-6">
-            <h3 className="text-lg font-bold text-slate-900 tracking-tight">Don't know the part name?</h3>
+            <h3 className="section-title">Don't know the part name?</h3>
             <p className="text-sm text-slate-500 mt-1">Take a photo of the broken part and our AI will identify it.</p>
           </div>
           

@@ -111,7 +111,7 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
         </button>
         <form onSubmit={(e) => { e.preventDefault(); handleAuth(); }}>
           <div className="mb-6 text-center">
-            <h3 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">
+            <h3 className="section-title dark:text-white">
               {isRegisterMode ? 'Create your account' : 'Welcome back'}
             </h3>
             <p className="mt-2 text-sm text-slate-500">
@@ -216,7 +216,7 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
       </div>
 
       <div className="card p-6 sm:p-8">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">Welcome, {user.name.split(' ')[0]}</h2>
+        <h2 className="section-title mb-2 dark:text-white">Welcome, {user.name.split(' ')[0]}</h2>
         <p className="text-sm text-slate-500 mb-8">Manage your saved searches and active price alerts.</p>
 
         {accountData ? (
