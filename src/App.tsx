@@ -11,6 +11,17 @@ const RecentSearches = lazy(() => import('./components/RecentSearches').then(m =
 const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })))
 
 import { StepIndicator } from './components/StepIndicator'
+
+// Shared Suspense fallback for lazily-loaded views: a quiet spinner instead of
+// developer-facing "Loading component..." text. aria-label keeps it announced
+// to screen readers without visible jargon.
+function ViewLoader() {
+  return (
+    <div className="flex justify-center py-24" role="status" aria-label="Loading">
+      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 dark:border-slate-700 dark:border-t-brand-400" />
+    </div>
+  )
+}
 import { useCart } from './hooks/useCart'
 import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
@@ -86,7 +97,7 @@ function App() {
             </span>
             <div className="min-w-0 text-left">
               <span className="block truncate text-lg font-semibold tracking-[-0.4px] text-slate-950 dark:text-slate-50 sm:text-[21px]">CarPartsRadar</span>
-              <span className="hidden text-xs font-medium tracking-[0.5px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
+              <span className="font-data hidden text-[10px] font-medium tracking-[1.5px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
             </div>
           </button>
 
@@ -133,7 +144,7 @@ function App() {
         {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
         <div key={viewKey} className="animate-slide-up">
           {showWatchlist ? (
-            <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+            <Suspense fallback={<ViewLoader />}>
               <CartPanel
                 items={watchlist.items}
                 onRemove={watchlist.removeItem}
@@ -142,7 +153,7 @@ function App() {
               />
             </Suspense>
           ) : step === 'dashboard' ? (
-            <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading Dashboard...</div>}>
+            <Suspense fallback={<ViewLoader />}>
               <Dashboard 
                 onClose={() => {
                   if (car && part) setStep('results')
@@ -156,38 +167,36 @@ function App() {
             <>
               {step === 'car' && (
                 <>
-                  {/* Hero */}
-                  <div className="mb-12 pt-4 text-center sm:mb-16 sm:pt-8">
-                    <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50/60 px-4 py-1.5 text-xs font-semibold text-brand-700 dark:border-brand-900/40 dark:bg-brand-950/30 dark:text-brand-400">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-500 opacity-60" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
-                      </span>
-                      Live prices, filtered to your exact vehicle
+                  {/* Hero — grounded in the actual artifact this tool produces: a
+                      fitment-matched line item, not an abstract marketing promise. */}
+                  <div className="blueprint-grid relative mb-12 pt-4 text-center sm:mb-16 sm:pt-8">
+                    <div className="font-data mx-auto mb-6 inline-flex items-center gap-2 rounded border border-brand-200/70 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                      Live catalog — updated per search
                     </div>
 
                     <h1 className="mx-auto max-w-4xl text-balance text-4xl font-semibold tracking-[-1px] text-slate-950 sm:text-6xl sm:tracking-[-2.2px]">
-                      Find the exact parts your vehicle needs, at the lowest prices.
+                      Enter your year, make, and model. We match the part.
                     </h1>
 
                     <p className="mx-auto mt-5 max-w-lg text-balance text-base text-slate-600 sm:text-lg">
-                      Compare prices across major marketplaces instantly. Fully verified fitment guaranteed.
+                      Every listing is checked against real compatibility data for your exact vehicle — and clearly labeled on the rare listing we can't verify.
                     </p>
 
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5 text-sm">
                       <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                        <ShieldCheck size={14} className="text-brand-600" /> Fitment checked
+                        <ShieldCheck size={14} className="text-brand-600" /> Fitment matched, not guessed
                       </div>
                       <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                        <Zap size={14} className="text-brand-600" /> Live pricing
+                        <Zap size={14} className="text-brand-600" /> Prices pulled live
                       </div>
                       <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 shadow-sm">
-                        <Tag size={14} className="text-brand-600" /> Value ranked
+                        <Tag size={14} className="text-brand-600" /> Ranked by real value
                       </div>
                     </div>
                   </div>
 
-                  <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+                  <Suspense fallback={<ViewLoader />}>
                     <CarSelector
                       onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
                     />
@@ -202,7 +211,7 @@ function App() {
               )}
 
               {step === 'part' && car && (
-                <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+                <Suspense fallback={<ViewLoader />}>
                   <PartSelector
                     car={car}
                     onBack={goHome}
@@ -212,7 +221,7 @@ function App() {
               )}
 
               {step === 'results' && car && part && (
-                <Suspense fallback={<div className="py-20 text-center text-sm text-slate-500 font-medium">Loading component...</div>}>
+                <Suspense fallback={<ViewLoader />}>
                   <ResultsList
                     car={car}
                     part={part}
@@ -286,9 +295,6 @@ function TrustBanner() {
   return (
     <div className="mt-20 border-t border-slate-200/60 pt-14 dark:border-slate-800/60">
       <div className="text-center">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-bold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-400 shadow-sm">
-          <ShieldCheck size={16} /> Over 45,000 parts compared daily
-        </div>
         <p className="eyebrow text-brand-600 dark:text-brand-400">How it works</p>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
           From vehicle to best price in three steps

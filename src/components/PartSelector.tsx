@@ -617,7 +617,7 @@ export function PartSelector({
                         </div>
                         {item.listing && (
                           <div className="shrink-0 text-right">
-                            <div className="text-sm font-bold text-slate-900">${item.listing.price.toFixed(2)}</div>
+                            <div className="font-data text-sm font-bold text-slate-900">${item.listing.price.toFixed(2)}</div>
                             <div className="text-[10px] text-slate-400">
                               {item.listing.shippingCost ? `+ $${item.listing.shippingCost.toFixed(2)} ship` : 'Free shipping'}
                             </div>
@@ -647,7 +647,7 @@ export function PartSelector({
                       <div className="text-xs text-slate-500">
                         Parts ${quote.subtotal.toFixed(2)} + shipping ${quote.shipping.toFixed(2)}
                       </div>
-                      <div className="text-lg font-extrabold tracking-tight text-slate-950">
+                      <div className="font-data text-lg font-bold tracking-tight text-slate-950">
                         ~${quote.total.toFixed(2)}
                       </div>
                     </div>

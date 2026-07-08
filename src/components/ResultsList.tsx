@@ -229,7 +229,7 @@ export function ResultsList({
     <div className="card p-6 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <VehicleThumbnail make={car.make} model={car.model} className="h-11 w-16" iconSize={20} />
+          <VehicleThumbnail make={car.make} model={car.model} year={car.year} className="h-11 w-16" iconSize={20} />
           <div>
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               {part}
@@ -458,7 +458,7 @@ export function ResultsList({
                   <div className="text-2xl font-semibold tracking-[-0.4px] text-slate-950">
                     {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
                     {priceRange && (
-                      <span className="ml-2 text-base font-normal text-slate-500">
+                      <span className="font-data ml-2 text-base font-normal text-slate-500">
                         ${priceRange.min.toFixed(2)} – ${priceRange.max.toFixed(2)}
                       </span>
                     )}

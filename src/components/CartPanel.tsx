@@ -42,7 +42,7 @@ function PriceDropNote({ saved, info }: { saved: number; info: PriceInfo | undef
 
 function CompareTable({ items }: { items: CartItem[] }) {
   const rows: { label: string; render: (item: CartItem) => ReactNode }[] = [
-    { label: 'Price', render: (i) => <span className="text-lg font-extrabold text-slate-900">${i.price.toFixed(2)}</span> },
+    { label: 'Price', render: (i) => <span className="font-data text-lg font-bold text-slate-900">${i.price.toFixed(2)}</span> },
     { label: 'Fits', render: (i) => i.carLabel },
     { label: 'Part', render: (i) => i.part },
     { label: 'Condition', render: (i) => i.condition },
@@ -207,7 +207,7 @@ export function CartPanel({
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className="text-lg font-extrabold text-slate-900">${item.price.toFixed(2)}</span>
+                  <span className="font-data text-lg font-bold text-slate-900">${item.price.toFixed(2)}</span>
                   <div className="flex gap-1.5">
                     <a
                       href={item.link}
@@ -236,7 +236,7 @@ export function CartPanel({
               <p className="text-xs text-slate-500">
                 {items.length} item{items.length === 1 ? '' : 's'} · bought directly from each seller
               </p>
-              <p className="text-xl font-extrabold text-slate-900">Total of watched items: ${total.toFixed(2)}</p>
+              <p className="text-xl font-bold text-slate-900">Total of watched items: <span className="font-data">${total.toFixed(2)}</span></p>
             </div>
             <button
               type="button"

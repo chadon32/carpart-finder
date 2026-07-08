@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, AlertCircle, X } from 'lucide-react'
+import { ArrowRight, AlertCircle, X, BookmarkPlus, Check } from 'lucide-react'
 import { fetchMakes, fetchModels, fetchTrims, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
 import { VehicleThumbnail } from './VehicleThumbnail'
@@ -184,7 +184,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <VehicleThumbnail make={c.make} model={c.model} className="h-9 w-14 rounded-lg" iconSize={16} />
+                  <VehicleThumbnail make={c.make} model={c.model} year={c.year} className="h-9 w-14 rounded-lg" iconSize={16} />
                   <div className="min-w-0">
                     <div className="font-bold text-slate-900 truncate text-xs">
                       {c.year} {c.make} {c.model}
@@ -327,25 +327,60 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       </div>
 
       {make && model && (
-        <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-brand-200/50 bg-gradient-to-br from-brand-50/40 via-white to-white p-4 shadow-sm sm:flex-row items-center justify-between">
-          <div className="flex flex-col items-center gap-4 sm:flex-row min-w-0">
-            <VehicleThumbnail make={make} model={model} className="h-20 w-32 sm:h-24 sm:w-40" iconSize={36} />
-            <div className="min-w-0 text-center sm:text-left">
-              <p className="text-[10px] font-bold uppercase tracking-[1px] text-brand-600">Active Vehicle</p>
-              <p className="mt-1 text-base font-bold tracking-tight text-slate-950">
-                {year} {make} {model}
-              </p>
-              {trim && <p className="text-xs text-slate-500">{trim}</p>}
+        <div className="spec-plate mt-8 max-w-3xl mx-auto overflow-hidden">
+          <span className="spec-plate-rivet left-3 top-3" />
+          <span className="spec-plate-rivet right-3 top-3" />
+          <span className="spec-plate-rivet left-3 bottom-3" />
+          <span className="spec-plate-rivet right-3 bottom-3" />
+
+          <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+              <div className="relative shrink-0 overflow-hidden rounded-lg bg-slate-800 ring-1 ring-white/10">
+                <VehicleThumbnail make={make} model={model} year={year} className="h-16 w-24 sm:h-[92px] sm:w-[138px] object-cover" iconSize={28} />
+              </div>
+
+              <div className="min-w-0 py-0.5">
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                  <span className="font-data text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Fitment lock — active
+                  </span>
+                </div>
+
+                <h3 className="font-data text-lg font-semibold leading-tight tracking-tight text-white sm:text-xl">
+                  <span className="text-slate-500">{year}</span>{' '}
+                  {make.toUpperCase()} {model.toUpperCase()}
+                </h3>
+
+                {trim && (
+                  <p className="font-data mt-1 text-[12px] font-medium text-slate-400">
+                    TRIM · {trim.toUpperCase()}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex shrink-0 justify-start sm:justify-end">
+              <button
+                type="button"
+                onClick={() => addToGarage({ year, make, model, trim })}
+                disabled={garage.some(c => c.year === year && c.make === make && c.model === model && c.trim === trim)}
+                className="group/btn relative flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-all hover:border-white/25 hover:bg-white/10 disabled:opacity-40"
+              >
+                {garage.some(c => c.year === year && c.make === make && c.model === model && c.trim === trim) ? (
+                  <>
+                    <Check size={16} className="text-emerald-400" />
+                    <span>Saved</span>
+                  </>
+                ) : (
+                  <>
+                    <BookmarkPlus size={16} className="text-slate-300 transition-transform group-hover/btn:scale-110" />
+                    <span>Save to Garage</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => addToGarage({ year, make, model, trim })}
-            disabled={garage.some(c => c.year === year && c.make === make && c.model === model && c.trim === trim)}
-            className="btn btn-secondary btn-sm shrink-0 self-center sm:self-end disabled:opacity-40"
-          >
-            Save to Garage
-          </button>
         </div>
       )}
 

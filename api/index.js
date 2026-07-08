@@ -196,12 +196,12 @@ app.get('/api/trims', async (req, res) => {
 })
 
 app.get('/api/vehicle-image', async (req, res) => {
-  const { make, model } = req.query
+  const { make, model, year } = req.query
   if (!make || !model) {
     return res.status(400).json({ error: 'make and model query params are required' })
   }
   try {
-    const imageUrl = await getVehicleImage(String(make), String(model))
+    const imageUrl = await getVehicleImage(String(make), String(model), year ? String(year) : undefined)
     // This is stable reference data (a model's stock photo), so let the
     // browser cache it too, unlike the no-store default for live listings.
     res.set('Cache-Control', 'public, max-age=86400')

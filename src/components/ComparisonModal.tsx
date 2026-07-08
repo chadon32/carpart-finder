@@ -55,7 +55,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
             <tr>
               <td className="py-4 pr-4 font-semibold text-slate-900">Retail Price</td>
               {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 font-bold text-sm text-slate-900 border-l border-slate-100/80">
+                <td key={item.id} className="font-data py-4 px-4 font-bold text-sm text-slate-900 border-l border-slate-100/80">
                   ${item.price.toFixed(2)}
                 </td>
               ))}
@@ -83,7 +83,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
               {listings.map((item) => {
                 const total = item.price + (item.shippingCost || 0)
                 return (
-                  <td key={item.id} className="py-4 px-4 font-extrabold text-base text-slate-950 border-l border-slate-100/80">
+                  <td key={item.id} className="font-data py-4 px-4 font-bold text-base text-slate-950 border-l border-slate-100/80">
                     ${total.toFixed(2)}
                   </td>
                 )

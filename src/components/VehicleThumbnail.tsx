@@ -7,11 +7,11 @@ import { fetchVehicleImage } from '../api/client'
 // same session without triggering duplicate network requests.
 const cache = new Map<string, Promise<string | null>>()
 
-function getImage(make: string, model: string): Promise<string | null> {
-  const key = `${make}::${model}`.toLowerCase()
+function getImage(make: string, model: string, year?: string): Promise<string | null> {
+  const key = year ? `${year}::${make}::${model}`.toLowerCase() : `${make}::${model}`.toLowerCase()
   let promise = cache.get(key)
   if (!promise) {
-    promise = fetchVehicleImage(make, model)
+    promise = fetchVehicleImage(make, model, year)
       .then((res) => res.imageUrl)
       .catch(() => null)
     cache.set(key, promise)
@@ -25,11 +25,13 @@ function getImage(make: string, model: string): Promise<string | null> {
 export function VehicleThumbnail({
   make,
   model,
+  year,
   className = 'h-14 w-20',
   iconSize = 22,
 }: {
   make: string
   model: string
+  year?: string
   className?: string
   iconSize?: number
 }) {
@@ -41,7 +43,7 @@ export function VehicleThumbnail({
     let cancelled = false
     setLoading(true)
     setFailed(false)
-    getImage(make, model).then((url) => {
+    getImage(make, model, year).then((url) => {
       if (cancelled) return
       setImageUrl(url)
       setLoading(false)
@@ -49,7 +51,7 @@ export function VehicleThumbnail({
     return () => {
       cancelled = true
     }
-  }, [make, model])
+  }, [make, model, year])
 
   const frame = `${className} shrink-0 overflow-hidden rounded-2xl border border-slate-200 shadow-sm`
 

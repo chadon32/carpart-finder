@@ -81,11 +81,11 @@ export function ListingCard({
             {listing.originalPrice && (
               <div className="text-xs text-emerald-600 font-medium">↓ Price dropped</div>
             )}
-            {listing.originalPrice && <div className="text-xs text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</div>}
-            <div className="font-semibold tracking-[-0.5px] text-slate-950 text-[24px] leading-none">
+            {listing.originalPrice && <div className="font-data text-xs text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</div>}
+            <div className="font-data font-semibold text-slate-950 text-[24px] leading-none">
               ${listing.price.toFixed(2)}
             </div>
-            <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1">
+            <div className="font-data text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1">
               Total: ${(listing.price + (listing.shippingCost || 0)).toFixed(2)}
             </div>
           </div>

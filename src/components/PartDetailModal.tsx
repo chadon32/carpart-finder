@@ -64,9 +64,9 @@ export function PartDetailModal({
 
             <div className="mt-4 flex items-baseline gap-3">
               {listing.originalPrice && (
-                <span className="text-lg text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</span>
+                <span className="font-data text-lg text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</span>
               )}
-              <span className="text-5xl font-semibold tracking-[-1px] text-slate-950">${listing.price.toFixed(2)}</span>
+              <span className="font-data text-5xl font-semibold tracking-[-1px] text-slate-950">${listing.price.toFixed(2)}</span>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">

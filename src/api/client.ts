@@ -63,8 +63,9 @@ export function fetchTrims(year: string, make: string, model: string): Promise<{
   return getJson(`/api/trims?${params.toString()}`)
 }
 
-export function fetchVehicleImage(make: string, model: string): Promise<{ imageUrl: string | null }> {
-  const params = new URLSearchParams({ make, model })
+export function fetchVehicleImage(make: string, model: string, year?: string): Promise<{ imageUrl: string | null }> {
+  const params = new URLSearchParams({ make, model, v: '2' })
+  if (year) params.set('year', year)
   return getJson(`/api/vehicle-image?${params.toString()}`)
 }
 
