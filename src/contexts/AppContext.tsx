@@ -125,7 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     getCurrentUser()
-      .then((res) => {
+      .then(() => {
         if (cancelled) return
       })
       .catch(async (err) => {
