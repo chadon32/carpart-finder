@@ -52,6 +52,17 @@ export async function getCurrentPrices(ids) {
 const BASE_FILTER =
   'buyingOptions:{FIXED_PRICE},itemLocationCountry:US,deliveryCountry:US,conditionIds:{1000|1500|2000|2500|3000}'
 
+// X-EBAY-C-ENDUSERCTX carries comma-separated context params. affiliateCampaignId
+// is the EPN (eBay Partner Network) campaign — when present, eBay returns
+// itemAffiliateWebUrl and clicks become commissionable. contextualLocation makes
+// shipping costs/dates accurate for the buyer's ZIP. Exported for tests.
+export function buildEndUserCtx({ zip, campaignId } = {}) {
+  const parts = []
+  if (campaignId) parts.push(`affiliateCampaignId=${campaignId}`)
+  if (zip) parts.push(`contextualLocation=${encodeURIComponent(`country=US,zip=${zip}`)}`)
+  return parts.length > 0 ? parts.join(',') : undefined
+}
+
 async function runSearch(token, { q, categoryId, compatibilityFilter, zip, sort = 'price' }) {
   const params = new URLSearchParams({
     q,
@@ -70,10 +81,11 @@ async function runSearch(token, { q, categoryId, compatibilityFilter, zip, sort 
     Authorization: `Bearer ${token}`,
     'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
   }
-  // Buyer ZIP makes eBay return location-accurate shipping cost + delivery dates.
-  // The header value must be URL-encoded or eBay ignores the location.
-  if (zip) {
-    headers['X-EBAY-C-ENDUSERCTX'] = `contextualLocation=${encodeURIComponent(`country=US,zip=${zip}`)}`
+  // EPN campaign id is read at call time so a config change doesn't require
+  // a code change, and tests can exercise the pure builder directly.
+  const endUserCtx = buildEndUserCtx({ zip, campaignId: process.env.EBAY_EPN_CAMPAIGN_ID })
+  if (endUserCtx) {
+    headers['X-EBAY-C-ENDUSERCTX'] = endUserCtx
   }
 
   // Tight timeout + one retry: the search runs up to three relaxation tiers,
@@ -95,7 +107,7 @@ function isValidItem(item) {
   return Boolean(item.title && item.itemWebUrl && Number(item.price?.value) > 0)
 }
 
-function mapItem(item, { verifiedFitment }) {
+export function mapItem(item, { verifiedFitment }) {
   return {
     id: `ebay-${item.itemId}`,
     verifiedFitment,
@@ -107,7 +119,7 @@ function mapItem(item, { verifiedFitment }) {
     sellerFeedbackPercentage: item.seller?.feedbackPercentage ?? null,
     sellerFeedbackScore: item.seller?.feedbackScore ?? null,
     image: item.image?.imageUrl ?? null,
-    link: item.itemWebUrl,
+    link: item.itemAffiliateWebUrl || item.itemWebUrl,
     source: 'eBay',
     crossBorder: false,
     originalPrice: item.marketingPrice?.originalPrice?.value

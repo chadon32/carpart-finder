@@ -265,7 +265,7 @@ function App() {
               <p>
                 Affiliate disclosure: some outbound links are affiliate links, meaning we may earn a commission if
                 you make a purchase — at no extra cost to you. As an Amazon Associate, CarPartsRadar earns from
-                qualifying purchases.
+                qualifying purchases. CarPartsRadar is also a member of the eBay Partner Network.
               </p>
             </div>
           </div>
