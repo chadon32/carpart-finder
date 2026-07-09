@@ -387,40 +387,40 @@ export function PartSelector({
         </p>
       )}
 
-      {/* Switcher Tab */}
-      <div className="mt-6 mb-5 flex border-b border-slate-100 dark:border-slate-800/60">
+      {/* Switcher Tab — horizontally scrollable on phones so all five fit */}
+      <div className="-mx-7 mb-5 mt-6 flex snap-x overflow-x-auto scrollbar-none border-b border-slate-100 px-7 dark:border-slate-800/60 sm:mx-0 sm:px-0">
         <button
           type="button"
           onClick={() => setSearchMethod('name')}
-          className={`tab ${searchMethod === 'name' ? 'tab-active' : ''}`}
+          className={`tab snap-start ${searchMethod === 'name' ? 'tab-active' : ''}`}
         >
           Part Name
         </button>
         <button
           type="button"
           onClick={() => setSearchMethod('kits')}
-          className={`tab ${searchMethod === 'kits' ? 'tab-active' : ''}`}
+          className={`tab snap-start ${searchMethod === 'kits' ? 'tab-active' : ''}`}
         >
           Maintenance Kits
         </button>
         <button
           type="button"
           onClick={() => setSearchMethod('code')}
-          className={`tab ${searchMethod === 'code' ? 'tab-active' : ''}`}
+          className={`tab snap-start ${searchMethod === 'code' ? 'tab-active' : ''}`}
         >
           Error Code (OBD-II)
         </button>
         <button
           type="button"
           onClick={() => setSearchMethod('photo')}
-          className={`tab ${searchMethod === 'photo' ? 'tab-active' : ''}`}
+          className={`tab snap-start ${searchMethod === 'photo' ? 'tab-active' : ''}`}
         >
           Photo Search
         </button>
         <button
           type="button"
           onClick={() => setSearchMethod('symptom')}
-          className={`tab ${searchMethod === 'symptom' ? 'tab-active' : ''}`}
+          className={`tab snap-start ${searchMethod === 'symptom' ? 'tab-active' : ''}`}
         >
           Describe a Problem
         </button>
@@ -447,7 +447,7 @@ export function PartSelector({
               className="field resize-none"
             />
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="-mx-1 flex gap-1.5 overflow-x-auto scrollbar-none px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
                 {SYMPTOM_EXAMPLES.map((ex) => (
                   <button
                     key={ex}
@@ -456,7 +456,7 @@ export function PartSelector({
                       setSymptomText(ex)
                       submitDiagnosis(ex)
                     }}
-                    className="chip text-[11px]"
+                    className="chip shrink-0 whitespace-nowrap text-[11px]"
                   >
                     {ex}
                   </button>
@@ -596,7 +596,7 @@ export function PartSelector({
 
                   <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {quote.items.map((item) => (
-                      <li key={item.part} className="flex items-center gap-3 px-4 py-3">
+                      <li key={item.part} className="flex flex-wrap items-center gap-3 px-4 py-3">
                         {item.listing?.image ? (
                           <img src={item.listing.image} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-slate-100 object-cover" />
                         ) : (
@@ -623,8 +623,8 @@ export function PartSelector({
                             </div>
                           </div>
                         )}
-                        <div className="flex shrink-0 flex-col gap-1">
-                          <button type="button" onClick={() => onSelect(item.part)} className="btn btn-secondary btn-sm whitespace-nowrap">
+                        <div className="flex w-full gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:gap-1">
+                          <button type="button" onClick={() => onSelect(item.part)} className="btn btn-secondary btn-sm flex-1 whitespace-nowrap sm:flex-none">
                             All listings
                           </button>
                           {item.listing && (
@@ -632,7 +632,7 @@ export function PartSelector({
                               href={item.listing.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="btn btn-ghost btn-sm whitespace-nowrap"
+                              className="btn btn-ghost btn-sm flex-1 justify-center whitespace-nowrap sm:flex-none"
                             >
                               View <ExternalLink size={11} />
                             </a>

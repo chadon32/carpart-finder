@@ -415,7 +415,7 @@ html.dark {
   /* Underline tab — used by PartSelector and the Account modal.
      slate-500 for AA contrast on inactive labels (400 fails at small sizes). */
   .tab {
-    @apply flex-1 touch-manipulation border-b-2 border-transparent pb-2.5 text-center text-xs font-semibold text-slate-500 transition hover:text-slate-700;
+    @apply shrink-0 touch-manipulation whitespace-nowrap border-b-2 border-transparent px-4 pb-2.5 text-center text-xs font-semibold text-slate-500 transition hover:text-slate-700 sm:flex-1;
   }
 
   .dark .tab {
