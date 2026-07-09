@@ -238,6 +238,7 @@ function App() {
                       watchlist.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)
                     }
                     isInWatchlist={watchlist.isInCart}
+                    onSearchPart={(p) => runSearch(car, p)}
                   />
                 </Suspense>
               )}

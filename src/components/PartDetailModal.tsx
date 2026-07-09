@@ -12,6 +12,8 @@ interface PartDetailModalProps {
   listing: Listing
   vehicleLabel: string
   part: string
+  companions?: string[]
+  onSearchPart?: (part: string) => void
   onClose: () => void
   onAddToWatchlist: () => void
   isInWatchlist: boolean
@@ -21,6 +23,8 @@ export function PartDetailModal({
   listing,
   vehicleLabel,
   part,
+  companions,
+  onSearchPart,
   onClose,
   onAddToWatchlist,
   isInWatchlist,
@@ -110,6 +114,19 @@ export function PartDetailModal({
               </div>
             )}
             
+            {companions && companions.length > 0 && onSearchPart && (
+              <div className="mt-5">
+                <div className="eyebrow">Complete the job</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {companions.map((c) => (
+                    <button key={c} type="button" onClick={() => onSearchPart(c)} className="btn btn-secondary px-3 py-1.5 text-xs">
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Repair Guide Section */}
             <div className="mt-8 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/50 to-brand-50/20 p-5 shadow-sm">
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">

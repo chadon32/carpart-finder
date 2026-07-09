@@ -16,6 +16,9 @@ import { searchParts, type Listing } from '../api/client'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
+import { companionsForPart } from '../data/partTypes'
+import { isElectricVehicle } from '../data/electricVehicles'
+import { trackEvent } from '../lib/analytics'
 import { saveSearch, ApiError } from '../api/supabase'
 // Modals only render on user interaction (opening a listing / comparing), so
 // split them out of the main results bundle and load on demand.
@@ -52,6 +55,7 @@ export function ResultsList({
   onBackToCar,
   onAddToWatchlist,
   isInWatchlist,
+  onSearchPart,
 }: {
   car: Car
   part: string
@@ -59,6 +63,7 @@ export function ResultsList({
   onBackToCar: () => void
   onAddToWatchlist: (listing: Listing) => void
   isInWatchlist: (listingId: string) => boolean
+  onSearchPart?: (part: string) => void
 }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -213,8 +218,20 @@ export function ResultsList({
     return { min: Math.min(...prices), max: Math.max(...prices) }
   }, [visible])
 
+  const companions = useMemo(
+    () => companionsForPart(part, isElectricVehicle(car.make, car.model)),
+    [part, car.make, car.model]
+  )
+
   const failedProviders = Object.keys(providerErrors)
   const vehicleLabel = `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`
+
+  const searchCompanion = (to: string, location: 'results-aside' | 'detail-modal') => {
+    if (!onSearchPart) return
+    trackEvent('Companion Part Clicked', { from: part, to, location, vehicleString: vehicleLabel })
+    setSelectedListing(null)
+    onSearchPart(to)
+  }
   const pageTitle = `${vehicleLabel} ${part} — Compare Prices on CarPartsRadar`
   const pageDescription = `Compare real-time prices for ${part} on a ${vehicleLabel}. Find the cheapest listings with verified fitment across top marketplaces.`
 
@@ -548,6 +565,30 @@ export function ResultsList({
             </div>
 
             <aside className="md:col-span-5 xl:col-span-4 space-y-6">
+              {companions.length > 0 && onSearchPart && (
+                <div className="card p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-tile bg-brand-600 text-white"><Wrench size={17} /></div>
+                    <div>
+                      <div className="font-semibold tracking-tight text-slate-950">Complete the job</div>
+                      <div className="text-xs text-slate-500">Commonly replaced together — searches your {car.year} {car.make} {car.model}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {companions.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => searchCompanion(c, 'results-aside')}
+                        className="btn btn-secondary px-3.5 py-2 text-xs"
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="card p-6">
                 <div className="flex items-center gap-3">
                   <div className="icon-tile bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"><Store size={17} /></div>
@@ -595,6 +636,8 @@ export function ResultsList({
             listing={selectedListing}
             vehicleLabel={vehicleLabel}
             part={part}
+            companions={companions}
+            onSearchPart={onSearchPart ? (p) => searchCompanion(p, 'detail-modal') : undefined}
             onClose={() => setSelectedListing(null)}
             onAddToWatchlist={() => {
               onAddToWatchlist(selectedListing)
