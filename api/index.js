@@ -95,6 +95,8 @@ const searchLimiter = rateLimit({
 app.use('/api/search', searchLimiter)
 // Quote runs one provider search per part, so it shares the same budget.
 app.use('/api/quote', searchLimiter)
+// Prices makes one eBay item lookup per requested id, so it does too.
+app.use('/api/prices', searchLimiter)
 
 // The AI endpoints each hit Gemini (paid, with hard quotas) and are the most
 // expensive per call, so they get a much tighter, dedicated budget. Without
@@ -201,10 +203,18 @@ app.get('/api/models', async (req, res) => {
   }
 })
 
+// One outbound eBay call is made per id, so this list must be bounded. Without
+// a cap, `?ids=a,b,c,...` with thousands of entries turned one unauthenticated
+// GET into thousands of concurrent upstream requests.
+const MAX_PRICE_IDS = 20
+
 app.get('/api/prices', async (req, res) => {
   const ids = req.query.ids ? String(req.query.ids).split(',').filter(Boolean) : []
   if (ids.length === 0) {
     return res.status(400).json({ error: 'ids query param is required' })
+  }
+  if (ids.length > MAX_PRICE_IDS) {
+    return res.status(400).json({ error: `A maximum of ${MAX_PRICE_IDS} ids may be requested at once` })
   }
   try {
     // Only eBay items can be re-checked; ignore other sources' ids gracefully.
