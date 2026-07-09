@@ -34,6 +34,9 @@ server/generated_mappings.json
 .claude/
 terminals/
 
+# Screenshots emitted by drive-mobile.mjs — regenerable verification artifacts
+shots/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
