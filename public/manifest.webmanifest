@@ -1,0 +1,14 @@
+{
+  "name": "CarPartsRadar",
+  "short_name": "PartsRadar",
+  "description": "Compare live car part prices with verified fitment for your exact vehicle.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#2050c8",
+  "background_color": "#fafafa",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
