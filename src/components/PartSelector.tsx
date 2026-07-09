@@ -674,6 +674,7 @@ export function PartSelector({
               value=""
               onChange={(part) => onSelect(part)}
               allowFreeText
+              enterKeyHint="search"
             />
             <p className="mt-1.5 text-xs text-slate-500">Pick from the autocomplete list, or enter any custom part name or number and press Enter.</p>
           </div>
@@ -827,6 +828,10 @@ export function PartSelector({
                 placeholder="Enter OBD-II trouble code (e.g., P0302, P0171)"
                 value={dtcInput}
                 onChange={(e) => setDtcInput(e.target.value)}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="search"
                 className="field pl-9 uppercase"
               />
               <span className="absolute left-3.5 top-3 text-slate-400">

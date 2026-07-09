@@ -47,6 +47,7 @@ export function Combobox({
   onChange,
   disabled,
   allowFreeText,
+  enterKeyHint,
 }: {
   label: string
   placeholder: string
@@ -56,6 +57,7 @@ export function Combobox({
   onChange: (value: string) => void
   disabled?: boolean
   allowFreeText?: boolean
+  enterKeyHint?: 'search' | 'go' | 'done' | 'next'
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -172,6 +174,7 @@ export function Combobox({
           aria-activedescendant={activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined}
           disabled={disabled}
           placeholder={placeholder}
+          enterKeyHint={enterKeyHint}
           value={open ? query : value}
           onFocus={(e) => {
             if (blurTimeout.current) clearTimeout(blurTimeout.current)
@@ -201,7 +204,7 @@ export function Combobox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-30 mt-1.5 max-h-72 w-full animate-fade-in overflow-auto rounded-xl border border-slate-200/80 bg-white p-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5"
+          className="absolute z-30 mt-1.5 max-h-60 w-full animate-fade-in overflow-auto rounded-xl border border-slate-200/80 bg-white p-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5 sm:max-h-72"
         >
           {items.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">No matches</li>}
           {entries.map((entry) =>
@@ -218,7 +221,7 @@ export function Combobox({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => submit(entry.value)}
                 onMouseMove={() => setActiveIndex(entry.index)}
-                className={`cursor-pointer rounded-lg px-3 py-2 text-sm transition ${
+                className={`cursor-pointer touch-manipulation rounded-lg px-3 py-3 text-sm transition sm:py-2 ${
                   entry.isFree
                     ? `flex items-center gap-2 font-semibold text-brand-700 ${
                         activeIndex === entry.index ? 'bg-brand-50' : 'hover:bg-brand-50'
