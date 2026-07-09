@@ -3,6 +3,7 @@ import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine, Activity } f
 import { toast } from 'sonner'
 import { fetchMakes, fetchModels, fetchTrims, decodeVinApi, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
+import { StickyActionBar } from './StickyActionBar'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { VehicleHealthModal } from './VehicleHealthModal'
 import { cachedRecallCount } from '../lib/recallCache'
@@ -274,17 +275,17 @@ export function CarSelector({
                       setHealthIndex(i)
                     }}
                     aria-label={`Vehicle health for ${c.year} ${c.make} ${c.model}`}
-                    className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-brand-600 transition"
+                    className="rounded-lg p-3 -m-1.5 text-slate-300 hover:bg-slate-100 hover:text-brand-600 transition"
                   >
-                    <Activity size={13} />
+                    <Activity size={16} />
                   </button>
                   <button
                     type="button"
                     onClick={(e) => removeFromGarage(i, e)}
                     aria-label="Remove vehicle"
-                    className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-rose-600 transition"
+                    className="rounded-lg p-3 -m-1.5 text-slate-300 hover:bg-slate-100 hover:text-rose-600 transition"
                   >
-                    <X size={13} />
+                    <X size={16} />
                   </button>
                 </div>
               </div>
@@ -315,6 +316,10 @@ export function CarSelector({
             }}
             placeholder="17-character VIN — driver's door jamb or windshield"
             maxLength={17}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
             className="field font-data flex-1 uppercase tracking-[0.08em]"
           />
           <button
@@ -337,7 +342,7 @@ export function CarSelector({
               key={opt.value}
               type="button"
               onClick={() => setVehicleType(opt.value)}
-              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+              className={`touch-manipulation rounded-lg px-3.5 py-2.5 text-sm font-medium transition sm:py-1.5 ${
                 vehicleType === opt.value
                   ? 'bg-white text-brand-700 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -387,7 +392,7 @@ export function CarSelector({
         <div className="mb-1.5 flex items-center justify-between">
           <label className="field-label mb-0">Trim (optional)</label>
           {trim && (
-            <button type="button" onClick={() => setTrim('')} className="text-xs font-medium text-brand-600 hover:text-brand-700">
+            <button type="button" onClick={() => setTrim('')} className="py-2 -my-2 text-xs font-medium text-brand-600 hover:text-brand-700">
               Clear selection
             </button>
           )}
@@ -403,7 +408,7 @@ export function CarSelector({
                 <button
                   type="button"
                   onClick={() => setTrim('')}
-                  className={`rounded-xl border px-4 py-2.5 text-left text-sm font-medium transition ${
+                  className={`touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
                     !trim
                       ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
                       : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -416,7 +421,7 @@ export function CarSelector({
                     key={t}
                     type="button"
                     onClick={() => setTrim(t)}
-                    className={`rounded-xl border px-4 py-2.5 text-left text-sm font-medium transition ${
+                    className={`touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
                       trim === t
                         ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
                         : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -509,6 +514,19 @@ export function CarSelector({
         Continue to parts
         <ArrowRight size={16} strokeWidth={2.4} className="transition-transform group-hover:translate-x-0.5" />
       </button>
+
+      {canConfirm && (
+        <StickyActionBar>
+          <button
+            type="button"
+            onClick={() => onConfirm({ year, make, model, trim: trim.trim() })}
+            className="btn btn-primary btn-lg w-full"
+          >
+            Continue to parts
+            <ArrowRight size={16} strokeWidth={2.4} />
+          </button>
+        </StickyActionBar>
+      )}
 
       {healthIndex !== null && garage[healthIndex] && (
         <VehicleHealthModal
