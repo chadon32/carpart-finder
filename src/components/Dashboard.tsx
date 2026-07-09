@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Trash2, ChevronLeft, LogOut, Search, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppContext } from '../contexts/AppContext'
-import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert } from '../api/supabase'
+import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert, ApiError } from '../api/supabase'
 
 interface DashboardProps {
   onClose: () => void
@@ -97,7 +97,14 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
       setAuthError(null)
       setAuthNotice(null)
     } catch (err: any) {
-      setAuthError(err.message || 'Authentication failed.')
+      // 503 means the server cannot verify credentials at all (Supabase is
+      // unconfigured). Say so plainly instead of implying the credentials
+      // were wrong — and point at what still works.
+      if (err instanceof ApiError && err.status === 503) {
+        setAuthError('Accounts are temporarily unavailable. Search and price comparison still work.')
+      } else {
+        setAuthError(err.message || 'Authentication failed.')
+      }
     } finally {
       setAuthLoading(false)
     }

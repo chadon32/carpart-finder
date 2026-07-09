@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "node --test \"server/**/*.test.js\" \"api/**/*.test.js\"",
     "test:diagnose": "node server/scripts/testDiagnosis.js"
   },
   "dependencies": {

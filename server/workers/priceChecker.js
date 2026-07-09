@@ -9,7 +9,7 @@
  * Scheduled via Vercel Cron hitting /api/cron/check-alerts (see vercel.json).
  */
 
-import { supabaseAdmin, isMockMode } from '../supabase.js'
+import { supabaseAdmin, isMockMode, accountsAvailable } from '../supabase.js'
 import { search as ebaySearch, isConfigured as ebayConfigured } from '../providers/ebay.js'
 
 // Runs one alert's search and returns the cheapest out-of-pocket option,
@@ -37,6 +37,13 @@ export async function checkPriceAlerts() {
   if (isMockMode) {
     console.warn('⚠️ [PriceChecker] Running in LOCAL MOCK MODE. Skipping Supabase DB lookup.')
     return { checked: 0, triggered: 0, skipped: 'mock mode' }
+  }
+
+  // supabaseAdmin is null when accounts are disabled. Without this the cron
+  // would throw on `.from()` of null.
+  if (!accountsAvailable || !supabaseAdmin) {
+    console.warn('⚠️ [PriceChecker] Accounts are disabled (Supabase unconfigured). Skipping price check.')
+    return { checked: 0, triggered: 0, skipped: 'accounts unavailable' }
   }
 
   if (!ebayConfigured()) {

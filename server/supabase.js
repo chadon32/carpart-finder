@@ -1,52 +1,37 @@
 import { createClient } from '@supabase/supabase-js'
 import 'dotenv/config'
+import { resolveAuthConfig } from './config.js'
 
-// A malformed or half-configured Supabase env (bad URL, empty key, only one of
-// URL/key set) makes createClient() throw at import time. Because this module
-// is imported by the single Vercel serverless function, that throw would take
-// down the ENTIRE API — including the vehicle/search endpoints that never touch
-// Supabase. So we validate first and fall back to mock mode instead of letting
-// the whole function crash with FUNCTION_INVOCATION_FAILED.
-const rawUrl = process.env.SUPABASE_URL?.trim()
-const rawAnonKey = process.env.SUPABASE_ANON_KEY?.trim()
-const rawServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+// A malformed or half-configured Supabase env used to silently enable mock
+// mode. It no longer can: resolveAuthConfig fails closed in production. This
+// module still must not throw at import time, because it is imported by the
+// single Vercel serverless function — a throw here would take down the search
+// endpoints too, which need no database at all.
+const config = resolveAuthConfig(process.env)
 
-function isValidHttpUrl(value) {
-  if (!value) return false
-  try {
-    const u = new URL(value)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
+export const isMockMode = config.isMockMode
+export const accountsAvailable = config.accountsAvailable
+
+if (!accountsAvailable) {
+  // An error, not a warning: in production this means the login form is dark.
+  console.error(`[auth] ACCOUNTS DISABLED — ${config.reason}`)
+} else if (isMockMode) {
+  console.warn('⚠️ [auth] LOCAL MOCK MODE — accounts do not persist and passwords are not verified.')
 }
 
-const hasValidConfig = isValidHttpUrl(rawUrl) && Boolean(rawAnonKey)
-
-export const isMockMode = !hasValidConfig
-
-if (isMockMode) {
-  if (rawUrl || rawAnonKey || rawServiceKey) {
-    // Something was set but it's incomplete/malformed — warn loudly so a
-    // misconfigured deploy is obvious in the logs rather than silently mock.
-    console.warn(
-      '⚠️ Supabase config is incomplete or invalid ' +
-        `(url=${rawUrl ? 'set' : 'missing'}, anonKey=${rawAnonKey ? 'set' : 'missing'}). ` +
-        'Falling back to LOCAL MOCK MODE — accounts, saved searches, and alerts will not persist.'
-    )
-  } else {
-    console.warn('⚠️ SUPABASE_URL / SUPABASE_ANON_KEY not set. Supabase features run in LOCAL MOCK MODE.')
-  }
-}
-
-// Safe placeholders when unconfigured — createClient needs syntactically valid
-// args, but in mock mode nothing actually calls out to them.
-const supabaseUrl = hasValidConfig ? rawUrl : 'https://mock.supabase.co'
-const supabaseAnonKey = hasValidConfig ? rawAnonKey : 'dummy-anon-key'
+// createClient needs syntactically valid args even when unused.
+const supabaseUrl = config.hasValidConfig ? process.env.SUPABASE_URL.trim() : 'https://mock.supabase.co'
+const supabaseAnonKey = config.hasValidConfig ? process.env.SUPABASE_ANON_KEY.trim() : 'dummy-anon-key'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Service-role client for server-side writes that must bypass RLS. Falls back
-// to the anon client when the service key is missing or config is mocked.
+// Service-role client for server-side writes that bypass RLS. It is `null`
+// when unusable — NEVER the anon client. The old fallback made every
+// guest-alert insert fail silently against RLS and made authed reads return
+// empty sets, because auth.uid() is null server-side. Callers are only
+// reachable when accountsAvailable is true (see requireAccountsAvailable),
+// and the mock branches never touch this client.
 export const supabaseAdmin =
-  hasValidConfig && rawServiceKey ? createClient(supabaseUrl, rawServiceKey) : supabase
+  config.hasValidConfig && config.hasServiceRole
+    ? createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY.trim())
+    : null
