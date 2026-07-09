@@ -179,6 +179,45 @@ router.post('/login', async (req, res) => {
   })
 })
 
+// Start Google OAuth Flow
+router.get('/oauth/google', async (req, res) => {
+  if (isMockMode) {
+    return res.status(503).send('OAuth is not available in local mock mode.')
+  }
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${req.protocol}://${req.get('host')}/api/supabase/auth/callback`
+    }
+  })
+
+  if (error) return res.status(400).send(error.message)
+  if (data?.url) return res.redirect(data.url)
+  res.status(500).send('Failed to initialize OAuth flow')
+})
+
+// OAuth Callback
+router.get('/auth/callback', async (req, res) => {
+  const { code } = req.query
+
+  if (!code) {
+    return res.redirect('/')
+  }
+
+  // Exchange the code for a Supabase session
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (!error && data?.session?.access_token) {
+    setAuthCookie(res, data.session.access_token)
+    // Redirect back to frontend with a flag so AppContext knows to fetch the user
+    return res.redirect('/?oauth=true')
+  }
+
+  // If exchange failed, just redirect home
+  res.redirect('/')
+})
+
 // All routes below require authentication
 router.use(requireAuth)
 

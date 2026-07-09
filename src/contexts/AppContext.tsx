@@ -86,22 +86,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Boot-only on purpose: re-running when `user` changes would clear the user
   // we just logged in, before the cookie round-trips.
   useEffect(() => {
-    if (!user) return
-    let cancelled = false
-    getCurrentUser().catch(async (err) => {
-      if (cancelled) return
-      // Only a definitive answer from the server ends the session. A network
-      // failure means we don't know, so keep the cached user rather than
-      // logging someone out over a dropped connection.
-      //   401/403 — the token is invalid or expired.
-      //   503     — accounts are disabled; any session we hold is a mock relic.
-      const definitive = err instanceof ApiError && [401, 403, 503].includes(err.status)
-      if (!definitive) return
+    const searchParams = new URLSearchParams(window.location.search)
+    const isOauthCallback = searchParams.get('oauth') === 'true'
 
-      await logoutUser() // clears the stale cpf_token cookie server-side
-      localStorage.removeItem('carpartsradar-user')
-      setUser(null)
-    })
+    if (!user && !isOauthCallback) return
+
+    let cancelled = false
+
+    if (isOauthCallback) {
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+
+    getCurrentUser()
+      .then((res) => {
+        if (cancelled) return
+        if (isOauthCallback && res.user) {
+          const newUser = {
+            name: res.user.user_metadata?.full_name || res.user.email?.split('@')[0] || 'User',
+            email: res.user.email || '',
+          }
+          localStorage.setItem('carpartsradar-user', JSON.stringify(newUser))
+          setUser(newUser)
+        }
+      })
+      .catch(async (err) => {
+        if (cancelled) return
+        // Only a definitive answer from the server ends the session. A network
+        // failure means we don't know, so keep the cached user rather than
+        // logging someone out over a dropped connection.
+        //   401/403 — the token is invalid or expired.
+        //   503     — accounts are disabled; any session we hold is a mock relic.
+        const definitive = err instanceof ApiError && [401, 403, 503].includes(err.status)
+        if (!definitive) return
+
+        await logoutUser() // clears the stale cpf_token cookie server-side
+        localStorage.removeItem('carpartsradar-user')
+        setUser(null)
+      })
     return () => {
       cancelled = true
     }

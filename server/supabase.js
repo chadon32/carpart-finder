@@ -23,7 +23,9 @@ if (!accountsAvailable) {
 const supabaseUrl = config.hasValidConfig ? process.env.SUPABASE_URL.trim() : 'https://mock.supabase.co'
 const supabaseAnonKey = config.hasValidConfig ? process.env.SUPABASE_ANON_KEY.trim() : 'dummy-anon-key'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: false }
+})
 
 // Service-role client for server-side writes that bypass RLS. It is `null`
 // when unusable — NEVER the anon client. The old fallback made every
