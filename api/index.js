@@ -40,27 +40,44 @@ const allowedOrigins = [
   process.env.FRONTEND_URL, // extra override, e.g. a staging domain
 ].filter(Boolean)
 
+// Dev-only convenience: allow LAN origins so a phone on the same network can
+// hit the dev server. Never true in production.
+function isDevLanOrigin(origin) {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    (origin.startsWith('http://192.168.') || origin.startsWith('http://10.'))
+  )
+}
+
+function isAllowedOrigin(origin) {
+  return allowedOrigins.includes(origin) || isDevLanOrigin(origin)
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) return callback(null, true)
-    
-    // In dev, allow local network IPs for mobile testing
-    if (process.env.NODE_ENV !== 'production') {
-      if (origin.startsWith('http://192.168.') || origin.startsWith('http://10.')) {
-        return callback(null, true)
-      }
-    }
-    
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true)
-    }
-    return callback(new Error('Not allowed by CORS'))
+    if (isAllowedOrigin(origin)) return callback(null, true)
+
+    // Do NOT throw: an Error here reaches the error handler as an opaque 500.
+    // Signal "not allowed" and let the guard below turn it into an honest 403.
+    return callback(null, false)
   },
   credentials: true,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
+
+// cors() omits the CORS headers for a disallowed origin but still calls next().
+// A browser would block reading the response, but a non-browser client would
+// not — so reject the request outright rather than serving it.
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ error: 'Origin not allowed' })
+  }
+  next()
+})
 
 app.use((_req, res, next) => {
   // JSON API responses: never cache, never sniff. The document-level policy
@@ -244,6 +261,17 @@ app.get('/api/vehicle-image', async (req, res) => {
   const { make, model, year } = req.query
   if (!make || !model) {
     return res.status(400).json({ error: 'make and model query params are required' })
+  }
+  // make/model become cache keys and upstream Wikipedia queries — bound them.
+  // vehicleError() isn't reused directly here: it requires a year, and year is
+  // optional on this route.
+  for (const [label, value] of Object.entries({ make, model })) {
+    if (String(value).trim().length > MAX_VEHICLE_FIELD) {
+      return res.status(400).json({ error: `${label} is too long` })
+    }
+  }
+  if (year && !validateYear(year)) {
+    return res.status(400).json({ error: 'A valid model year (1980–present) is required' })
   }
   try {
     const imageUrl = await getVehicleImage(String(make), String(model), year ? String(year) : undefined)
@@ -483,6 +511,28 @@ app.get('/api/search', async (req, res) => {
     console.error(err)
     res.status(502).json({ error: 'Failed to fetch data' })
   }
+})
+
+// Anything reaching here matched no route. Return JSON, not Express's HTML.
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
+
+// Terminal error handler. Express identifies it by its four-argument arity —
+// do not remove `next` even though it is unused. Without this, express.json()'s
+// SyntaxError on a malformed body falls through to Express's default handler,
+// which replies with an HTML page (and a stack trace outside production).
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+    return res.status(400).json({ error: 'Malformed JSON body' })
+  }
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request body is too large' })
+  }
+  // Log the detail; return none of it.
+  console.error('[api] Unhandled error:', err?.message, err?.stack)
+  res.status(500).json({ error: 'Something went wrong' })
 })
 
 export default app
