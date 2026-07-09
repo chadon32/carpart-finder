@@ -12,6 +12,7 @@
 import { supabaseAdmin, isMockMode, accountsAvailable } from '../supabase.js'
 import { search as ebaySearch, isConfigured as ebayConfigured } from '../providers/ebay.js'
 import { escapeHtml, safeListingUrl } from '../lib/html.js'
+import { recordPriceObservation } from '../priceHistory.js'
 
 // Runs one alert's search and returns the cheapest out-of-pocket option,
 // matching what the UI shows (price + shipping). null = no live listings.
@@ -75,6 +76,12 @@ export async function checkPriceAlerts() {
       const cheapest = await findCheapest(search)
       checked++
 
+      // History accrues on every check, not just on triggers, so alerted
+      // searches build a daily series even when the price never drops.
+      if (cheapest) {
+        await recordPriceObservation({ year: search.year, make: search.make, model: search.model, part: search.part, total: cheapest.total })
+      }
+
       const update = { last_checked_at: new Date().toISOString() }
 
       if (cheapest) {
@@ -111,6 +118,10 @@ export async function checkPriceAlerts() {
     try {
       const cheapest = await findCheapest(alert)
       checked++
+
+      if (cheapest) {
+        await recordPriceObservation({ year: alert.year, make: alert.make, model: alert.model, part: alert.part, total: cheapest.total })
+      }
 
       const update = { last_checked_at: new Date().toISOString() }
 

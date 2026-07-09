@@ -14,6 +14,7 @@ import { getVehicleImage } from '../server/vehicleImages.js'
 import { getRecalls } from '../server/recalls.js'
 import supabaseRoutes from '../server/routes/supabase.js'
 import { checkPriceAlerts } from '../server/workers/priceChecker.js'
+import { recordPriceObservation } from '../server/priceHistory.js'
 import { diagnoseSymptom } from '../server/symptoms.js'
 import { generateRepairGuide } from '../server/routes/ai.js'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -546,6 +547,17 @@ app.get('/api/search', async (req, res) => {
       part: String(part),
       zip: cleanZip,
     })
+    // Record the day's observed low from genuinely live results only (cache
+    // hits re-observe nothing; stale results are old data). Awaited because
+    // Vercel can freeze the function right after res.json; recordPriceObservation
+    // never throws, so this cannot fail the search.
+    if (!result.cached && !result.stale && result.results.length > 0) {
+      const cheapestTotal = result.results.reduce(
+        (best, r) => Math.min(best, r.price + (r.shippingCost || 0)),
+        Infinity
+      )
+      await recordPriceObservation({ year, make, model, part, total: cheapestTotal })
+    }
     res.json(result)
   } catch (err) {
     console.error(err)

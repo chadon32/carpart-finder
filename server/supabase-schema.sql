@@ -96,6 +96,28 @@ create unique index if not exists idx_guest_alerts_unique
   on public.guest_alerts (email, year, make, model, part);
 
 -- ============================================
+-- PRICE HISTORY (daily observed lows per search signature)
+-- ============================================
+-- Written only by the server with the service-role key (organic searches and
+-- the alert cron); RLS is enabled with no policies so the anon key can neither
+-- read nor write. make/model/part are stored normalized lowercase.
+create table if not exists public.price_history (
+  id uuid primary key default uuid_generate_v4(),
+  year text not null,
+  make text not null,
+  model text not null,
+  part text not null,
+  observed_date date not null,
+  price numeric not null,
+  created_at timestamptz default now()
+);
+
+alter table public.price_history enable row level security;
+
+create unique index if not exists idx_price_history_daily
+  on public.price_history (year, make, model, part, observed_date);
+
+-- ============================================
 -- INDEXES
 -- ============================================
 create index if not exists idx_saved_searches_user_id on public.saved_searches(user_id);
