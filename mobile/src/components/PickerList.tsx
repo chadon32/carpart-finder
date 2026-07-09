@@ -1,0 +1,66 @@
+import { useState } from 'react'
+import { View, Text, TextInput, FlatList, Pressable, ActivityIndicator } from 'react-native'
+import { useThemeColors } from '../theme'
+
+export function PickerList({ title, options, loading, onSelect, searchable = false }: {
+  title: string
+  options: string[]
+  loading?: boolean
+  onSelect: (value: string) => void
+  searchable?: boolean
+}) {
+  const c = useThemeColors()
+  const [q, setQ] = useState('')
+  const shown = q ? options.filter((o) => o.toLowerCase().includes(q.toLowerCase())) : options
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', padding: 16 }}>{title}</Text>
+      {searchable ? (
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder="Search"
+          placeholderTextColor={c.subtext}
+          autoCorrect={false}
+          autoCapitalize="none"
+          style={{
+            marginHorizontal: 16,
+            marginBottom: 8,
+            minHeight: 44,
+            borderRadius: 12,
+            paddingHorizontal: 12,
+            fontSize: 16,
+            color: c.text,
+            backgroundColor: c.card,
+            borderWidth: 1,
+            borderColor: c.border,
+          }}
+        />
+      ) : null}
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 32 }} />
+      ) : (
+        <FlatList
+          data={shown}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => onSelect(item)}
+              style={{
+                minHeight: 48,
+                justifyContent: 'center',
+                paddingHorizontal: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: c.border,
+              }}
+            >
+              <Text style={{ color: c.text, fontSize: 16 }}>{item}</Text>
+            </Pressable>
+          )}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
+    </View>
+  )
+}
