@@ -40,7 +40,7 @@ export function PartDetailModal({
             <div className="text-xs font-semibold tracking-[1px] text-brand-600">DETAILED VIEW</div>
             <div className="font-semibold text-xl tracking-tight text-slate-950">{part}</div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={onClose} aria-label="Close" className="rounded-full p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
@@ -151,8 +151,8 @@ export function PartDetailModal({
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex flex-col gap-3 border-t bg-slate-50 p-6 sm:flex-row mt-4">
+        {/* Footer Actions — pinned to the sheet bottom on mobile */}
+        <div className="sticky bottom-0 mt-4 flex flex-col gap-3 border-t bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:static sm:flex-row sm:p-6">
           <button
             onClick={() => {
               onAddToWatchlist()
@@ -173,7 +173,7 @@ export function PartDetailModal({
             View on {listing.source} <ExternalLink size={16} />
           </a>
 
-          <button onClick={onClose} className="btn btn-ghost py-3 text-base">
+          <button onClick={onClose} className="btn btn-ghost hidden py-3 text-base sm:inline-flex">
             Close
           </button>
         </div>

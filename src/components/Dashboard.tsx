@@ -113,7 +113,7 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
   if (!user) {
     return (
       <div className="mx-auto max-w-md card p-8 mt-12 animate-slide-up">
-        <button onClick={onClose} className="mb-6 flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-brand-600 transition">
+        <button onClick={onClose} className="btn btn-ghost -ml-3 mb-6 px-3 text-sm font-medium text-slate-500 hover:text-brand-600">
           <ChevronLeft size={16} /> Back to Search
         </button>
         <form onSubmit={(e) => { e.preventDefault(); handleAuth(); }}>
@@ -233,7 +233,7 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
   return (
     <div className="mx-auto max-w-4xl animate-slide-up">
       <div className="mb-6 flex items-center justify-between">
-        <button onClick={onClose} className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-brand-600 transition">
+        <button onClick={onClose} className="btn btn-ghost -ml-3 px-3 text-sm font-medium text-slate-500 hover:text-brand-600">
           <ChevronLeft size={16} /> Back
         </button>
         <button onClick={handleLogout} disabled={authLoading} className="btn btn-ghost text-sm text-slate-500 hover:text-rose-600">

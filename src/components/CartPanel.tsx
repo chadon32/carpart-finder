@@ -158,7 +158,7 @@ export function CartPanel({
               {checking ? 'Checking…' : 'Check prices'}
             </button>
           )}
-          <button type="button" onClick={onClose} className="btn btn-ghost px-2.5 py-1.5">
+          <button type="button" onClick={onClose} className="btn btn-ghost hidden px-2.5 py-1.5 sm:inline-flex">
             <ChevronLeft size={15} /> Search
           </button>
         </div>
@@ -194,7 +194,7 @@ export function CartPanel({
             {items.map((item) => (
               <li
                 key={item.cartId}
-                className="flex items-center gap-4 rounded-2xl border border-slate-200 p-3 transition hover:border-slate-300"
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 p-3 transition hover:border-slate-300 sm:gap-4"
               >
                 {item.image && <img src={item.image} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />}
                 <div className="min-w-0 flex-1">
@@ -206,7 +206,7 @@ export function CartPanel({
                     <PriceDropNote saved={item.price} info={prices?.[item.id]} />
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
                   <span className="font-data text-lg font-bold text-slate-900">${item.price.toFixed(2)}</span>
                   <div className="flex gap-1.5">
                     <a
@@ -231,7 +231,7 @@ export function CartPanel({
             ))}
           </ul>
 
-          <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
+          <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs text-slate-500">
                 {items.length} item{items.length === 1 ? '' : 's'} · bought directly from each seller
@@ -241,7 +241,7 @@ export function CartPanel({
             <button
               type="button"
               onClick={onClear}
-              className="text-sm font-semibold text-slate-500 transition hover:text-red-600"
+              className="self-start py-2 text-sm font-semibold text-slate-500 transition hover:text-red-600 sm:self-auto sm:py-0"
             >
               Clear Watchlist
             </button>
