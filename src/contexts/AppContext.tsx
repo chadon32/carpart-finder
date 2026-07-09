@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { getCurrentUser, logoutUser, ApiError } from '../api/supabase'
 
 interface User {
   name: string
@@ -75,6 +76,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
       document.documentElement.classList.remove('dark')
     }
   }, [darkMode])
+
+  // A cached user in localStorage is a UI hint, never proof of a session. The
+  // server holds the real answer in an httpOnly cookie we cannot read. Confirm
+  // it once on boot and clear both sides if the session is gone — this is what
+  // logs out anyone still holding a session minted by the old mock-mode auth,
+  // which accepted any password for any email.
+  //
+  // Boot-only on purpose: re-running when `user` changes would clear the user
+  // we just logged in, before the cookie round-trips.
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getCurrentUser().catch(async (err) => {
+      if (cancelled) return
+      // Only a definitive answer from the server ends the session. A network
+      // failure means we don't know, so keep the cached user rather than
+      // logging someone out over a dropped connection.
+      //   401/403 — the token is invalid or expired.
+      //   503     — accounts are disabled; any session we hold is a mock relic.
+      const definitive = err instanceof ApiError && [401, 403, 503].includes(err.status)
+      if (!definitive) return
+
+      await logoutUser() // clears the stale cpf_token cookie server-side
+      localStorage.removeItem('carpartsradar-user')
+      setUser(null)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <AppContext.Provider value={{ user, setUser, accountData, setAccountData, darkMode, setDarkMode }}>

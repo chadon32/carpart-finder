@@ -101,7 +101,9 @@ export async function signupUser(user: {
   })
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.error || 'Failed to sign up')
+    // ApiError, not Error: callers need the status to tell "accounts are
+    // disabled" (503) apart from "wrong password" (400).
+    throw new ApiError(errorData.error || 'Failed to sign up', res.status)
   }
   return res.json()
 }
@@ -118,7 +120,7 @@ export async function loginUser(credentials: {
   })
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.error || 'Failed to log in')
+    throw new ApiError(errorData.error || 'Failed to log in', res.status)
   }
   return res.json()
 }
