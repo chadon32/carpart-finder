@@ -13,10 +13,21 @@ const IMG_FETCH_OPTS = { timeoutMs: 5000, retries: 0 }
 const USER_AGENT = 'CarPartFinder/1.0 (personal project; contact via GitHub)'
 
 // Long-lived cache: a model's representative photo essentially never changes,
-// and "no match found" is just as stable, so we cache both outcomes.
+// and "no match found" is just as stable, so we cache both outcomes. Capped,
+// because the key space is derived from user-supplied query params — an
+// uncapped Map here grows without bound. Mirrors search.js's LRU.
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_CACHE_SIZE = Number(process.env.MAX_IMAGE_CACHE_SIZE) || 500
 const cache = new Map()
 const imagePromises = new Map()
+
+// Simple LRU eviction: delete the oldest entry when over the limit.
+function evictOldestIfNeeded() {
+  if (cache.size > MAX_CACHE_SIZE) {
+    const oldestKey = cache.keys().next().value
+    cache.delete(oldestKey)
+  }
+}
 
 async function resolveTitle(query) {
   const params = new URLSearchParams({ action: 'opensearch', search: query, limit: '1', format: 'json' })
@@ -100,9 +111,14 @@ export async function getVehicleImage(make, model, year) {
       imageUrl = null
     }
 
+    evictOldestIfNeeded()
     cache.set(key, { imageUrl, expiresAt: Date.now() + CACHE_TTL_MS })
     return imageUrl
-  })()
+  })().finally(() => {
+    // Without this, one in-flight promise leaked per unique make::model, and
+    // the map was never drained for the process's lifetime.
+    imagePromises.delete(key)
+  })
 
   imagePromises.set(key, promise)
   return promise
