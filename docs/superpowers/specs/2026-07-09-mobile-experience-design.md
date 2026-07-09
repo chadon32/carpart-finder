@@ -73,7 +73,7 @@
 **`Modal.tsx` rework — same public API** (`label`, `onClose`, `children`, `maxWidth`).
 - New `useIsMobile()` hook (`matchMedia('(max-width: 639px)')`, updates on change).
 - **Desktop (≥640px):** existing centered dialog implementation unchanged (focus trap, Escape, backdrop, scroll lock).
-- **Mobile:** vaul `Drawer.Root` (open, `onOpenChange` → `onClose`) with `Drawer.Overlay` (same dim/blur), `Drawer.Content`: rounded-t-3xl, drag handle bar, `max-h-[92dvh]`, internal `overflow-y-auto` content area, `pb-safe`. `aria-label` passed through (vaul/Radix supplies dialog role, focus management, Escape).
+- **Mobile:** vaul `Drawer.Root` (open, `onOpenChange` → `onClose`) with `Drawer.Overlay` (same dim/blur), `Drawer.Content`: rounded-t-3xl, drag handle bar, `max-h-[92dvh]`, internal `overflow-y-auto` content area, `pb-safe`. `aria-label` passed through (vaul/Radix supplies dialog role, focus management, Escape). `maxWidth` is ignored in sheet mode — sheets are always full-width.
 - Nested case: RepairGuideModal opens from PartDetailModal — vaul supports stacked drawers; both render as siblings exactly as today.
 
 **Consumers**
