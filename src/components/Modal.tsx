@@ -1,11 +1,13 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { Drawer } from 'vaul'
+import { useIsMobile } from '../hooks/useIsMobile'
 
-// Accessible modal shell shared by every dialog in the app:
-// - role="dialog" + aria-modal so screen readers announce it correctly
-// - focuses the panel on open and restores focus to the trigger on close
-// - traps Tab/Shift+Tab inside the dialog
-// - closes on Escape and backdrop click
-// - locks body scroll while open
+// Accessible modal shell shared by every dialog in the app.
+// Desktop (>=640px): centered dialog with its own focus trap, Escape,
+// backdrop close, and body scroll lock. Mobile (<640px): a vaul bottom
+// sheet — drag handle, swipe-down dismiss, safe-area padding; vaul/Radix
+// supplies dialog semantics, focus management, and scroll lock there.
+// `maxWidth` only applies to the desktop dialog; sheets are full-width.
 export function Modal({
   label,
   onClose,
@@ -17,10 +19,12 @@ export function Modal({
   children: ReactNode
   maxWidth?: string
 }) {
+  const isMobile = useIsMobile()
   const panelRef = useRef<HTMLDivElement>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
+    if (isMobile) return
     restoreRef.current = document.activeElement as HTMLElement | null
     panelRef.current?.focus()
     const prevOverflow = document.body.style.overflow
@@ -29,7 +33,24 @@ export function Modal({
       document.body.style.overflow = prevOverflow
       restoreRef.current?.focus?.()
     }
-  }, [])
+  }, [isMobile])
+
+  if (isMobile) {
+    return (
+      <Drawer.Root open onOpenChange={(open) => { if (!open) onClose() }}>
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-white outline-none dark:bg-slate-900">
+            <Drawer.Title className="sr-only">{label}</Drawer.Title>
+            <div aria-hidden className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700" />
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-safe">
+              {children}
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+    )
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
