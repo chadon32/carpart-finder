@@ -22,14 +22,17 @@ create table if not exists public.saved_searches (
 alter table public.saved_searches enable row level security;
 
 -- Users can only see their own saved searches
+drop policy if exists "Users can view own saved searches" on public.saved_searches;
 create policy "Users can view own saved searches"
   on public.saved_searches for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own saved searches" on public.saved_searches;
 create policy "Users can insert own saved searches"
   on public.saved_searches for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own saved searches" on public.saved_searches;
 create policy "Users can delete own saved searches"
   on public.saved_searches for delete
   using (auth.uid() = user_id);
@@ -51,18 +54,22 @@ create table if not exists public.price_alerts (
 
 alter table public.price_alerts enable row level security;
 
+drop policy if exists "Users can view own price alerts" on public.price_alerts;
 create policy "Users can view own price alerts"
   on public.price_alerts for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert own price alerts" on public.price_alerts;
 create policy "Users can insert own price alerts"
   on public.price_alerts for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update own price alerts" on public.price_alerts;
 create policy "Users can update own price alerts"
   on public.price_alerts for update
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can delete own price alerts" on public.price_alerts;
 create policy "Users can delete own price alerts"
   on public.price_alerts for delete
   using (auth.uid() = user_id);
