@@ -67,7 +67,7 @@ export function companionsForPart(part: string, isElectric: boolean): string[] {
 
 // Cross-reference integrity: every companion must name a real part type, or it
 // silently produces a broken search category. Warn loudly in dev, never throw.
-if (import.meta.env.DEV) {
+if (__DEV__) {
   const names = new Set(partTypes.map((p) => p.name))
   for (const p of partTypes) {
     for (const c of p.companions ?? []) {

@@ -1,7 +1,7 @@
 import { fetchMakes, searchParts, API_BASE } from '../client'
 
 const mockFetch = jest.fn()
-global.fetch = mockFetch as unknown as typeof fetch
+globalThis.fetch = mockFetch as unknown as typeof fetch
 
 const jsonResponse = (body: unknown, ok = true, status = 200) =>
   Promise.resolve({ ok, status, json: () => Promise.resolve(body) })
