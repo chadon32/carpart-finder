@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, AlertCircle, X, BookmarkPlus, Check } from 'lucide-react'
-import { fetchMakes, fetchModels, fetchTrims, type VehicleType } from '../api/client'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine } from 'lucide-react'
+import { toast } from 'sonner'
+import { fetchMakes, fetchModels, fetchTrims, decodeVinApi, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
 import { VehicleThumbnail } from './VehicleThumbnail'
 
@@ -10,6 +11,10 @@ export type Car = {
   model: string
   trim: string
 }
+
+// Garage entries carry optional enrichment (VIN from a decode, user-entered
+// mileage). All fields optional so pre-existing localStorage entries parse.
+export type GarageVehicle = Car & { vin?: string; mileage?: number }
 
 const currentYear = new Date().getFullYear()
 const years = Array.from({ length: currentYear - 1980 + 2 }, (_, i) => String(currentYear + 1 - i))
@@ -39,7 +44,17 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   const [model, setModel] = useState('')
   const [trim, setTrim] = useState('')
 
-  const [garage, setGarage] = useState<Car[]>(() => {
+  const [vinInput, setVinInput] = useState('')
+  const [vinLoading, setVinLoading] = useState(false)
+  const [vinError, setVinError] = useState<string | null>(null)
+  // The VIN that produced the current selection; cleared on any manual change
+  // so a stale VIN is never saved onto a hand-edited vehicle.
+  const [decodedVin, setDecodedVin] = useState<string | null>(null)
+  // Model/trim from a decode must be applied AFTER the models/trims effects
+  // run, because those effects clear model and trim when year/make change.
+  const pendingVin = useRef<{ model: string; trim: string } | null>(null)
+
+  const [garage, setGarage] = useState<GarageVehicle[]>(() => {
     try {
       const raw = localStorage.getItem('carpartsradar-garage')
       return raw ? JSON.parse(raw) : []
@@ -52,7 +67,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
     localStorage.setItem('carpartsradar-garage', JSON.stringify(garage))
   }, [garage])
 
-  const addToGarage = (carToAdd: Car) => {
+  const addToGarage = (carToAdd: GarageVehicle) => {
     setGarage((prev) => {
       const exists = prev.some(
         (c) =>
@@ -119,9 +134,16 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       .then((res) => {
         if (cancelled) return
         setModels(res.models)
+        if (pendingVin.current) {
+          const match = res.models.find((m) => m.toLowerCase() === pendingVin.current!.model.toLowerCase())
+          setModel(match ?? pendingVin.current.model)
+        }
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message)
+        if (!cancelled) {
+          setError(err.message)
+          pendingVin.current = null
+        }
       })
       .finally(() => {
         if (!cancelled) setModelsLoading(false)
@@ -141,10 +163,22 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       .then((res) => {
         if (cancelled) return
         setTrims(res.trims)
+        if (pendingVin.current) {
+          const want = pendingVin.current.trim
+          const match = res.trims.find((t) => t.toLowerCase() === want.toLowerCase())
+          setTrim(match ?? want)
+          pendingVin.current = null
+        }
       })
       .catch(() => {
         // Trim data is a nice-to-have; fall back to free text silently on failure.
-        if (!cancelled) setTrims([])
+        if (!cancelled) {
+          setTrims([])
+          if (pendingVin.current) {
+            setTrim(pendingVin.current.trim)
+            pendingVin.current = null
+          }
+        }
       })
       .finally(() => {
         if (!cancelled) setTrimsLoading(false)
@@ -155,6 +189,28 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
   }, [make, year, model])
 
   const canConfirm = Boolean(year && make && model)
+
+  const handleDecodeVin = async () => {
+    setVinLoading(true)
+    setVinError(null)
+    try {
+      const d = await decodeVinApi(vinInput)
+      pendingVin.current = { model: d.model, trim: d.trim || '' }
+      setYear(d.year)
+      setMake(d.make)
+      setDecodedVin(vinInput)
+      const engineBits = [
+        d.engine.displacementL && `${d.engine.displacementL}L`,
+        d.engine.cylinders && `${d.engine.cylinders}-cyl`,
+        d.engine.driveType,
+      ].filter(Boolean).join(' · ')
+      toast.success(`Decoded: ${d.year} ${d.make} ${d.model}${engineBits ? ` — ${engineBits}` : ''}`)
+    } catch (err) {
+      setVinError(err instanceof Error ? err.message : "Couldn't decode that VIN — pick your vehicle manually below")
+    } finally {
+      setVinLoading(false)
+    }
+  }
 
   return (
     <div className="card p-7">
@@ -214,6 +270,35 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
       )}
 
       <div className="mt-6">
+        <label htmlFor="vin-input" className="field-label flex items-center gap-1.5">
+          <ScanLine size={13} className="text-brand-600" /> Have your VIN? Decode it (fastest)
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="vin-input"
+            type="text"
+            value={vinInput}
+            onChange={(e) => {
+              setVinInput(e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17))
+              setVinError(null)
+            }}
+            placeholder="17-character VIN — driver's door jamb or windshield"
+            maxLength={17}
+            className="field font-data flex-1 uppercase tracking-[0.08em]"
+          />
+          <button
+            type="button"
+            onClick={handleDecodeVin}
+            disabled={vinInput.length !== 17 || vinLoading}
+            className="btn btn-secondary shrink-0 px-4"
+          >
+            {vinLoading ? 'Decoding…' : 'Decode'}
+          </button>
+        </div>
+        {vinError && <p className="mt-1.5 text-xs text-rose-600">{vinError}</p>}
+      </div>
+
+      <div className="mt-6">
         <label className="field-label">Vehicle type</label>
         <div className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {vehicleTypeOptions.map((opt) => (
@@ -239,7 +324,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
           placeholder="Select year"
           options={years}
           value={year}
-          onChange={(v) => setYear(v)}
+          onChange={(v) => { setYear(v); setDecodedVin(null) }}
         />
         <div>
           <label className="field-label">Make</label>
@@ -253,7 +338,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
               { label: 'All Makes', options: otherOptions },
             ]}
             value={make}
-            onChange={(v) => setMake(v)}
+            onChange={(v) => { setMake(v); setDecodedVin(null) }}
             disabled={makesLoading}
           />
         </div>
@@ -262,7 +347,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
           placeholder={!make || !year ? 'Pick year & make first' : modelsLoading ? 'Loading models…' : 'Select model'}
           options={models}
           value={model}
-          onChange={(v) => setModel(v)}
+          onChange={(v) => { setModel(v); setDecodedVin(null) }}
           disabled={!make || !year || modelsLoading}
         />
       </div>
@@ -363,7 +448,7 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
             <div className="flex shrink-0 justify-start sm:justify-end">
               <button
                 type="button"
-                onClick={() => addToGarage({ year, make, model, trim })}
+                onClick={() => addToGarage({ year, make, model, trim, ...(decodedVin ? { vin: decodedVin } : {}) })}
                 disabled={garage.some(c => c.year === year && c.make === make && c.model === model && c.trim === trim)}
                 className="group/btn relative flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-all hover:border-white/25 hover:bg-white/10 disabled:opacity-40"
               >

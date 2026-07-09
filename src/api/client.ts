@@ -140,6 +140,24 @@ export function searchParts(
   return getJson(`/api/search?${params.toString()}`)
 }
 
+export type VinDecodeResult = {
+  year: string
+  make: string
+  model: string
+  trim: string | null
+  engine: {
+    displacementL: string | null
+    cylinders: string | null
+    driveType: string | null
+    fuelType: string | null
+  }
+}
+
+export function decodeVinApi(vin: string): Promise<VinDecodeResult> {
+  const params = new URLSearchParams({ vin })
+  return getJson(`/api/vin?${params.toString()}`)
+}
+
 export function identifyPartFromImage(base64Image: string): Promise<{ identified: boolean; partName: string | null }> {
   return fetch('/api/identify-part', {
     method: 'POST',
