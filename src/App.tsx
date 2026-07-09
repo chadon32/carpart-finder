@@ -162,7 +162,17 @@ function App() {
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 sm:pb-10">
         {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
-        <div key={viewKey} className="animate-slide-up">
+        {/* Entrance animation must be removed once done: a transform animation
+            (even filled at identity) makes this div the containing block for
+            position:fixed descendants like the compare bar, pinning them to
+            the document instead of the viewport. */}
+        <div
+          key={viewKey}
+          className="animate-slide-up"
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget) e.currentTarget.classList.remove('animate-slide-up')
+          }}
+        >
           {showWatchlist ? (
             <Suspense fallback={<ViewLoader />}>
               <CartPanel

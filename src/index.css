@@ -52,7 +52,10 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* `none`, not translateY(0): the animation fills forwards, and any
+       retained transform — even identity — makes the element the containing
+       block for position:fixed descendants (e.g. the compare bar). */
+    transform: none;
   }
 }
 
@@ -164,32 +167,6 @@ html.dark {
   }
   .scrollbar-none::-webkit-scrollbar {
     display: none;
-  }
-
-  /* Touch-target floor: on phones every control reaches the 44px Apple /
-     48dp Android standard (40px for compact pills) and text inputs render
-     at 16px so iOS Safari doesn't force-zoom on focus. Desktop unchanged. */
-  @media (max-width: 639px) {
-    .btn {
-      min-height: 44px;
-    }
-    .btn-sm {
-      min-height: 40px;
-    }
-    .chip,
-    .filter-pill {
-      min-height: 40px;
-      padding-top: 0.5rem;
-      padding-bottom: 0.5rem;
-    }
-    .tab {
-      min-height: 44px;
-      padding-top: 0.625rem;
-    }
-    .field,
-    textarea.field {
-      font-size: 16px;
-    }
   }
 
   .app-bg {
@@ -531,5 +508,33 @@ html.dark {
 
   .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
     border-color: rgba(51, 65, 85, 0.4) !important;
+  }
+
+  /* Touch-target floor: on phones every control reaches the 44px Apple /
+     48dp Android standard (40px for compact pills) and text inputs render
+     at 16px so iOS Safari doesn't force-zoom on focus. Desktop unchanged.
+     Kept last in this layer so these overrides win the cascade against the
+     base component rules above (same specificity, later source order). */
+  @media (max-width: 639px) {
+    .btn {
+      min-height: 44px;
+    }
+    .btn-sm {
+      min-height: 40px;
+    }
+    .chip,
+    .filter-pill {
+      min-height: 40px;
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+    .tab {
+      min-height: 44px;
+      padding-top: 0.625rem;
+    }
+    .field,
+    textarea.field {
+      font-size: 16px;
+    }
   }
 }
