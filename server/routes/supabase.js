@@ -35,7 +35,6 @@ function clearAuthCookie(res) {
 // In-memory mock database for local development without Supabase keys
 const mockSavedSearches = []
 const mockPriceAlerts = []
-const mockGuestSubscriptions = []
 
 // Defined BEFORE the gate on purpose. Logout takes no credentials and reads no
 // database; it must keep working even when accounts are disabled, so browsers
@@ -66,17 +65,6 @@ router.post('/price-alerts/subscribe', async (req, res) => {
 
   if (isMockMode) {
     console.log(`[Alert Subscription] Guest ${email} subscribed to alerts for ${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part} at target price $${price}`)
-    mockGuestSubscriptions.push({
-      id: crypto.randomUUID(),
-      email,
-      year,
-      make,
-      model,
-      trim,
-      part,
-      target_price: price,
-      created_at: new Date().toISOString()
-    })
     return res.json({ success: true, message: 'Alert subscription created (Local Mock)!' })
   }
 
