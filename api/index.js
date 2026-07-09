@@ -63,17 +63,13 @@ app.use(cors({
 }))
 
 app.use((_req, res, next) => {
+  // JSON API responses: never cache, never sniff. The document-level policy
+  // (CSP, HSTS, X-Frame-Options, Referrer-Policy) now lives in vercel.json,
+  // because those headers do nothing on an API response — only the HTML
+  // document enforces them, and the document is served by Vercel's static
+  // host, which never ran this middleware.
   res.set('Cache-Control', 'no-store')
-  // Security headers
   res.set('X-Content-Type-Options', 'nosniff')
-  res.set('X-Frame-Options', 'DENY')
-  res.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:")
-  
-  if (process.env.NODE_ENV === 'production') {
-    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-  }
-  
   next()
 })
 

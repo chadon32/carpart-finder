@@ -14,7 +14,20 @@
       rel="stylesheet"
     />
     <!-- CJ (Commission Junction) Page-Based Link auto-monetization: rewrites
-         outbound clicks to joined CJ advertisers into tracked affiliate links. -->
+         outbound clicks to joined CJ advertisers into tracked affiliate links.
+
+         ACCEPTED RISK: a third-party script with full DOM access. Subresource
+         Integrity is not possible because CJ rotates the file's contents, so a
+         CJ compromise is a compromise of every visitor. It is allow-listed by
+         name in the Content-Security-Policy in vercel.json rather than being
+         covered by a blanket policy, which means removing this tag also closes
+         the hole. Revisit if the affiliate revenue stops justifying it.
+
+         The CSP's script-src also lists CJ's redirect domains (dpbolvw,
+         tqlkg, kqzyfj, jdoqocy, tkqlhce) because am.js loads siblings from
+         them; style-src needs 'unsafe-inline' for Tailwind, sonner's runtime
+         style injection, and inline style attributes; img-src needs https:
+         because eBay and Wikimedia image hostnames rotate. -->
     <script src="https://www.anrdoezrs.net/am/101820027/impressions/page/am.js"></script>
   </head>
   <body>
