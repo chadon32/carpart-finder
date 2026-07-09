@@ -93,3 +93,61 @@ export async function getModels(make, year) {
   modelsPromises.set(key, promise)
   return promise
 }
+
+const vinCache = new Map()
+const vinPromises = new Map()
+const MAX_VIN_CACHE = 500
+
+// Full-VIN decode via vPIC DecodeVinValues (flat single-row response). Returns
+// nulls for fields vPIC doesn't know rather than guessing — the route decides
+// whether the decode is usable. Cached like makes/models (VINs are immutable).
+export async function decodeVin(vin) {
+  const key = vin.toUpperCase()
+  const cached = vinCache.get(key)
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data
+  }
+
+  if (vinPromises.has(key)) {
+    return vinPromises.get(key)
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetchWithRetry(
+        `${BASE_URL}/DecodeVinValues/${encodeURIComponent(key)}?format=json`,
+        {},
+        { timeoutMs: 10000, retries: 2 }
+      )
+      if (!res.ok) throw new Error(`NHTSA VIN decode failed (${res.status})`)
+      const data = await res.json()
+      const row = data.Results?.[0] || {}
+      const clean = (v) => {
+        const s = v == null ? '' : String(v).trim()
+        return s || null
+      }
+      const decoded = {
+        year: clean(row.ModelYear),
+        make: clean(row.Make),
+        model: clean(row.Model),
+        trim: clean(row.Trim),
+        engine: {
+          displacementL: clean(row.DisplacementL),
+          cylinders: clean(row.EngineCylinders),
+          driveType: clean(row.DriveType),
+          fuelType: clean(row.FuelTypePrimary),
+        },
+      }
+      if (vinCache.size >= MAX_VIN_CACHE) {
+        vinCache.delete(vinCache.keys().next().value)
+      }
+      vinCache.set(key, { data: decoded, expiresAt: Date.now() + CACHE_TTL_MS })
+      return decoded
+    } finally {
+      vinPromises.delete(key)
+    }
+  })()
+
+  vinPromises.set(key, promise)
+  return promise
+}

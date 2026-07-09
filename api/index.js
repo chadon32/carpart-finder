@@ -7,7 +7,7 @@ import express from 'express'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import { searchCheapestListings } from '../server/search.js'
-import { getMakes, getModels } from '../server/nhtsa.js'
+import { getMakes, getModels, decodeVin } from '../server/nhtsa.js'
 import { getTrims } from '../server/ebayCompatibility.js'
 import { getCurrentPrices } from '../server/providers/ebay.js'
 import { getVehicleImage } from '../server/vehicleImages.js'
@@ -210,6 +210,28 @@ app.get('/api/models', async (req, res) => {
   try {
     const models = await getModels(String(make), String(year))
     res.json({ models })
+  } catch (err) {
+    console.error(err)
+    res.status(502).json({ error: 'Failed to fetch data' })
+  }
+})
+
+// 17 chars; letters I, O, Q are never used in a VIN (avoids 0/1 confusion).
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/i
+
+app.get('/api/vin', async (req, res) => {
+  const vin = String(req.query.vin || '').trim()
+  if (!VIN_RE.test(vin)) {
+    return res.status(400).json({ error: 'A 17-character VIN is required (the letters I, O, and Q never appear in a VIN)' })
+  }
+  try {
+    const decoded = await decodeVin(vin)
+    // vPIC answers 200 even for VINs it can't resolve; an unusable decode is a
+    // client-visible condition, not fabricated fallback data.
+    if (!decoded.year || !decoded.make || !decoded.model) {
+      return res.status(422).json({ error: "Couldn't decode that VIN — try picking your vehicle manually" })
+    }
+    res.json(decoded)
   } catch (err) {
     console.error(err)
     res.status(502).json({ error: 'Failed to fetch data' })
