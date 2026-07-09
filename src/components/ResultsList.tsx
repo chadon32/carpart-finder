@@ -3,14 +3,17 @@ import {
   ChevronLeft,
   Wrench,
   AlertTriangle,
+  BookmarkPlus,
   ExternalLink,
   Check,
   RotateCw,
+  SlidersHorizontal,
   Truck,
   Store,
   Share2,
   TrendingDown,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Helmet } from 'react-helmet-async'
 import type { Car } from './CarSelector'
 import { searchParts, fetchPriceHistory, type Listing, type PriceObservation } from '../api/client'
@@ -28,6 +31,7 @@ const PartDetailModal = lazy(() => import('./PartDetailModal').then((m) => ({ de
 const ComparisonModal = lazy(() => import('./ComparisonModal').then((m) => ({ default: m.ComparisonModal })))
 
 import { PriceAlertCard } from './PriceAlertCard'
+import { FilterSheet } from './FilterSheet'
 import { ListingCard } from './ListingCard'
 import { RadarMark } from './RadarMark'
 import { isNew, isUsed, valueScore } from '../lib/listingHelpers'
@@ -93,6 +97,7 @@ export function ResultsList({
   // Comparison
   const [compareList, setCompareList] = useState<Listing[]>([])
   const [showCompareModal, setShowCompareModal] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
   const [copied, setCopied] = useState(false)
@@ -237,6 +242,21 @@ export function ResultsList({
     return { min: Math.min(...prices), max: Math.max(...prices) }
   }, [visible])
 
+  const activeFilterCount =
+    (condition !== 'all' ? 1 : 0) +
+    (hideOverseas ? 1 : 0) +
+    (filterFastDelivery ? 1 : 0) +
+    (minRating > 0 ? 1 : 0) +
+    (effectiveZip ? 1 : 0)
+
+  const clearFilters = () => {
+    setCondition('all')
+    setHideOverseas(false)
+    setFilterFastDelivery(false)
+    setMinRating(0)
+    setZip('')
+  }
+
   const companions = useMemo(
     () => companionsForPart(part, isElectricVehicle(car.make, car.model)),
     [part, car.make, car.model]
@@ -283,7 +303,7 @@ export function ResultsList({
           <button type="button" onClick={onBackToPart} className="btn btn-ghost px-2.5 py-1.5">
             <ChevronLeft size={16} /> Part
           </button>
-          <button type="button" onClick={onBackToCar} className="btn btn-ghost px-2.5 py-1.5">
+          <button type="button" onClick={onBackToCar} className="btn btn-ghost hidden px-2.5 py-1.5 sm:inline-flex">
             Vehicle
           </button>
           <button
@@ -300,21 +320,25 @@ export function ResultsList({
                   part
                 })
                 setSaveState('saved')
+                toast.success('Search saved')
                 setTimeout(() => setSaveState('idle'), 2500)
               } catch (err) {
                 // 401 = not signed in; anything else is a real server/network
                 // failure and shouldn't be mislabeled as an auth problem.
                 const isAuth = err instanceof ApiError && err.status === 401
                 setSaveState(isAuth ? 'auth' : 'error')
+                toast.error(isAuth ? 'Log in to save searches' : "Couldn't save — try again")
                 setTimeout(() => setSaveState('idle'), 3500)
               }
             }}
+            aria-label="Save search"
             className={`btn btn-accent px-4 py-2 text-xs flex items-center gap-1.5 shadow-md ${
               saveState === 'error' || saveState === 'auth' ? 'bg-rose-600 hover:bg-rose-700' : ''
             }`}
           >
             {saveState === 'saved' && <Check size={13} className="text-emerald-600 animate-scale-up" />}
-            <span>
+            <BookmarkPlus size={15} className="sm:hidden" />
+            <span className="hidden sm:inline">
               {saveState === 'saving'
                 ? 'Saving…'
                 : saveState === 'saved'
@@ -333,10 +357,11 @@ export function ResultsList({
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             }}
+            aria-label="Copy share link"
             className="btn btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5"
           >
             {copied ? <Check size={13} className="text-emerald-600 animate-scale-up" /> : <Share2 size={13} />}
-            <span>{copied ? 'Copied!' : 'Share'}</span>
+            <span className="hidden sm:inline">{copied ? 'Copied!' : 'Share'}</span>
           </button>
         </div>
       </div>
@@ -403,7 +428,45 @@ export function ResultsList({
             )
           )}
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          {/* Mobile toolbar: one thumb-scrollable row; detail filters live in the sheet */}
+          <div className="-mx-6 mt-6 flex items-center gap-2 overflow-x-auto scrollbar-none px-6 sm:hidden">
+            <button
+              type="button"
+              onClick={() => setShowFilters(true)}
+              className="btn btn-secondary relative shrink-0 px-4 text-xs"
+            >
+              <SlidersHorizontal size={15} /> Filters
+              {activeFilterCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <div className="inline-flex shrink-0 gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+              {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCondition(c)}
+                  className={`min-h-[38px] touch-manipulation rounded-full px-4 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}
+                >
+                  {c === 'all' ? 'All' : c}
+                </button>
+              ))}
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              aria-label="Sort listings"
+              className="field w-auto shrink-0 py-2.5 pr-8 text-xs font-semibold"
+            >
+              <option value="price">Cheapest first</option>
+              <option value="value">Best value</option>
+              <option value="rating">Seller rating</option>
+            </select>
+          </div>
+
+          <div className="mt-6 hidden flex-wrap items-center justify-between gap-3 sm:flex">
             <div className="flex flex-wrap items-center gap-2">
               {/* Condition Filter */}
               <div className="inline-flex gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
@@ -512,12 +575,7 @@ export function ResultsList({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setCondition('all')
-                      setHideOverseas(false)
-                      setFilterFastDelivery(false)
-                      setMinRating(0)
-                    }}
+                    onClick={clearFilters}
                     className="btn btn-ghost px-3 py-1.5 text-xs"
                   >
                     Clear filters
@@ -539,13 +597,8 @@ export function ResultsList({
                   No listings match these filters.{' '}
                   <button
                     type="button"
-                    onClick={() => {
-                      setCondition('all')
-                      setHideOverseas(false)
-                      setFilterFastDelivery(false)
-                      setMinRating(0)
-                    }}
-                    className="font-semibold text-brand-700 underline hover:text-brand-800"
+                    onClick={clearFilters}
+                    className="py-2 font-semibold text-brand-700 underline hover:text-brand-800"
                   >
                     Clear filters
                   </button>
@@ -691,6 +744,26 @@ export function ResultsList({
         <Suspense fallback={null}>
           <ComparisonModal listings={compareList} onClose={() => setShowCompareModal(false)} />
         </Suspense>
+      )}
+
+      {showFilters && (
+        <FilterSheet
+          condition={condition}
+          onCondition={setCondition}
+          hideOverseas={hideOverseas}
+          onHideOverseas={setHideOverseas}
+          fastDelivery={filterFastDelivery}
+          onFastDelivery={setFilterFastDelivery}
+          minRating={minRating}
+          onMinRating={setMinRating}
+          zipInput={zipInput}
+          onZipInput={setZipInput}
+          onCommitZip={() => {
+            if (zipInput === '' || /^\d{5}$/.test(zipInput)) setZip(zipInput)
+          }}
+          onClearAll={clearFilters}
+          onClose={() => setShowFilters(false)}
+        />
       )}
 
       {compareList.length > 0 && (
