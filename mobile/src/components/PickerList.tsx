@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TextInput, FlatList, Pressable, ActivityIndicator } from 'react-native'
-import { useThemeColors } from '../theme'
+import { useThemeColors, displayFont } from '../theme'
 
 export function PickerList({ title, options, loading, onSelect, searchable = false }: {
   title: string
@@ -15,7 +15,9 @@ export function PickerList({ title, options, loading, onSelect, searchable = fal
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', padding: 16 }}>{title}</Text>
+      <Text style={{ color: c.text, fontSize: 26, fontFamily: displayFont, padding: 16 }}>
+        {title.toUpperCase()}
+      </Text>
       {searchable ? (
         <TextInput
           value={q}

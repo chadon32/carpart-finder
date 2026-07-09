@@ -1,8 +1,11 @@
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router'
 import { useColorScheme } from 'react-native'
+import { useFonts, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed'
 
 export default function RootLayout() {
   const colorScheme = useColorScheme()
+  const [fontsLoaded] = useFonts({ BarlowCondensed_700Bold })
+  if (!fontsLoaded) return null
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>

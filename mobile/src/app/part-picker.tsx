@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TextInput, FlatList, Pressable } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { partTypes } from '@/data/partTypes'
-import { useThemeColors } from '@/theme'
+import { useThemeColors, displayFont } from '@/theme'
 
 export default function PartPicker() {
   const c = useThemeColors()
@@ -26,8 +26,8 @@ export default function PartPicker() {
       <Text style={{ color: c.subtext, paddingHorizontal: 16, paddingTop: 12, fontWeight: '600' }}>
         {year} {String(make).toUpperCase()} {String(model).toUpperCase()}
       </Text>
-      <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', padding: 16 }}>
-        What part do you need?
+      <Text style={{ color: c.text, fontSize: 26, fontFamily: displayFont, padding: 16 }}>
+        WHAT PART DO YOU NEED?
       </Text>
       <TextInput
         value={q}

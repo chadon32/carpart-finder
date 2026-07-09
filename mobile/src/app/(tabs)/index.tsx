@@ -2,7 +2,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useGarage } from '@/stores/garage'
-import { useThemeColors, brand } from '@/theme'
+import { useThemeColors, brand, displayFont } from '@/theme'
 import { VehicleCard } from '@/components/VehicleCard'
 
 export default function SearchScreen() {
@@ -13,7 +13,7 @@ export default function SearchScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         <View style={{ paddingTop: 8 }}>
-          <Text style={{ color: c.text, fontSize: 30, fontWeight: '800' }}>
+          <Text style={{ color: c.text, fontSize: 38, fontFamily: displayFont, letterSpacing: 0.5 }}>
             CARPARTS<Text style={{ color: brand }}>RADAR</Text>
           </Text>
           <Text style={{ color: c.subtext, marginTop: 4 }}>

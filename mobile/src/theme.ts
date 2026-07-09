@@ -2,6 +2,10 @@ import { useColorScheme } from 'react-native'
 
 export const brand = '#2050c8'
 
+// The site's "Blueprint & Radar" display face: Barlow Condensed 700, always
+// uppercase. Use for screen titles and the wordmark, never body text.
+export const displayFont = 'BarlowCondensed_700Bold'
+
 const light = {
   bg: '#fafafa',
   card: '#ffffff',

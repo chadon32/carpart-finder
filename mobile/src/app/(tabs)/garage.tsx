@@ -2,7 +2,7 @@ import { View, Text, FlatList } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useGarage } from '@/stores/garage'
-import { useThemeColors } from '@/theme'
+import { useThemeColors, displayFont } from '@/theme'
 import { VehicleCard } from '@/components/VehicleCard'
 
 export default function GarageScreen() {
@@ -12,7 +12,7 @@ export default function GarageScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
-      <Text style={{ color: c.text, fontSize: 30, fontWeight: '800', padding: 16 }}>Garage</Text>
+      <Text style={{ color: c.text, fontSize: 34, fontFamily: displayFont, padding: 16 }}>GARAGE</Text>
       <FlatList
         data={vehicles}
         keyExtractor={(v, i) => `${v.year}-${v.make}-${v.model}-${v.trim}-${i}`}
