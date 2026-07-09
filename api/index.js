@@ -14,7 +14,7 @@ import { getVehicleImage } from '../server/vehicleImages.js'
 import { getRecalls } from '../server/recalls.js'
 import supabaseRoutes from '../server/routes/supabase.js'
 import { checkPriceAlerts } from '../server/workers/priceChecker.js'
-import { recordPriceObservation } from '../server/priceHistory.js'
+import { recordPriceObservation, getPriceHistory } from '../server/priceHistory.js'
 import { diagnoseSymptom } from '../server/symptoms.js'
 import { generateRepairGuide } from '../server/routes/ai.js'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -112,6 +112,8 @@ app.use('/api/search', searchLimiter)
 app.use('/api/quote', searchLimiter)
 // Prices makes one eBay item lookup per requested id, so it does too.
 app.use('/api/prices', searchLimiter)
+// History reads hit Supabase, so they share the search budget.
+app.use('/api/price-history', searchLimiter)
 
 // The AI endpoints each hit Gemini (paid, with hard quotas) and are the most
 // expensive per call, so they get a much tighter, dedicated budget. Without
@@ -324,6 +326,20 @@ app.get('/api/recalls', async (req, res) => {
     console.error(err)
     res.status(502).json({ error: 'Failed to fetch data' })
   }
+})
+
+app.get('/api/price-history', async (req, res) => {
+  const { year, make, model, part } = req.query
+  if (!part || !String(part).trim()) {
+    return res.status(400).json({ error: 'part query param is required' })
+  }
+  const invalid = vehicleError({ year, make, model, part })
+  if (invalid) {
+    return res.status(400).json({ error: invalid })
+  }
+  // getPriceHistory never throws (it returns [] and logs), so no try/catch.
+  const observations = await getPriceHistory({ year, make, model, part })
+  res.json({ observations })
 })
 
 // Supabase-backed routes (accounts, saved searches, price alerts)

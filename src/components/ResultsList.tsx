@@ -9,13 +9,15 @@ import {
   Truck,
   Store,
   Share2,
+  TrendingDown,
 } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import type { Car } from './CarSelector'
-import { searchParts, type Listing } from '../api/client'
+import { searchParts, fetchPriceHistory, type Listing, type PriceObservation } from '../api/client'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
+import { Sparkline } from './Sparkline'
 import { companionsForPart } from '../data/partTypes'
 import { isElectricVehicle } from '../data/electricVehicles'
 import { trackEvent } from '../lib/analytics'
@@ -124,6 +126,23 @@ export function ResultsList({
       cancelled = true
     }
   }, [car, part, reloadKey, effectiveZip])
+
+  // Real observed daily lows for this search signature. Absence is normal
+  // (history only accrues once Supabase is configured), so errors just hide it.
+  const [history, setHistory] = useState<PriceObservation[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    setHistory([])
+    fetchPriceHistory(car.year, car.make, car.model, part)
+      .then((res) => {
+        if (!cancelled) setHistory(res.observations)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [car.year, car.make, car.model, part])
 
   // Dynamic JSON-LD Structured Schema Injection for SEO snippets
   useEffect(() => {
@@ -621,6 +640,26 @@ export function ResultsList({
                   })}
                 </div>
               </div>
+
+              {history.length >= 5 && (
+                <div className="card p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"><TrendingDown size={17} /></div>
+                    <div>
+                      <div className="font-semibold tracking-tight text-slate-950">Price radar — observed lows</div>
+                      <div className="text-xs text-slate-500">Lowest daily total we've actually seen for this search</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-brand-600 dark:text-brand-400">
+                    <Sparkline points={history} />
+                  </div>
+                  <div className="font-data mt-3 flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500">
+                    <span>Low ${Math.min(...history.map((p) => p.price)).toFixed(2)}</span>
+                    <span>High ${Math.max(...history.map((p) => p.price)).toFixed(2)}</span>
+                    <span>Since {new Date(`${history[0].date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  </div>
+                </div>
+              )}
 
               {bestPrice > 0 && (
                 <PriceAlertCard car={car} part={part} targetPrice={bestPrice} />

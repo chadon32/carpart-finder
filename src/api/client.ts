@@ -140,6 +140,18 @@ export function searchParts(
   return getJson(`/api/search?${params.toString()}`)
 }
 
+export type PriceObservation = { date: string; price: number }
+
+export function fetchPriceHistory(
+  year: string,
+  make: string,
+  model: string,
+  part: string
+): Promise<{ observations: PriceObservation[] }> {
+  const params = new URLSearchParams({ year, make, model, part })
+  return getJson(`/api/price-history?${params.toString()}`)
+}
+
 export type Recall = {
   campaignNumber: string | null
   component: string | null
