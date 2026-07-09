@@ -177,8 +177,6 @@ router.post('/login', async (req, res) => {
     user: data.user,
     confirmationRequired: !token,
   })
-})
-
 // Start Google OAuth Flow
 router.get('/oauth/google', async (req, res) => {
   if (isMockMode) {
@@ -188,7 +186,8 @@ router.get('/oauth/google', async (req, res) => {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${req.protocol}://${req.get('host')}/api/supabase/auth/callback`
+      // Redirect back to the frontend root. Supabase will append #access_token=...
+      redirectTo: `${req.protocol}://${req.get('host')}/`
     }
   })
 
@@ -197,25 +196,23 @@ router.get('/oauth/google', async (req, res) => {
   res.status(500).send('Failed to initialize OAuth flow')
 })
 
-// OAuth Callback
-router.get('/auth/callback', async (req, res) => {
-  const { code } = req.query
+// Receive an access_token from the frontend and securely set the HTTP-only cookie
+router.post('/set-session', async (req, res) => {
+  const { access_token } = req.body
+  if (!access_token) return res.status(400).json({ error: 'Missing token' })
 
-  if (!code) {
-    return res.redirect('/')
+  if (isMockMode) {
+    return res.status(503).json({ error: 'OAuth not supported in mock mode' })
   }
 
-  // Exchange the code for a Supabase session
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
-  if (!error && data?.session?.access_token) {
-    setAuthCookie(res, data.session.access_token)
-    // Redirect back to frontend with a flag so AppContext knows to fetch the user
-    return res.redirect('/?oauth=true')
+  // Verify the token by asking Supabase who it belongs to
+  const { data, error } = await supabase.auth.getUser(access_token)
+  if (error || !data?.user) {
+    return res.status(401).json({ error: 'Invalid token' })
   }
 
-  // If exchange failed, just redirect home
-  res.redirect('/')
+  setAuthCookie(res, access_token)
+  res.json({ user: data.user })
 })
 
 // All routes below require authentication

@@ -86,29 +86,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Boot-only on purpose: re-running when `user` changes would clear the user
   // we just logged in, before the cookie round-trips.
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search)
-    const isOauthCallback = searchParams.get('oauth') === 'true'
+    // Check if Supabase redirected back with an Implicit Flow access token
+    const hashStr = window.location.hash.substring(1)
+    const hashParams = new URLSearchParams(hashStr)
+    const accessToken = hashParams.get('access_token')
 
-    if (!user && !isOauthCallback) return
+    if (accessToken) {
+      // Clear the sensitive token from the URL immediately
+      window.history.replaceState({}, '', window.location.pathname)
+
+      // Send it to the backend to set the secure httpOnly cookie
+      fetch('/api/supabase/set-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.user) {
+            const newUser = {
+              name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+              email: data.user.email || '',
+            }
+            localStorage.setItem('carpartsradar-user', JSON.stringify(newUser))
+            setUser(newUser)
+          }
+        })
+        .catch(() => {
+          // If the token is invalid or server is down, just fail silently
+          localStorage.removeItem('carpartsradar-user')
+          setUser(null)
+        })
+      return
+    }
+
+    if (!user) return
 
     let cancelled = false
-
-    if (isOauthCallback) {
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-    }
 
     getCurrentUser()
       .then((res) => {
         if (cancelled) return
-        if (isOauthCallback && res.user) {
-          const newUser = {
-            name: res.user.user_metadata?.full_name || res.user.email?.split('@')[0] || 'User',
-            email: res.user.email || '',
-          }
-          localStorage.setItem('carpartsradar-user', JSON.stringify(newUser))
-          setUser(newUser)
-        }
       })
       .catch(async (err) => {
         if (cancelled) return
