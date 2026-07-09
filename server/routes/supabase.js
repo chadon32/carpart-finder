@@ -177,6 +177,8 @@ router.post('/login', async (req, res) => {
     user: data.user,
     confirmationRequired: !token,
   })
+})
+
 // Start Google OAuth Flow
 router.get('/oauth/google', async (req, res) => {
   if (isMockMode) {
