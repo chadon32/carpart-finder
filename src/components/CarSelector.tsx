@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine } from 'lucide-react'
+import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchMakes, fetchModels, fetchTrims, decodeVinApi, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
 import { VehicleThumbnail } from './VehicleThumbnail'
+import { VehicleHealthModal } from './VehicleHealthModal'
+import { cachedRecallCount } from '../lib/recallCache'
 
 export type Car = {
   year: string
@@ -37,7 +39,13 @@ const POPULAR_MAKES = [
 ]
 const POPULAR_RANK = new Map(POPULAR_MAKES.map((m, i) => [m.toUpperCase(), i]))
 
-export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
+export function CarSelector({
+  onConfirm,
+  onSearchPart,
+}: {
+  onConfirm: (car: Car) => void
+  onSearchPart?: (car: Car, part: string) => void
+}) {
   const [vehicleType, setVehicleType] = useState<VehicleType>('all')
   const [year, setYear] = useState('')
   const [make, setMake] = useState('')
@@ -85,6 +93,8 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
     e.stopPropagation()
     setGarage((prev) => prev.filter((_, i) => i !== indexToRemove))
   }
+
+  const [healthIndex, setHealthIndex] = useState<number | null>(null)
 
   const [makes, setMakes] = useState<string[]>([])
 
@@ -248,14 +258,35 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
                     {c.trim && <div className="text-[10px] text-slate-400 truncate">{c.trim}</div>}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => removeFromGarage(i, e)}
-                  aria-label="Remove vehicle"
-                  className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-rose-600 transition"
-                >
-                  <X size={13} />
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {(() => {
+                    const count = cachedRecallCount(c.year, c.make, c.model)
+                    return count != null && count > 0 ? (
+                      <span className="badge bg-rose-100 text-rose-700 px-1.5 text-[10px]">
+                        {count} recall{count === 1 ? '' : 's'}
+                      </span>
+                    ) : null
+                  })()}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setHealthIndex(i)
+                    }}
+                    aria-label={`Vehicle health for ${c.year} ${c.make} ${c.model}`}
+                    className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-brand-600 transition"
+                  >
+                    <Activity size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => removeFromGarage(i, e)}
+                    aria-label="Remove vehicle"
+                    className="rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-rose-600 transition"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -478,6 +509,21 @@ export function CarSelector({ onConfirm }: { onConfirm: (car: Car) => void }) {
         Continue to parts
         <ArrowRight size={16} strokeWidth={2.4} className="transition-transform group-hover:translate-x-0.5" />
       </button>
+
+      {healthIndex !== null && garage[healthIndex] && (
+        <VehicleHealthModal
+          vehicle={garage[healthIndex]}
+          onClose={() => setHealthIndex(null)}
+          onUpdateMileage={(mileage) =>
+            setGarage((prev) => prev.map((c, i) => (i === healthIndex ? { ...c, mileage } : c)))
+          }
+          onShopPart={(shopPart) => {
+            const v = garage[healthIndex]
+            setHealthIndex(null)
+            onSearchPart?.({ year: v.year, make: v.make, model: v.model, trim: v.trim }, shopPart)
+          }}
+        />
+      )}
     </div>
   )
 }

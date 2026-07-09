@@ -140,6 +140,20 @@ export function searchParts(
   return getJson(`/api/search?${params.toString()}`)
 }
 
+export type Recall = {
+  campaignNumber: string | null
+  component: string | null
+  summary: string | null
+  consequence: string | null
+  remedy: string | null
+  reportedDate: string | null
+}
+
+export function fetchRecalls(year: string, make: string, model: string): Promise<{ recalls: Recall[] }> {
+  const params = new URLSearchParams({ year, make, model })
+  return getJson(`/api/recalls?${params.toString()}`)
+}
+
 export type VinDecodeResult = {
   year: string
   make: string

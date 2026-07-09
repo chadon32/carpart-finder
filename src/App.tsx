@@ -206,6 +206,7 @@ function App() {
                   <Suspense fallback={<ViewLoader />}>
                     <CarSelector
                       onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
+                      onSearchPart={(garageCar, garagePart) => runSearch(garageCar, garagePart)}
                     />
                     <RecentSearches
                       searches={recent.searches}
