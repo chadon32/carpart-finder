@@ -73,6 +73,7 @@ export function VehicleThumbnail({
         src={imageUrl}
         alt={`${make} ${model}`}
         loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
         className="h-full w-full object-cover"
       />

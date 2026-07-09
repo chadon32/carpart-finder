@@ -53,6 +53,7 @@ export function PartDetailModal({
                 src={listing.image}
                 alt={listing.title}
                 loading="lazy"
+                decoding="async"
                 className="w-full rounded-2xl border border-slate-100 object-cover shadow-sm"
               />
             ) : (

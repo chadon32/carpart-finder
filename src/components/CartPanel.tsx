@@ -68,7 +68,7 @@ function CompareTable({ items }: { items: CartItem[] }) {
             <th className="w-24 border-b border-slate-200 p-2" />
             {items.map((item) => (
               <th key={item.cartId} className="min-w-[190px] border-b border-slate-200 p-3 align-top">
-                {item.image && <img src={item.image} alt="" className="mx-auto h-20 w-20 rounded-xl object-cover" />}
+                {item.image && <img src={item.image} alt="" loading="lazy" decoding="async" className="mx-auto h-20 w-20 rounded-xl object-cover" />}
                 <p className="mt-2 line-clamp-3 text-left text-xs font-semibold text-slate-900">{item.title}</p>
               </th>
             ))}
@@ -196,7 +196,7 @@ export function CartPanel({
                 key={item.cartId}
                 className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 p-3 transition hover:border-slate-300 sm:gap-4"
               >
-                {item.image && <img src={item.image} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />}
+                {item.image && <img src={item.image} alt="" loading="lazy" decoding="async" className="h-16 w-16 shrink-0 rounded-xl object-cover" />}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-slate-900">{item.title}</p>
                   <p className="mt-0.5 truncate text-sm text-slate-500">

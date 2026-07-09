@@ -598,7 +598,7 @@ export function PartSelector({
                     {quote.items.map((item) => (
                       <li key={item.part} className="flex flex-wrap items-center gap-3 px-4 py-3">
                         {item.listing?.image ? (
-                          <img src={item.listing.image} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-slate-100 object-cover" />
+                          <img src={item.listing.image} alt="" loading="lazy" decoding="async" className="h-11 w-11 shrink-0 rounded-lg border border-slate-100 object-cover" />
                         ) : (
                           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-300 dark:bg-slate-800">
                             <Wrench size={16} />
