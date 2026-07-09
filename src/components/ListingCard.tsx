@@ -1,4 +1,5 @@
-import { Star, Award, Tag, Sparkles, MapPin, AlertTriangle, ExternalLink, Check, Plus, Package, Truck, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { Star, Award, Tag, Sparkles, MapPin, AlertTriangle, ChevronRight, ExternalLink, Check, Plus, Package, Truck, ShieldCheck } from 'lucide-react'
 import type { Listing } from '../api/client'
 import { deliveryLabel, shippingLabel } from '../lib/listingHelpers'
 
@@ -27,6 +28,10 @@ export function ListingCard({
   onAddToWatchlist,
   onToggleCompare,
 }: ListingCardProps) {
+  // Best Value explanation: hover-only tooltips don't exist on touch, so the
+  // badge is also a tap-toggle. Desktop hover still works via group-hover.
+  const [showValueInfo, setShowValueInfo] = useState(false)
+
   return (
     <li
       onClick={(e) => {
@@ -50,12 +55,13 @@ export function ListingCard({
             src={listing.image}
             alt={listing.title}
             loading="lazy"
+            decoding="async"
             width={96}
             height={96}
-            className="mt-3 h-24 w-24 rounded-xl border border-slate-100 object-cover shadow-sm"
+            className="mt-3 h-20 w-20 rounded-xl border border-slate-100 object-cover shadow-sm sm:h-24 sm:w-24"
           />
         ) : (
-          <div className="mt-3 flex h-24 w-24 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-slate-300">
+          <div className="mt-3 flex h-20 w-20 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-slate-300 sm:h-24 sm:w-24">
             <Package size={30} strokeWidth={1.25} />
           </div>
         )}
@@ -89,6 +95,13 @@ export function ListingCard({
             <div className="font-data text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1">
               Total: ${(listing.price + (listing.shippingCost || 0)).toFixed(2)}
             </div>
+            <button
+              type="button"
+              onClick={() => onSelect(listing)}
+              className="mt-1 inline-flex touch-manipulation items-center gap-0.5 py-1.5 text-[11px] font-semibold text-brand-600 dark:text-brand-400 sm:hidden"
+            >
+              Details <ChevronRight size={12} />
+            </button>
           </div>
         </div>
 
@@ -122,9 +135,24 @@ export function ListingCard({
             <span className="badge bg-emerald-100 text-emerald-800"><ShieldCheck size={12} /> Verified fitment</span>
           )}
           {isBestValue && (
-            <span className="group relative badge bg-emerald-100 text-emerald-800 cursor-help">
-              <Sparkles size={12} /> Recommended (Best Value)
-              <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-normal leading-normal text-white opacity-0 shadow-xl transition-all duration-200 group-hover:opacity-100">
+            <span className="group relative badge bg-emerald-100 text-emerald-800 p-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowValueInfo((v) => !v)
+                }}
+                aria-expanded={showValueInfo}
+                aria-describedby={`bv-tip-${listing.id}`}
+                className="inline-flex touch-manipulation items-center gap-1 px-2.5 py-1.5"
+              >
+                <Sparkles size={12} /> Recommended (Best Value)
+              </button>
+              <span
+                id={`bv-tip-${listing.id}`}
+                role="tooltip"
+                className={`pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-normal leading-normal text-white shadow-xl transition-all duration-200 ${showValueInfo ? 'opacity-100' : 'opacity-0'} sm:group-hover:opacity-100`}
+              >
                 <strong>Best Value Deal:</strong> Calculated by weighing total price (with shipping), seller feedback, and vehicle fitment compatibility.
                 <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 bg-slate-950 rotate-45" />
               </span>
@@ -136,13 +164,13 @@ export function ListingCard({
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <a href={listing.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary px-5 py-2 text-sm">
+          <a href={listing.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary flex-1 px-4 py-2 text-sm sm:flex-none sm:px-5">
             Buy on {listing.source} <ExternalLink size={14} />
           </a>
           <button
             type="button"
             onClick={() => onSelect(listing)}
-            className="btn btn-secondary px-5 py-2 text-sm"
+            className="btn btn-secondary hidden px-5 py-2 text-sm sm:inline-flex"
           >
             Click for Detailed View
           </button>
@@ -150,9 +178,9 @@ export function ListingCard({
             type="button"
             disabled={inWatchlist}
             onClick={() => onAddToWatchlist(listing)}
-            className={`btn px-5 py-2 text-sm ${inWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
+            className={`btn px-4 py-2 text-sm sm:px-5 ${inWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
           >
-            {inWatchlist ? <><Check size={15} /> Watching</> : <><Plus size={15} /> Watch part</>}
+            {inWatchlist ? <><Check size={15} /> Watching</> : <><Plus size={15} /> <span className="sm:hidden">Watch</span><span className="hidden sm:inline">Watch part</span></>}
           </button>
           <button
             onClick={() => onToggleCompare(listing)}
