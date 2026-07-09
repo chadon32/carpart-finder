@@ -694,7 +694,7 @@ export function ResultsList({
       )}
 
       {compareList.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 animate-slide-up items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-950/20 max-w-sm sm:max-w-md w-[calc(100%-2rem)]">
+        <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 animate-slide-up items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-950/20 max-w-sm sm:max-w-md w-[calc(100%-2rem)] sm:bottom-6">
           <div className="flex items-center gap-2">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-[11px] font-extrabold text-white">
               {compareList.length}

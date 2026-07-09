@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { Helmet } from 'react-helmet-async'
 import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
 import { RadarMark } from './components/RadarMark'
+import { BottomNav } from './components/BottomNav'
 import { CarSelector, type Car } from './components/CarSelector'
 
 const PartSelector = lazy(() => import('./components/PartSelector').then(m => ({ default: m.PartSelector })))
@@ -77,6 +78,23 @@ function App() {
     navigate({ step: 'car', car: null, part: null })
   }
 
+  // Bottom-nav Search tab: from watchlist/account, return to wherever the
+  // search flow was; if already on the search flow, go home (native re-tap
+  // convention).
+  const goToSearchTab = () => {
+    if (showWatchlist) {
+      setShowWatchlist(false)
+      return
+    }
+    if (step === 'dashboard') {
+      if (car && part) setStep('results')
+      else if (car) setStep('part')
+      else setStep('car')
+      return
+    }
+    goHome()
+  }
+
   const viewKey = showWatchlist ? 'watchlist' : step
 
   return (
@@ -107,7 +125,7 @@ function App() {
             <button
               type="button"
               onClick={() => setShowWatchlist(true)}
-              className="btn btn-secondary relative px-3 py-2.5 text-sm sm:px-4"
+              className="btn btn-secondary relative hidden px-3 py-2.5 text-sm sm:inline-flex sm:px-4"
               aria-label="Open watchlist"
             >
               <Bookmark size={17} strokeWidth={2.3} />
@@ -124,7 +142,7 @@ function App() {
                 setStep('dashboard')
                 setShowWatchlist(false)
               }}
-              className={`btn flex items-center gap-2 px-3 py-2.5 text-sm sm:px-4 ${step === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn hidden items-center gap-2 px-3 py-2.5 text-sm sm:inline-flex sm:px-4 ${step === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
               aria-label="Open account"
             >
               <UserIcon size={17} strokeWidth={2.3} />
@@ -142,7 +160,7 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-10 pt-8 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 sm:pb-10">
         {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
         <div key={viewKey} className="animate-slide-up">
           {showWatchlist ? (
@@ -173,31 +191,31 @@ function App() {
                       headline, and the honest fitment promise underneath.
                       Elements stagger in once on load; the sweep keeps the
                       "live scan" idea moving after the entrance settles. */}
-                  <div className="blueprint-grid relative mb-12 pt-6 text-center sm:mb-16 sm:pt-10">
-                    <div className="animate-slide-up font-data mx-auto mb-7 inline-flex items-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400">
+                  <div className="blueprint-grid relative mb-10 pt-4 text-center sm:mb-16 sm:pt-10">
+                    <div className="animate-slide-up font-data mx-auto mb-5 inline-flex items-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400 sm:mb-7">
                       <RadarMark className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                       Live scan — prices pulled per search
                     </div>
 
-                    <h1 className="font-display animate-slide-up mx-auto max-w-4xl text-balance text-5xl text-slate-950 sm:text-7xl md:text-8xl [animation-delay:90ms]">
+                    <h1 className="font-display animate-slide-up mx-auto max-w-4xl text-balance text-4xl text-slate-950 sm:text-7xl md:text-8xl [animation-delay:90ms]">
                       Parts that fit.
                       <br />
                       <span className="text-brand-600 dark:text-brand-400">Prices on radar.</span>
                     </h1>
 
-                    <p className="animate-slide-up mx-auto mt-6 max-w-lg text-balance text-base text-slate-600 sm:text-lg [animation-delay:180ms]">
+                    <p className="animate-slide-up mx-auto mt-4 max-w-lg text-balance text-base text-slate-600 sm:mt-6 sm:text-lg [animation-delay:180ms]">
                       Pick your year, make, and model. Every listing is checked against real
                       compatibility data for your exact vehicle — and clearly labeled on the rare one we can't verify.
                     </p>
 
-                    <div className="animate-slide-up mt-8 flex flex-wrap items-center justify-center gap-2.5 [animation-delay:260ms]">
-                      <div className="font-data flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
+                    <div className="animate-slide-up -mx-5 mt-6 flex items-center gap-2.5 overflow-x-auto scrollbar-none px-5 sm:mx-0 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0 [animation-delay:260ms]">
+                      <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
                         <ShieldCheck size={13} className="text-brand-600" /> Fitment matched, not guessed
                       </div>
-                      <div className="font-data flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
+                      <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
                         <Zap size={13} className="text-brand-600" /> Prices pulled live
                       </div>
-                      <div className="font-data flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
+                      <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
                         <Tag size={13} className="text-brand-600" /> Ranked by real value
                       </div>
                     </div>
@@ -276,6 +294,17 @@ function App() {
           </p>
         </div>
       </footer>
+
+      <BottomNav
+        active={showWatchlist ? 'watchlist' : step === 'dashboard' ? 'account' : 'search'}
+        watchlistCount={watchlist.items.length}
+        onSearch={goToSearchTab}
+        onWatchlist={() => setShowWatchlist(true)}
+        onAccount={() => {
+          setStep('dashboard')
+          setShowWatchlist(false)
+        }}
+      />
     </div>
   )
 }
