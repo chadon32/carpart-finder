@@ -113,6 +113,45 @@ const aiLimiter = rateLimit({
 app.use('/api/identify-part', aiLimiter)
 app.use('/api/ai', aiLimiter)
 
+// The account surface had NO rate limiting at all: unlimited password
+// brute-force against /login, unlimited account creation via /signup, and
+// unlimited unauthenticated row insertion via the public subscribe endpoint.
+// Order matters — the narrowest paths mount first, so a login attempt is
+// charged to authLimiter rather than the general write budget.
+//
+// Successes are counted alongside failures. That costs a legitimate user
+// nothing (they log in once) and denies an attacker cheap confirmation once
+// they find a valid credential.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many attempts. Please try again in a few minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// Guest alert subscription is public and writes a database row. Tighter still.
+const subscribeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many alert subscriptions. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.use('/api/supabase/login', authLimiter)
+app.use('/api/supabase/signup', authLimiter)
+app.use('/api/supabase/price-alerts/subscribe', subscribeLimiter)
+app.use('/api/supabase', writeLimiter)
+
 // A model year is 4 digits from 1980 to next year; make/model must be non-empty
 // and sanely short. Rejecting junk up front avoids burning rate-limited eBay
 // calls on garbage like `year=abc&model=;DROP` and keeps NHTSA lookups clean.
