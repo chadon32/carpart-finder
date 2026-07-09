@@ -11,6 +11,7 @@ import { getMakes, getModels, decodeVin } from '../server/nhtsa.js'
 import { getTrims } from '../server/ebayCompatibility.js'
 import { getCurrentPrices } from '../server/providers/ebay.js'
 import { getVehicleImage } from '../server/vehicleImages.js'
+import { getRecalls } from '../server/recalls.js'
 import supabaseRoutes from '../server/routes/supabase.js'
 import { checkPriceAlerts } from '../server/workers/priceChecker.js'
 import { diagnoseSymptom } from '../server/symptoms.js'
@@ -301,6 +302,23 @@ app.get('/api/vehicle-image', async (req, res) => {
     // browser cache it too, unlike the no-store default for live listings.
     res.set('Cache-Control', 'public, max-age=86400')
     res.json({ imageUrl })
+  } catch (err) {
+    console.error(err)
+    res.status(502).json({ error: 'Failed to fetch data' })
+  }
+})
+
+app.get('/api/recalls', async (req, res) => {
+  const { year, make, model } = req.query
+  const invalid = vehicleError({ year, make, model })
+  if (invalid) {
+    return res.status(400).json({ error: invalid })
+  }
+  try {
+    const recalls = await getRecalls(String(make), String(model), String(year))
+    // Recall campaigns are stable reference data — let the browser cache too.
+    res.set('Cache-Control', 'public, max-age=86400')
+    res.json({ recalls })
   } catch (err) {
     console.error(err)
     res.status(502).json({ error: 'Failed to fetch data' })
