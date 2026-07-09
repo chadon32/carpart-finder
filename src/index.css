@@ -80,10 +80,12 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   font-feature-settings: "cv11", "ss01", "ss03";
+  overscroll-behavior-y: none;
   @apply text-slate-800 bg-slate-50 transition-colors duration-200;
 }
 
@@ -151,6 +153,45 @@ html.dark {
 }
 
 @layer components {
+  /* Safe-area helper for fixed bottom UI (tab bar, sheets, sticky CTAs). */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Hide scrollbars on horizontal chip/tab rows while keeping scrollability. */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch-target floor: on phones every control reaches the 44px Apple /
+     48dp Android standard (40px for compact pills) and text inputs render
+     at 16px so iOS Safari doesn't force-zoom on focus. Desktop unchanged. */
+  @media (max-width: 639px) {
+    .btn {
+      min-height: 44px;
+    }
+    .btn-sm {
+      min-height: 40px;
+    }
+    .chip,
+    .filter-pill {
+      min-height: 40px;
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+    .tab {
+      min-height: 44px;
+      padding-top: 0.625rem;
+    }
+    .field,
+    textarea.field {
+      font-size: 16px;
+    }
+  }
+
   .app-bg {
     background-color: #fafafa;
     background-image:
@@ -288,7 +329,7 @@ html.dark {
   }
 
   .chip {
-    @apply inline-flex items-center rounded-full border border-slate-200/70 bg-white px-3.5 py-1 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-900/[0.01] transition-all hover:border-brand-500 hover:bg-brand-50 hover:text-brand-500 active:scale-[0.985];
+    @apply inline-flex touch-manipulation items-center rounded-full border border-slate-200/70 bg-white px-3.5 py-1 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-900/[0.01] transition-all hover:border-brand-500 hover:bg-brand-50 hover:text-brand-500 active:scale-[0.985];
   }
 
   .dark .chip {
@@ -305,7 +346,7 @@ html.dark {
 
   /* Premium button system */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.975];
+    @apply inline-flex touch-manipulation items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.975];
   }
 
   .btn-primary {
@@ -374,7 +415,7 @@ html.dark {
   /* Underline tab — used by PartSelector and the Account modal.
      slate-500 for AA contrast on inactive labels (400 fails at small sizes). */
   .tab {
-    @apply flex-1 border-b-2 border-transparent pb-2.5 text-center text-xs font-semibold text-slate-500 transition hover:text-slate-700;
+    @apply flex-1 touch-manipulation border-b-2 border-transparent pb-2.5 text-center text-xs font-semibold text-slate-500 transition hover:text-slate-700;
   }
 
   .dark .tab {
@@ -391,7 +432,7 @@ html.dark {
 
   /* Filter pill — the white ring-bordered controls in the results toolbar */
   .filter-pill {
-    @apply inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 transition;
+    @apply inline-flex touch-manipulation items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 transition;
   }
 
   .dark .filter-pill {
