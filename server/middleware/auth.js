@@ -8,12 +8,21 @@ export const AUTH_COOKIE = 'cpf_token'
 export function getAuthToken(req) {
   const rawCookie = req.headers.cookie || ''
   const match = rawCookie.match(/(?:^|;\s*)cpf_token=([^;]+)/)
-  if (match) return decodeURIComponent(match[1])
+  if (match) {
+    try {
+      return decodeURIComponent(match[1])
+    } catch {
+      return null // malformed percent-encoding
+    }
+  }
 
+  // Anchored and case-insensitive. The old `.replace('Bearer ', '')` accepted a
+  // bare token with no scheme, passed a `Basic ...` header straight through,
+  // and stripped only the first occurrence of the literal anywhere in the
+  // string.
   const authHeader = req.headers.authorization
-  if (authHeader) return authHeader.replace('Bearer ', '').trim()
-
-  return null
+  const bearer = authHeader?.match(/^Bearer\s+(.+)$/i)
+  return bearer ? bearer[1].trim() : null
 }
 
 export async function requireAuth(req, res, next) {

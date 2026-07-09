@@ -11,6 +11,7 @@
 
 import { supabaseAdmin, isMockMode, accountsAvailable } from '../supabase.js'
 import { search as ebaySearch, isConfigured as ebayConfigured } from '../providers/ebay.js'
+import { escapeHtml, safeListingUrl } from '../lib/html.js'
 
 // Runs one alert's search and returns the cheapest out-of-pocket option,
 // matching what the UI shows (price + shipping). null = no live listings.
@@ -164,6 +165,24 @@ async function sendPriceDropEmail(email, targetPrice, searchLike, currentPrice, 
     return
   }
 
+  // listing.title, listing.seller, and listing.link are eBay-seller-controlled
+  // strings. Interpolated raw, a crafted title escapes the href attribute and
+  // injects arbitrary markup into mail sent from our verified sending domain.
+  const safeVehicle = escapeHtml(vehicle)
+  const safePart = escapeHtml(searchLike.part)
+  const safeTitle = escapeHtml(listing.title)
+  const safeSeller = escapeHtml(listing.seller)
+  const href = safeListingUrl(listing.link)
+  const price = currentPrice.toFixed(2)
+  const target = Number(targetPrice).toFixed(2)
+
+  // Drop the link entirely rather than emit an unvalidated href.
+  const listingLine = href
+    ? `<p><a href="${href}">${safeTitle}</a><br/>
+        Sold by ${safeSeller}${listing.shippingCost === 0 ? ' · free shipping' : ''}</p>`
+    : `<p>${safeTitle}<br/>
+        Sold by ${safeSeller}${listing.shippingCost === 0 ? ' · free shipping' : ''}</p>`
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -173,13 +192,14 @@ async function sendPriceDropEmail(email, targetPrice, searchLike, currentPrice, 
     body: JSON.stringify({
       from: process.env.RESEND_FROM || 'CarPartsRadar <onboarding@resend.dev>',
       to: [email],
-      subject: `Price drop: ${searchLike.part} for your ${vehicle} — now $${currentPrice.toFixed(2)}`,
+      // Subject is a header, not HTML — Resend rejects header injection, and
+      // escaping here would render literal entities in the subject line.
+      subject: `Price drop: ${searchLike.part} for your ${vehicle} — now $${price}`,
       html: `
-        <p>Good news — a <strong>${searchLike.part}</strong> matching your price alert for a
-        <strong>${vehicle}</strong> just dropped to <strong>$${currentPrice.toFixed(2)}</strong>
-        (your target was $${Number(targetPrice).toFixed(2)}).</p>
-        <p><a href="${listing.link}">${listing.title}</a><br/>
-        Sold by ${listing.seller}${listing.shippingCost === 0 ? ' · free shipping' : ''}</p>
+        <p>Good news — a <strong>${safePart}</strong> matching your price alert for a
+        <strong>${safeVehicle}</strong> just dropped to <strong>$${price}</strong>
+        (your target was $${target}).</p>
+        ${listingLine}
         <p style="color:#64748b;font-size:12px">You're receiving this because you set a price alert on CarPartsRadar.
         This alert has now been fulfilled and won't email you again.</p>
       `,

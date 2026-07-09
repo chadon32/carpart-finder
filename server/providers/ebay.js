@@ -1,6 +1,7 @@
 import { EBAY_API_ROOT, getAccessToken, isConfigured } from '../ebayAuth.js'
 import { categoryForPart } from '../partCategories.js'
 import { fetchWithRetry } from '../httpClient.js'
+import { mapWithConcurrency } from '../lib/concurrency.js'
 
 const SEARCH_URL = `${EBAY_API_ROOT}/buy/browse/v1/item_summary/search`
 const ITEM_URL = `${EBAY_API_ROOT}/buy/browse/v1/item`
@@ -13,33 +14,33 @@ export { isConfigured }
 export async function getCurrentPrices(ids) {
   const token = await getAccessToken()
 
-  const entries = await Promise.all(
-    ids.map(async (id) => {
-      const itemId = id.startsWith('ebay-') ? id.slice('ebay-'.length) : id
-      try {
-        const res = await fetchWithRetry(
-          `${ITEM_URL}/${encodeURIComponent(itemId)}`,
-          { headers: { Authorization: `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
-          { timeoutMs: 6000, retries: 1 }
-        )
-        if (res.status === 404) {
-          return [id, { available: false }]
-        }
-        if (!res.ok) return [id, null]
-        const data = await res.json()
-        const status = data.estimatedAvailabilities?.[0]?.estimatedAvailabilityStatus
-        return [
-          id,
-          {
-            available: status !== 'OUT_OF_STOCK',
-            price: data.price?.value != null ? Number(data.price.value) : null,
-          },
-        ]
-      } catch {
-        return [id, null]
+  // Bounded: `ids` is user-supplied. An unbounded Promise.all here turned a
+  // single GET /api/prices into one outbound eBay call per id, with no ceiling.
+  const entries = await mapWithConcurrency(ids, 5, async (id) => {
+    const itemId = id.startsWith('ebay-') ? id.slice('ebay-'.length) : id
+    try {
+      const res = await fetchWithRetry(
+        `${ITEM_URL}/${encodeURIComponent(itemId)}`,
+        { headers: { Authorization: `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
+        { timeoutMs: 6000, retries: 1 }
+      )
+      if (res.status === 404) {
+        return [id, { available: false }]
       }
-    })
-  )
+      if (!res.ok) return [id, null]
+      const data = await res.json()
+      const status = data.estimatedAvailabilities?.[0]?.estimatedAvailabilityStatus
+      return [
+        id,
+        {
+          available: status !== 'OUT_OF_STOCK',
+          price: data.price?.value != null ? Number(data.price.value) : null,
+        },
+      ]
+    } catch {
+      return [id, null]
+    }
+  })
 
   const map = {}
   for (const [id, value] of entries) {

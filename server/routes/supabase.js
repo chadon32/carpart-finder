@@ -35,7 +35,6 @@ function clearAuthCookie(res) {
 // In-memory mock database for local development without Supabase keys
 const mockSavedSearches = []
 const mockPriceAlerts = []
-const mockGuestSubscriptions = []
 
 // Defined BEFORE the gate on purpose. Logout takes no credentials and reads no
 // database; it must keep working even when accounts are disabled, so browsers
@@ -66,17 +65,6 @@ router.post('/price-alerts/subscribe', async (req, res) => {
 
   if (isMockMode) {
     console.log(`[Alert Subscription] Guest ${email} subscribed to alerts for ${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part} at target price $${price}`)
-    mockGuestSubscriptions.push({
-      id: crypto.randomUUID(),
-      email,
-      year,
-      make,
-      model,
-      trim,
-      part,
-      target_price: price,
-      created_at: new Date().toISOString()
-    })
     return res.json({ success: true, message: 'Alert subscription created (Local Mock)!' })
   }
 
@@ -220,7 +208,12 @@ router.get('/saved-searches', async (req, res) => {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (error) return res.status(500).json({ error: error.message })
+  // Log the Postgres detail; never return it. Raw error.message leaks
+  // constraint names, column names, and schema structure to the client.
+  if (error) {
+    console.error('[supabase] fetch saved searches failed:', error.message)
+    return res.status(500).json({ error: 'Could not load your saved searches' })
+  }
   res.json({ searches: data })
 })
 
@@ -256,7 +249,10 @@ router.post('/saved-searches', async (req, res) => {
     .select()
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[supabase] insert saved search failed:', error.message)
+    return res.status(500).json({ error: 'Could not save that search' })
+  }
   res.json({ search: data })
 })
 
@@ -280,7 +276,10 @@ router.delete('/saved-searches/:id', async (req, res) => {
     .eq('id', id)
     .eq('user_id', req.user.id)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[supabase] delete saved search failed:', error.message)
+    return res.status(500).json({ error: 'Could not delete that search' })
+  }
   res.json({ success: true })
 })
 
@@ -301,7 +300,10 @@ router.delete('/price-alerts/:id', async (req, res) => {
     .eq('id', id)
     .eq('user_id', req.user.id)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[supabase] delete price alert failed:', error.message)
+    return res.status(500).json({ error: 'Could not delete that alert' })
+  }
   res.json({ success: true })
 })
 
@@ -327,7 +329,10 @@ router.get('/price-alerts', async (req, res) => {
     .eq('user_id', req.user.id)
     .order('created_at', { ascending: false })
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[supabase] fetch price alerts failed:', error.message)
+    return res.status(500).json({ error: 'Could not load your price alerts' })
+  }
   res.json({ alerts: data })
 })
 
@@ -376,7 +381,10 @@ router.post('/price-alerts', async (req, res) => {
     .select()
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('[supabase] insert price alert failed:', error.message)
+    return res.status(500).json({ error: 'Could not create that alert' })
+  }
   res.json({ alert: data })
 })
 
