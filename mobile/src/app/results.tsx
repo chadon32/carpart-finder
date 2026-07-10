@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, FlatList, Pressable, RefreshControl, Animated, Modal, Switch } from 'react-native'
+import { View, Text, TextInput, FlatList, Pressable, RefreshControl, Animated, Modal, Switch, ScrollView } from 'react-native'
+import * as WebBrowser from 'expo-web-browser'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
-import { searchParts } from '@/api/client'
+import { searchParts, fetchPriceHistory, type PriceObservation } from '@/api/client'
+import { companionsForPart } from '@/data/partTypes'
+import { isElectricVehicle } from '@/data/electricVehicles'
+import { retailerLinks } from '@/data/retailerLinks'
+import { sparklineHeights } from '@/lib/sparkline'
+import { usePrefs } from '@/stores/prefs'
 import type { Listing, SearchResponse } from '@/api/types'
 import { deriveResultsState } from '@/lib/resultsState'
 import {
@@ -64,11 +70,17 @@ export default function Results() {
   const isComparing = useCompare((s) => s.isComparing)
   const [filters, setFilters] = useState<ListingFilters>(defaultFilters)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const zip = usePrefs((s) => s.zip)
+  const setZip = usePrefs((s) => s.setZip)
+  const [history, setHistory] = useState<PriceObservation[]>([])
 
   const run = useCallback(async () => {
     setFailed(false)
     try {
-      const r = await searchParts(year, make, model, part, trim || undefined)
+      const r = await searchParts(
+        year, make, model, part, trim || undefined,
+        usePrefs.getState().zip || undefined
+      )
       setResponse(r)
       if (r.results.length > 0) {
         useRecents.getState().record({ year, make, model, trim: trim ?? '' }, part)
@@ -80,7 +92,15 @@ export default function Results() {
 
   useEffect(() => {
     run()
-  }, [run])
+  }, [run, zip])
+
+  useEffect(() => {
+    fetchPriceHistory(year, make, model, part)
+      .then((r) => setHistory(r.observations))
+      .catch(() => setHistory([]))
+  }, [year, make, model, part])
+
+  const companions = companionsForPart(part, isElectricVehicle(String(make), String(model)))
 
   const state = deriveResultsState(response, failed)
   const results = response?.results ?? []
@@ -192,6 +212,37 @@ export default function Results() {
               <Text style={{ color: c.subtext, fontWeight: '700' }}>🔧 Repair guide</Text>
             </Pressable>
           </View>
+          {companions.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingTop: 10, alignItems: 'center' }}
+            >
+              <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>
+                COMPLETE THE JOB
+              </Text>
+              {companions.map((name) => (
+                <Pressable
+                  key={name}
+                  onPress={() =>
+                    router.push({ pathname: '/results', params: { year, make, model, trim: trim ?? '', part: name } })
+                  }
+                  style={{
+                    minHeight: 40,
+                    paddingHorizontal: 12,
+                    borderRadius: 999,
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: c.border,
+                    backgroundColor: c.card,
+                  }}
+                >
+                  <Text style={{ color: brand, fontWeight: '600' }}>+ {name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
           {state === 'stale' && (
             <View
               style={{
@@ -219,6 +270,71 @@ export default function Results() {
               </View>
             }
             contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
+            ListFooterComponent={
+              <View style={{ paddingHorizontal: 16, gap: 14, paddingTop: 8 }}>
+                {history.length >= 5 && (
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>
+                      PRICE HISTORY ({history.length} DAYS)
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'flex-end',
+                        gap: 2,
+                        height: 40,
+                        backgroundColor: c.card,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: c.border,
+                        padding: 6,
+                      }}
+                    >
+                      {sparklineHeights(history.map((o) => o.price)).map((h, i) => (
+                        <View
+                          key={i}
+                          style={{
+                            flex: 1,
+                            height: Math.max(3, h * 28),
+                            borderRadius: 2,
+                            backgroundColor: brand,
+                            opacity: 0.5 + h * 0.5,
+                          }}
+                        />
+                      ))}
+                    </View>
+                    <Text style={{ color: c.subtext, fontSize: 11 }}>
+                      ${Math.min(...history.map((o) => o.price)).toFixed(2)} low ·{' '}
+                      ${Math.max(...history.map((o) => o.price)).toFixed(2)} high (daily observed lows)
+                    </Text>
+                  </View>
+                )}
+                <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>
+                  COMPARE AT OTHER STORES
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {retailerLinks.map((r) => (
+                    <Pressable
+                      key={r.name}
+                      onPress={() =>
+                        WebBrowser.openBrowserAsync(r.buildUrl(`${year} ${make} ${model} ${part}`))
+                      }
+                      style={{
+                        minHeight: 44,
+                        paddingHorizontal: 14,
+                        borderRadius: 12,
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: c.border,
+                        backgroundColor: c.card,
+                      }}
+                    >
+                      <Text style={{ color: c.text, fontWeight: '600' }}>{r.name} ↗</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            }
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -302,6 +418,30 @@ export default function Results() {
               value={filters.hideOverseas}
               onValueChange={(v) => setFilters((f) => ({ ...f, hideOverseas: v }))}
               trackColor={{ true: brand }}
+            />
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+              SHIPPING ZIP (EXACT SHIPPING COSTS)
+            </Text>
+            <TextInput
+              value={zip}
+              onChangeText={setZip}
+              placeholder="e.g. 90210"
+              placeholderTextColor={c.subtext}
+              keyboardType="number-pad"
+              maxLength={5}
+              style={{
+                minHeight: 44,
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                fontSize: 16,
+                color: c.text,
+                backgroundColor: c.card,
+                borderWidth: 1,
+                borderColor: c.border,
+              }}
             />
           </View>
 

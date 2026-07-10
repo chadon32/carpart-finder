@@ -28,6 +28,16 @@ test('searchParts builds the query and returns the typed response', async () => 
   )
 })
 
+test('searchParts passes trim and zip when provided', async () => {
+  mockFetch.mockReturnValue(
+    jsonResponse({ query: 'q', results: [], providerErrors: {}, skippedProviders: [] })
+  )
+  await searchParts('2015', 'Toyota', 'Camry', 'Brake Pads', 'LE', '90210')
+  expect(mockFetch.mock.calls[0][0]).toBe(
+    `${API_BASE}/api/search?year=2015&make=Toyota&model=Camry&part=Brake+Pads&trim=LE&zip=90210`
+  )
+})
+
 test('fetchPrices joins ids into one query', async () => {
   mockFetch.mockReturnValue(jsonResponse({ prices: { a: { available: true, price: 9 } } }))
   const res = await fetchPrices(['a', 'b'])

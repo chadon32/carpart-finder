@@ -1,4 +1,4 @@
-import type { SearchResponse, VehicleType, VinDecodeResult } from './types'
+import type { Listing, SearchResponse, VehicleType, VinDecodeResult } from './types'
 
 export const API_BASE = 'https://carpartsradar.com'
 
@@ -47,11 +47,52 @@ export function searchParts(
   make: string,
   model: string,
   part: string,
-  trim?: string
+  trim?: string,
+  zip?: string
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ year, make, model, part })
   if (trim) params.set('trim', trim)
+  if (zip) params.set('zip', zip)
   return getJson(`/api/search?${params}`)
+}
+
+export type PriceObservation = { date: string; price: number }
+
+export function fetchPriceHistory(
+  year: string,
+  make: string,
+  model: string,
+  part: string
+): Promise<{ observations: PriceObservation[] }> {
+  return getJson(`/api/price-history?${new URLSearchParams({ year, make, model, part })}`)
+}
+
+export type QuoteItem = {
+  part: string
+  listing: Listing | null
+  error?: boolean
+}
+
+export type QuoteResponse = {
+  items: QuoteItem[]
+  subtotal: number
+  shipping: number
+  total: number
+  currency: string
+}
+
+export function fetchQuote(
+  year: string,
+  make: string,
+  model: string,
+  parts: string[],
+  trim?: string,
+  zip?: string
+): Promise<QuoteResponse> {
+  const params = new URLSearchParams({ year, make, model, parts: parts.join(',') })
+  if (trim) params.set('trim', trim)
+  if (zip) params.set('zip', zip)
+  return getJson(`/api/quote?${params}`)
 }
 
 export function decodeVinApi(vin: string): Promise<VinDecodeResult> {

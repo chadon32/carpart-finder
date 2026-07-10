@@ -3,7 +3,8 @@ import { View, Text, TextInput, FlatList, Pressable, ActivityIndicator } from 'r
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { identifyPartFromImage } from '@/api/client'
-import { partTypes } from '@/data/partTypes'
+import { partTypesForVehicle } from '@/data/partTypes'
+import { isElectricVehicle } from '@/data/electricVehicles'
 import { useThemeColors, displayFont } from '@/theme'
 
 export default function PartPicker() {
@@ -57,9 +58,11 @@ export default function PartPicker() {
     }
   }
 
+  const electric = isElectricVehicle(String(make), String(model))
+  const available = partTypesForVehicle(electric)
   const shown = q
-    ? partTypes.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
-    : partTypes.filter((p) => p.popular)
+    ? available.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
+    : available.filter((p) => p.popular)
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -69,6 +72,11 @@ export default function PartPicker() {
       <Text style={{ color: c.text, fontSize: 26, fontFamily: displayFont, padding: 16 }}>
         WHAT PART DO YOU NEED?
       </Text>
+      {electric && (
+        <Text style={{ color: c.brand, paddingHorizontal: 16, paddingBottom: 8, fontSize: 13, fontWeight: '600' }}>
+          ⚡ Electric vehicle detected — engine-only parts are hidden.
+        </Text>
+      )}
       <TextInput
         value={q}
         onChangeText={setQ}

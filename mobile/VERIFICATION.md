@@ -74,3 +74,18 @@
 - [ ] Part picker: "OBD-II code" → P0302 shows definition + parts; junk input shows format error
 - [ ] Garage: health icon → recalls (or honest error with retry) + typical-maintenance table; rows shop the part
 - [ ] Results: "Repair guide" generates markdown guide with disclaimer
+
+## Phase 6 — Automated (2026-07-09)
+
+- [x] `npm test` — 39/39 passing (adds sparkline, zip param, quote client)
+- [x] `npx tsc --noEmit` — clean
+- [x] `npx expo export --platform ios` — bundle builds (JS-only)
+
+## Phase 6 — On-device
+
+- [ ] EV in garage (e.g. Tesla Model 3) hides engine-only parts with the ⚡ note
+- [ ] Results: "Complete the job" chips (e.g. Brake Pads → + Brake Rotors) run companion search
+- [ ] Results footer: retailer links open each store's search in in-app Safari
+- [ ] Filter sheet ZIP: entering a ZIP re-runs search with exact shipping; persists across launches
+- [ ] Price history bars appear only for parts with ≥5 daily observations
+- [ ] Diagnose: long-press or + to select parts → combined quote with subtotal/shipping/total; missing listings say so
