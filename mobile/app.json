@@ -8,7 +8,6 @@
     "scheme": "carpartsradar",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.carpartsradar.app",
       "supportsTablet": false,
       "infoPlist": {
