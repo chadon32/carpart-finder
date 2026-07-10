@@ -47,3 +47,6 @@ shots/
 *.njsproj
 *.sln
 *.sw?
+
+# Personal App Store screenshots - not source
+screenshots/
