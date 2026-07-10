@@ -1,4 +1,4 @@
-import { fetchMakes, searchParts, API_BASE } from '../client'
+import { fetchMakes, searchParts, fetchPrices, API_BASE } from '../client'
 
 const mockFetch = jest.fn()
 globalThis.fetch = mockFetch as unknown as typeof fetch
@@ -26,6 +26,13 @@ test('searchParts builds the query and returns the typed response', async () => 
   expect(mockFetch.mock.calls[0][0]).toBe(
     `${API_BASE}/api/search?year=2015&make=Toyota&model=Camry&part=Brake+Pads`
   )
+})
+
+test('fetchPrices joins ids into one query', async () => {
+  mockFetch.mockReturnValue(jsonResponse({ prices: { a: { available: true, price: 9 } } }))
+  const res = await fetchPrices(['a', 'b'])
+  expect(res.prices.a.price).toBe(9)
+  expect(mockFetch.mock.calls[0][0]).toBe(`${API_BASE}/api/prices?ids=a%2Cb`)
 })
 
 test('non-OK responses throw the server error message', async () => {

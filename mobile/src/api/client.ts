@@ -36,6 +36,12 @@ export function fetchVehicleImage(
   return getJson(`/api/vehicle-image?${params}`)
 }
 
+export type PriceInfo = { available: boolean; price?: number | null }
+
+export function fetchPrices(ids: string[]): Promise<{ prices: Record<string, PriceInfo> }> {
+  return getJson(`/api/prices?${new URLSearchParams({ ids: ids.join(',') })}`)
+}
+
 export function searchParts(
   year: string,
   make: string,
