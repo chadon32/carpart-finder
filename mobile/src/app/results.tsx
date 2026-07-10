@@ -150,7 +150,14 @@ export default function Results() {
       <Text style={{ color: c.subtext, fontSize: 11, letterSpacing: 1, fontFamily: dataFont }}>
         COMPARE AT OTHER STORES
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        // Explicit height — without it this collapses to 0 inside a list
+        // cell and the store row never appears.
+        style={{ height: 44, flexGrow: 0 }}
+        contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+      >
         {retailerLinks.map((r) => (
           <Pressable
             key={r.name}
@@ -273,8 +280,10 @@ export default function Results() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={{ flexGrow: 0 }}
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingTop: 10, alignItems: 'center' }}
+              // Explicit height: a horizontal ScrollView here can measure 0
+              // while its children still paint over the list below.
+              style={{ flexGrow: 0, height: 60 }}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, alignItems: 'center' }}
             >
               <Text style={{ color: c.subtext, fontSize: 11, letterSpacing: 1, fontFamily: dataFont }}>
                 COMPLETE THE JOB
