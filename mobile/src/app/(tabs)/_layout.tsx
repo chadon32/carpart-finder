@@ -1,6 +1,8 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
+import { useWatchlist } from '@/stores/watchlist'
 
 export default function TabLayout() {
+  const watchCount = useWatchlist((s) => s.items.length)
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -14,6 +16,7 @@ export default function TabLayout() {
           sf={{ default: 'bookmark', selected: 'bookmark.fill' }}
           md="bookmark"
         />
+        {watchCount > 0 && <NativeTabs.Trigger.Badge>{String(watchCount)}</NativeTabs.Trigger.Badge>}
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="garage">
