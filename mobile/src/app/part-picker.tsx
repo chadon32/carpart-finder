@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { View, Text, TextInput, FlatList, Pressable } from 'react-native'
+import { View, Text, TextInput, FlatList, Pressable, ActivityIndicator } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
+import * as Haptics from 'expo-haptics'
+import { identifyPartFromImage } from '@/api/client'
 import { partTypes } from '@/data/partTypes'
 import { useThemeColors, displayFont } from '@/theme'
 
@@ -13,9 +15,45 @@ export default function PartPicker() {
     trim?: string
   }>()
   const [q, setQ] = useState('')
+  const [identifying, setIdentifying] = useState(false)
+  const [identifyMsg, setIdentifyMsg] = useState<string | null>(null)
 
   const goToResults = (part: string) =>
     router.push({ pathname: '/results', params: { year, make, model, trim: trim ?? '', part } })
+
+  const identifyFromPhoto = async () => {
+    setIdentifyMsg(null)
+    // Lazy import: the native module only exists in builds that include it —
+    // older installs get a message instead of a crash at module load.
+    let ImagePicker: typeof import('expo-image-picker')
+    try {
+      ImagePicker = await import('expo-image-picker')
+    } catch {
+      setIdentifyMsg('Camera features need the newest app build — update from the install link.')
+      return
+    }
+    const perm = await ImagePicker.requestCameraPermissionsAsync()
+    if (!perm.granted) {
+      setIdentifyMsg('Camera access is off — enable it for CarPartsRadar in Settings.')
+      return
+    }
+    const shot = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 })
+    if (shot.canceled || !shot.assets[0]?.base64) return
+    setIdentifying(true)
+    try {
+      const r = await identifyPartFromImage(shot.assets[0].base64)
+      if (r.identified && r.partName) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        goToResults(r.partName)
+      } else {
+        setIdentifyMsg("Couldn't identify the part — try a clearer photo or search by name.")
+      }
+    } catch {
+      setIdentifyMsg('Identification failed — check your connection and try again.')
+    } finally {
+      setIdentifying(false)
+    }
+  }
 
   const shown = q
     ? partTypes.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
@@ -50,6 +88,37 @@ export default function PartPicker() {
           borderColor: c.border,
         }}
       />
+      {!q && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
+          <Pressable
+            onPress={identifyFromPhoto}
+            disabled={identifying}
+            style={{
+              minHeight: 50,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: c.brand,
+              backgroundColor: c.card,
+            }}
+          >
+            {identifying ? (
+              <>
+                <ActivityIndicator />
+                <Text style={{ color: c.subtext, fontWeight: '700' }}>Identifying part…</Text>
+              </>
+            ) : (
+              <Text style={{ color: c.brand, fontWeight: '700' }}>📷  Identify from a photo</Text>
+            )}
+          </Pressable>
+          {identifyMsg ? (
+            <Text style={{ color: '#be123c', fontSize: 13 }}>{identifyMsg}</Text>
+          ) : null}
+        </View>
+      )}
       {!q && (
         <Text
           style={{
