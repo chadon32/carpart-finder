@@ -6,10 +6,11 @@ import type { GarageVehicle } from '../api/types'
 import { fetchVehicleImage } from '../api/client'
 import { useThemeColors } from '../theme'
 
-export function VehicleCard({ vehicle, onPress, onRemove }: {
+export function VehicleCard({ vehicle, onPress, onRemove, onHealth }: {
   vehicle: GarageVehicle
   onPress: () => void
   onRemove?: () => void
+  onHealth?: () => void
 }) {
   const c = useThemeColors()
   const [img, setImg] = useState<string | null>(null)
@@ -63,6 +64,11 @@ export function VehicleCard({ vehicle, onPress, onRemove }: {
         </Text>
         {vehicle.trim ? <Text style={{ color: c.subtext, fontSize: 13 }}>{vehicle.trim}</Text> : null}
       </View>
+      {onHealth ? (
+        <Pressable onPress={onHealth} hitSlop={12} accessibilityLabel="Vehicle health and recalls">
+          <SymbolView name="heart.text.square" size={20} tintColor={c.subtext} />
+        </Pressable>
+      ) : null}
       {onRemove ? (
         <Pressable onPress={onRemove} hitSlop={12} accessibilityLabel="Remove vehicle">
           <SymbolView name="trash" size={20} tintColor={c.subtext} />

@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, FlatList, Pressable, RefreshControl, Animated } from 'react-native'
+import { View, Text, FlatList, Pressable, RefreshControl, Animated, Modal, Switch } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { searchParts } from '@/api/client'
 import type { Listing, SearchResponse } from '@/api/types'
 import { deriveResultsState } from '@/lib/resultsState'
+import {
+  applyListingFilters,
+  activeFilterCount,
+  defaultFilters,
+  type ListingFilters,
+} from '@/lib/listingFilters'
 import { ListingCard } from '@/components/ListingCard'
 import { useCompare } from '@/stores/compare'
 import { useRecents } from '@/stores/recents'
@@ -56,6 +62,8 @@ export default function Results() {
   const compare = useCompare((s) => s.listings)
   const toggleCompare = useCompare((s) => s.toggle)
   const isComparing = useCompare((s) => s.isComparing)
+  const [filters, setFilters] = useState<ListingFilters>(defaultFilters)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const run = useCallback(async () => {
     setFailed(false)
@@ -76,10 +84,15 @@ export default function Results() {
 
   const state = deriveResultsState(response, failed)
   const results = response?.results ?? []
+  // Badges are computed on the raw server ranking, then filters/sort reorder
+  // the display — Best Value stays the server's pick wherever it lands.
+  const bestValueId = results[0]?.id ?? null
   const cheapestId =
     results.length > 0
       ? results.reduce((min, l) => (totalCost(l) < totalCost(min) ? l : min), results[0]).id
       : null
+  const shown = applyListingFilters(results, filters)
+  const filterCount = activeFilterCount(filters)
 
   const openListing = (l: Listing) => {
     Haptics.selectionAsync()
@@ -145,6 +158,40 @@ export default function Results() {
 
       {(state === 'live' || state === 'stale') && (
         <>
+          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 }}>
+            <Pressable
+              onPress={() => setSheetOpen(true)}
+              style={{
+                minHeight: 44,
+                paddingHorizontal: 14,
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                borderWidth: 1,
+                borderColor: filterCount > 0 ? brand : c.border,
+                backgroundColor: c.card,
+              }}
+            >
+              <Text style={{ color: filterCount > 0 ? brand : c.text, fontWeight: '700' }}>
+                Filters{filterCount > 0 ? ` (${filterCount})` : ''}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push({ pathname: '/repair-guide', params: { year, make, model, part } })}
+              style={{
+                minHeight: 44,
+                paddingHorizontal: 14,
+                borderRadius: 12,
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: c.card,
+              }}
+            >
+              <Text style={{ color: c.subtext, fontWeight: '700' }}>🔧 Repair guide</Text>
+            </Pressable>
+          </View>
           {state === 'stale' && (
             <View
               style={{
@@ -161,8 +208,16 @@ export default function Results() {
             </View>
           )}
           <FlatList
-            data={results}
+            data={shown}
             keyExtractor={(l) => l.id}
+            ListEmptyComponent={
+              <View style={{ alignItems: 'center', paddingTop: 40, paddingHorizontal: 24, gap: 6 }}>
+                <Text style={{ color: c.text, fontWeight: '700' }}>No listings match your filters</Text>
+                <Text style={{ color: c.subtext, textAlign: 'center' }}>
+                  Loosen a filter or reset them to see all {results.length} listings.
+                </Text>
+              </View>
+            }
             contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
             refreshControl={
               <RefreshControl
@@ -174,10 +229,10 @@ export default function Results() {
                 }}
               />
             }
-            renderItem={({ item, index }) => (
+            renderItem={({ item }) => (
               <ListingCard
                 listing={item}
-                isBestValue={index === 0}
+                isBestValue={item.id === bestValueId}
                 isCheapest={item.id === cheapestId}
                 isComparing={isComparing(item.id)}
                 onPress={() => openListing(item)}
@@ -190,6 +245,84 @@ export default function Results() {
           />
         </>
       )}
+
+      <Modal
+        visible={sheetOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSheetOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: c.bg, padding: 20, gap: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>Filters</Text>
+            <Pressable onPress={() => setFilters(defaultFilters)} hitSlop={8}>
+              <Text style={{ color: brand, fontWeight: '700' }}>Reset</Text>
+            </Pressable>
+          </View>
+
+          {(
+            [
+              ['Sort by', 'sort', [['best', 'Best value'], ['price', 'Price'], ['total', 'Price + shipping'], ['rating', 'Seller rating']]],
+              ['Minimum seller rating', 'minRating', [[0, 'Any'], [90, '90%+'], [95, '95%+'], [98, '98%+']]],
+              ['Condition', 'condition', [['all', 'All'], ['new', 'New'], ['used', 'Used']]],
+            ] as const
+          ).map(([label, key, options]) => (
+            <View key={key} style={{ gap: 8 }}>
+              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+                {label.toUpperCase()}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {options.map(([value, text]) => {
+                  const active = filters[key] === value
+                  return (
+                    <Pressable
+                      key={String(value)}
+                      onPress={() => setFilters((f) => ({ ...f, [key]: value }))}
+                      style={{
+                        minHeight: 40,
+                        paddingHorizontal: 14,
+                        borderRadius: 999,
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: active ? brand : c.border,
+                        backgroundColor: active ? brand : c.card,
+                      }}
+                    >
+                      <Text style={{ color: active ? '#fff' : c.text, fontWeight: '600' }}>{text}</Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </View>
+          ))}
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ color: c.text, fontWeight: '600' }}>Hide overseas listings</Text>
+            <Switch
+              value={filters.hideOverseas}
+              onValueChange={(v) => setFilters((f) => ({ ...f, hideOverseas: v }))}
+              trackColor={{ true: brand }}
+            />
+          </View>
+
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={() => setSheetOpen(false)}
+            style={{
+              backgroundColor: brand,
+              borderRadius: 14,
+              minHeight: 50,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
+              Show {applyListingFilters(results, filters).length} listings
+            </Text>
+          </Pressable>
+        </View>
+      </Modal>
 
       {compare.length > 0 && (
         <View

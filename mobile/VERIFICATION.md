@@ -60,3 +60,17 @@
 - [ ] TestFlight install verified on device
 - [ ] Screenshots captured for App Store listing
 - [ ] Submit for App Review (user action in App Store Connect)
+
+## Phase 5 — Automated (2026-07-09)
+
+- [x] `npm test` — 35/35 passing (adds listingFilters, dtc lookup)
+- [x] `npx tsc --noEmit` — clean
+- [x] `npx expo export --platform ios` — bundle builds (all JS-only; hot-loads into existing builds)
+
+## Phase 5 — On-device
+
+- [ ] Results: Filters sheet (sort, min rating, condition, hide overseas); count badge; filtered-empty message; badges follow listings when re-sorted
+- [ ] Part picker: "Describe the problem" → diagnosis matches with confidence pills → part chip → results
+- [ ] Part picker: "OBD-II code" → P0302 shows definition + parts; junk input shows format error
+- [ ] Garage: health icon → recalls (or honest error with retry) + typical-maintenance table; rows shop the part
+- [ ] Results: "Repair guide" generates markdown guide with disclaimer

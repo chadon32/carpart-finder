@@ -58,6 +58,56 @@ export function decodeVinApi(vin: string): Promise<VinDecodeResult> {
   return getJson(`/api/vin?${new URLSearchParams({ vin })}`)
 }
 
+export type SymptomPart = {
+  name: string
+  why: string
+  priority: 'likely' | 'possible'
+}
+
+export type DiagnosisMatch = {
+  id: string
+  title: string
+  system: string
+  summary: string
+  safety: string | null
+  score: number
+  confidence: 'strong' | 'likely' | 'possible'
+  parts: SymptomPart[]
+}
+
+export function diagnoseProblem(symptom: string): Promise<{ matches: DiagnosisMatch[] }> {
+  return getJson(`/api/diagnose?${new URLSearchParams({ symptom })}`)
+}
+
+export type Recall = {
+  campaignNumber: string | null
+  component: string | null
+  summary: string | null
+  consequence: string | null
+  remedy: string | null
+  reportedDate: string | null
+}
+
+export function fetchRecalls(year: string, make: string, model: string): Promise<{ recalls: Recall[] }> {
+  return getJson(`/api/recalls?${new URLSearchParams({ year, make, model })}`)
+}
+
+export async function fetchRepairGuide(
+  year: string,
+  make: string,
+  model: string,
+  part: string
+): Promise<{ guide: string }> {
+  const res = await fetch(`${API_BASE}/api/ai/repair-guide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
+    body: JSON.stringify({ year, make, model, part }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+  return data as { guide: string }
+}
+
 export async function identifyPartFromImage(
   base64Image: string
 ): Promise<{ identified: boolean; partName: string | null }> {

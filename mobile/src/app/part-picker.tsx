@@ -119,6 +119,42 @@ export default function PartPicker() {
           {identifyMsg ? (
             <Text style={{ color: '#be123c', fontSize: 13 }}>{identifyMsg}</Text>
           ) : null}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: '/diagnose', params: { mode: 'symptom', year, make, model, trim: trim ?? '' } })
+              }
+              style={{
+                flex: 1,
+                minHeight: 48,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: c.card,
+              }}
+            >
+              <Text style={{ color: c.text, fontWeight: '700' }}>Describe the problem</Text>
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: '/diagnose', params: { mode: 'obd', year, make, model, trim: trim ?? '' } })
+              }
+              style={{
+                flex: 1,
+                minHeight: 48,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: c.card,
+              }}
+            >
+              <Text style={{ color: c.text, fontWeight: '700' }}>OBD-II code</Text>
+            </Pressable>
+          </View>
         </View>
       )}
       {!q && (

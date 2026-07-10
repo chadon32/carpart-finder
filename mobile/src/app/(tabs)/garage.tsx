@@ -21,6 +21,7 @@ export default function GarageScreen() {
           <VehicleCard
             vehicle={item}
             onPress={() => router.push({ pathname: '/part-picker', params: { ...item } })}
+            onHealth={() => router.push({ pathname: '/vehicle-health', params: { ...item } })}
             onRemove={() => removeVehicle(index)}
           />
         )}
