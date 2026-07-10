@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, FlatList, Pressable, RefreshControl, Animated } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
-import * as WebBrowser from 'expo-web-browser'
+import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { searchParts } from '@/api/client'
 import type { Listing, SearchResponse } from '@/api/types'
@@ -74,9 +73,16 @@ export default function Results() {
       ? results.reduce((min, l) => (totalCost(l) < totalCost(min) ? l : min), results[0]).id
       : null
 
-  const openListing = async (l: Listing) => {
+  const openListing = (l: Listing) => {
     Haptics.selectionAsync()
-    await WebBrowser.openBrowserAsync(l.link)
+    router.push({
+      pathname: '/listing-detail',
+      params: {
+        listing: JSON.stringify(l),
+        carLabel: `${year} ${make} ${model}`,
+        part,
+      },
+    })
   }
 
   return (
