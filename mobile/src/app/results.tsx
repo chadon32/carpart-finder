@@ -131,6 +131,36 @@ export default function Results() {
     })
   }
 
+  // Placed mid-list (after the second card) so it's seen without scrolling
+  // to the very end; falls back to the list footer on short result sets.
+  const retailerBlock = (
+    <View style={{ paddingHorizontal: 16, gap: 10, paddingVertical: 8 }}>
+      <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+        COMPARE AT OTHER STORES
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        {retailerLinks.map((r) => (
+          <Pressable
+            key={r.name}
+            onPress={() => WebBrowser.openBrowserAsync(r.buildUrl(`${year} ${make} ${model} ${part}`))}
+            style={{
+              minHeight: 44,
+              paddingHorizontal: 14,
+              borderRadius: 12,
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: c.border,
+              backgroundColor: c.card,
+            }}
+          >
+            <Text style={{ color: c.text, fontWeight: '600' }}>{r.name} ↗</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  )
+  const retailersInline = shown.length >= 3
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Text style={{ color: c.subtext, paddingHorizontal: 16, paddingTop: 12, fontWeight: '600' }}>
@@ -319,30 +349,7 @@ export default function Results() {
                     </Text>
                   </View>
                 )}
-                <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
-                  COMPARE AT OTHER STORES
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {retailerLinks.map((r) => (
-                    <Pressable
-                      key={r.name}
-                      onPress={() =>
-                        WebBrowser.openBrowserAsync(r.buildUrl(`${year} ${make} ${model} ${part}`))
-                      }
-                      style={{
-                        minHeight: 44,
-                        paddingHorizontal: 14,
-                        borderRadius: 12,
-                        justifyContent: 'center',
-                        borderWidth: 1,
-                        borderColor: c.border,
-                        backgroundColor: c.card,
-                      }}
-                    >
-                      <Text style={{ color: c.text, fontWeight: '600' }}>{r.name} ↗</Text>
-                    </Pressable>
-                  ))}
-                </View>
+                {!retailersInline && retailerBlock}
               </View>
             }
             refreshControl={
@@ -355,18 +362,21 @@ export default function Results() {
                 }}
               />
             }
-            renderItem={({ item }) => (
-              <ListingCard
-                listing={item}
-                isBestValue={item.id === bestValueId}
-                isCheapest={item.id === cheapestId}
-                isComparing={isComparing(item.id)}
-                onPress={() => openListing(item)}
-                onToggleCompare={() => {
-                  Haptics.selectionAsync()
-                  toggleCompare(item)
-                }}
-              />
+            renderItem={({ item, index }) => (
+              <>
+                <ListingCard
+                  listing={item}
+                  isBestValue={item.id === bestValueId}
+                  isCheapest={item.id === cheapestId}
+                  isComparing={isComparing(item.id)}
+                  onPress={() => openListing(item)}
+                  onToggleCompare={() => {
+                    Haptics.selectionAsync()
+                    toggleCompare(item)
+                  }}
+                />
+                {retailersInline && index === 1 ? retailerBlock : null}
+              </>
             )}
           />
         </>
