@@ -96,6 +96,8 @@
 - [x] `npx tsc --noEmit` — clean; iOS bundle exports
 - [x] Production accounts verified live (login returns real Supabase errors, /me 401s unauthenticated)
 - [x] Final production build (all 7 phases) uploaded to TestFlight — processing 2026-07-09
+- [x] Brand pass (RadarMark, JetBrains Mono) + mid-list retailer row → build 7 uploaded 2026-07-10
+- [x] Final health check 2026-07-10: web 85/85, mobile 43/43, tsc clean, all API endpoints smoke-tested live
 
 ### On-device
 - [ ] Garage → Account: create account or log in with the SAME email as the website — session persists across app restarts (cookie)
