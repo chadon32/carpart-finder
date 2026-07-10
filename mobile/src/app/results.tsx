@@ -7,6 +7,7 @@ import type { Listing, SearchResponse } from '@/api/types'
 import { deriveResultsState } from '@/lib/resultsState'
 import { ListingCard } from '@/components/ListingCard'
 import { useCompare } from '@/stores/compare'
+import { useRecents } from '@/stores/recents'
 import { useThemeColors, brand } from '@/theme'
 
 function SkeletonCard() {
@@ -61,6 +62,9 @@ export default function Results() {
     try {
       const r = await searchParts(year, make, model, part, trim || undefined)
       setResponse(r)
+      if (r.results.length > 0) {
+        useRecents.getState().record({ year, make, model, trim: trim ?? '' }, part)
+      }
     } catch {
       setFailed(true)
     }
