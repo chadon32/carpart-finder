@@ -1,10 +1,16 @@
+import { useEffect } from 'react'
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router'
 import { useColorScheme } from 'react-native'
 import { useFonts, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed'
+import { useAuth } from '@/stores/auth'
 
 export default function RootLayout() {
   const colorScheme = useColorScheme()
   const [fontsLoaded] = useFonts({ BarlowCondensed_700Bold })
+  useEffect(() => {
+    // Rehydrate the session from the persisted cookie, if any.
+    useAuth.getState().loadMe()
+  }, [])
   if (!fontsLoaded) return null
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

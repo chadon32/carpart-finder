@@ -4,6 +4,7 @@ import { router } from 'expo-router'
 import { useGarage } from '@/stores/garage'
 import { useThemeColors, displayFont } from '@/theme'
 import { VehicleCard } from '@/components/VehicleCard'
+import { AccountCard } from '@/components/AccountCard'
 
 export default function GarageScreen() {
   const c = useThemeColors()
@@ -34,11 +35,9 @@ export default function GarageScreen() {
           </View>
         }
         ListFooterComponent={
-          vehicles.length > 0 ? (
-            <Text style={{ color: c.subtext, fontSize: 12, textAlign: 'center', paddingTop: 16 }}>
-              Settings arrive with accounts in a later release.
-            </Text>
-          ) : null
+          <View style={{ paddingTop: 16 }}>
+            <AccountCard />
+          </View>
         }
       />
     </SafeAreaView>

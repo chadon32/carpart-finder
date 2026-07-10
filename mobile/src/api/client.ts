@@ -2,9 +2,26 @@ import type { Listing, SearchResponse, VehicleType, VinDecodeResult } from './ty
 
 export const API_BASE = 'https://carpartsradar.com'
 
+// credentials 'include': auth rides the same httpOnly cpf_token cookie the
+// website uses — iOS persists it natively, so app and site share accounts.
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'X-App-Platform': 'ios' },
+    credentials: 'include',
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+  }
+  return data as T
+}
+
+async function postJson<T>(path: string, body: unknown, method = 'POST'): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
+    credentials: 'include',
+    body: JSON.stringify(body),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -147,6 +164,76 @@ export async function fetchRepairGuide(
   const data = await res.json()
   if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
   return data as { guide: string }
+}
+
+// ---- Accounts (shared with the website via the same API + cookie) ----
+
+export type AuthUser = {
+  id: string
+  email?: string
+  user_metadata?: { full_name?: string }
+}
+
+export type AuthResponse = { user: AuthUser; confirmationRequired?: boolean }
+
+export function login(email: string, password: string): Promise<AuthResponse> {
+  return postJson('/api/supabase/login', { email, password })
+}
+
+export function signup(email: string, password: string, name?: string): Promise<AuthResponse> {
+  return postJson('/api/supabase/signup', { email, password, name })
+}
+
+export function logout(): Promise<{ success?: boolean }> {
+  return postJson('/api/supabase/logout', {})
+}
+
+export function getMe(): Promise<{ user: AuthUser }> {
+  return getJson('/api/supabase/me')
+}
+
+export type SavedSearch = {
+  id: string
+  year: string
+  make: string
+  model: string
+  trim: string | null
+  part: string
+  created_at: string
+}
+
+export type PriceAlert = {
+  id: string
+  saved_search_id: string
+  target_price: number
+  is_active: boolean
+  created_at: string
+  saved_searches: SavedSearch | null
+}
+
+export function createSavedSearch(
+  year: string,
+  make: string,
+  model: string,
+  trim: string,
+  part: string
+): Promise<{ search: SavedSearch }> {
+  return postJson('/api/supabase/saved-searches', { year, make, model, trim, part })
+}
+
+export function deleteSavedSearch(id: string): Promise<{ success: boolean }> {
+  return postJson(`/api/supabase/saved-searches/${id}`, {}, 'DELETE')
+}
+
+export function getPriceAlerts(): Promise<{ alerts: PriceAlert[] }> {
+  return getJson('/api/supabase/price-alerts')
+}
+
+export function createPriceAlert(
+  saved_search_id: string,
+  target_price: number
+): Promise<{ alert: PriceAlert }> {
+  return postJson('/api/supabase/price-alerts', { saved_search_id, target_price })
 }
 
 export async function identifyPartFromImage(

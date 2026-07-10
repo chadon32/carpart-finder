@@ -3,8 +3,11 @@ import { Image } from 'expo-image'
 import { useLocalSearchParams } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import * as Haptics from 'expo-haptics'
+import { useState } from 'react'
 import type { Listing } from '@/api/types'
+import { createSavedSearch, createPriceAlert } from '@/api/client'
 import { useWatchlist } from '@/stores/watchlist'
+import { useAuth } from '@/stores/auth'
 import { useThemeColors, brand } from '@/theme'
 
 function Pill({ label, bg, fg }: { label: string; bg: string; fg: string }) {
@@ -29,11 +32,35 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export default function ListingDetail() {
   const c = useThemeColors()
-  const params = useLocalSearchParams<{ listing: string; carLabel: string; part: string }>()
+  const params = useLocalSearchParams<{
+    listing: string
+    carLabel: string
+    year: string
+    make: string
+    model: string
+    trim?: string
+    part: string
+  }>()
   const listing = JSON.parse(params.listing) as Listing
   const watch = useWatchlist((s) => s.watch)
   const unwatch = useWatchlist((s) => s.unwatch)
   const watched = useWatchlist((s) => s.items.some((i) => i.id === listing.id))
+  const signedIn = useAuth((s) => s.status === 'signedIn')
+  const [alertState, setAlertState] = useState<'idle' | 'busy' | 'set' | 'failed'>('idle')
+
+  const createAlert = async () => {
+    setAlertState('busy')
+    try {
+      const { search } = await createSavedSearch(
+        params.year, params.make, params.model, params.trim ?? '', params.part
+      )
+      await createPriceAlert(search.id, listing.price)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      setAlertState('set')
+    } catch {
+      setAlertState('failed')
+    }
+  }
 
   const shipping =
     listing.shippingCost == null
@@ -118,6 +145,32 @@ export default function ListingDetail() {
               {listing.shortDescription}
             </Text>
           ) : null}
+
+          {signedIn && (
+            <Pressable
+              onPress={createAlert}
+              disabled={alertState === 'busy' || alertState === 'set'}
+              style={{
+                minHeight: 48,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: alertState === 'set' ? '#047857' : c.border,
+                backgroundColor: alertState === 'set' ? '#d1fae5' : c.card,
+              }}
+            >
+              <Text style={{ color: alertState === 'set' ? '#047857' : c.text, fontWeight: '700' }}>
+                {alertState === 'set'
+                  ? `✓ Alert set — emails you below $${listing.price.toFixed(2)}`
+                  : alertState === 'busy'
+                    ? 'Setting alert…'
+                    : alertState === 'failed'
+                      ? 'Alert failed — tap to retry'
+                      : `🔔 Email me if ${params.part} drops below $${listing.price.toFixed(2)}`}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
 

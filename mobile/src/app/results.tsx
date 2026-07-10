@@ -121,6 +121,10 @@ export default function Results() {
       params: {
         listing: JSON.stringify(l),
         carLabel: `${year} ${make} ${model}`,
+        year,
+        make,
+        model,
+        trim: trim ?? '',
         part,
       },
     })

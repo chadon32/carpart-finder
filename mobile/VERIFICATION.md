@@ -89,3 +89,15 @@
 - [ ] Filter sheet ZIP: entering a ZIP re-runs search with exact shipping; persists across launches
 - [ ] Price history bars appear only for parts with ≥5 daily observations
 - [ ] Diagnose: long-press or + to select parts → combined quote with subtotal/shipping/total; missing listings say so
+
+## Phase 7 — Shared accounts (2026-07-09)
+
+- [x] `npm test` — 43/43 passing (adds auth store)
+- [x] `npx tsc --noEmit` — clean; iOS bundle exports
+- [x] Production accounts verified live (login returns real Supabase errors, /me 401s unauthenticated)
+
+### On-device
+- [ ] Garage → Account: create account or log in with the SAME email as the website — session persists across app restarts (cookie)
+- [ ] Signed in: listing detail shows "Email me if X drops below $Y" → sets alert (daily cron checks it)
+- [ ] Account card lists alerts; Remove deletes (cascades via saved search)
+- [ ] Log out clears the session
