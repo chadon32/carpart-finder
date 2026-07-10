@@ -542,7 +542,12 @@ export function PartSelector({
                         <input
                           type="checkbox"
                           checked={!!checkedParts[p.name]}
-                          onChange={(e) => setCheckedParts((prev) => ({ ...prev, [p.name]: e.target.checked }))}
+                          onChange={(e) => {
+                            setCheckedParts((prev) => ({ ...prev, [p.name]: e.target.checked }))
+                            // The fetched quote no longer describes the selection.
+                            setQuote(null)
+                            setQuoteError(null)
+                          }}
                           className="mt-0.5 h-3.5 w-3.5 accent-brand-600"
                         />
                         <span className="min-w-0 flex-1">

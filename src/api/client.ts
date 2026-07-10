@@ -76,6 +76,29 @@ export function fetchPrices(ids: string[]): Promise<{ prices: Record<string, Pri
   return getJson(`/api/prices?${params.toString()}`)
 }
 
+// The API validates query length, so a large watchlist must not go out as one
+// giant ids param. Batches of 10 in parallel; partial failures contribute
+// nothing, and only an all-batches failure rejects (so callers can still
+// surface a real outage).
+export async function fetchPricesChunked(ids: string[]): Promise<Record<string, PriceInfo>> {
+  const batches: string[][] = []
+  for (let i = 0; i < ids.length; i += 10) batches.push(ids.slice(i, i + 10))
+  const settled = await Promise.allSettled(batches.map((b) => fetchPrices(b)))
+  const merged: Record<string, PriceInfo> = {}
+  let anyFulfilled = false
+  for (const s of settled) {
+    if (s.status === 'fulfilled') {
+      anyFulfilled = true
+      Object.assign(merged, s.value.prices)
+    }
+  }
+  if (!anyFulfilled && batches.length > 0) {
+    const firstFailure = settled[0] as PromiseRejectedResult
+    throw firstFailure.reason
+  }
+  return merged
+}
+
 export type SymptomPart = {
   name: string
   why: string

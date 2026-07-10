@@ -12,7 +12,7 @@ import {
   Award,
 } from 'lucide-react'
 import type { CartItem } from '../hooks/useCart'
-import { fetchPrices, type PriceInfo } from '../api/client'
+import { fetchPricesChunked, type PriceInfo } from '../api/client'
 
 type PriceCheck = Record<string, PriceInfo>
 
@@ -129,8 +129,8 @@ export function CartPanel({
   const checkPrices = () => {
     setChecking(true)
     setCheckError(null)
-    fetchPrices(items.map((i) => i.id))
-      .then((res) => setPrices(res.prices))
+    fetchPricesChunked(items.map((i) => i.id))
+      .then(setPrices)
       .catch((err) => setCheckError(err.message))
       .finally(() => setChecking(false))
   }

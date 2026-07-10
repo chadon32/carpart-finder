@@ -17,6 +17,9 @@ export function RepairGuideModal({ vehicleLabel, part, onClose }: RepairGuideMod
 
   useEffect(() => {
     let cancelled = false
+    // Abort the request itself on close — the `cancelled` flag alone lets the
+    // AI generation run to completion server-side after the modal is gone.
+    const controller = new AbortController()
 
     const generateGuide = async () => {
       setIsGenerating(true)
@@ -26,23 +29,25 @@ export function RepairGuideModal({ vehicleLabel, part, onClose }: RepairGuideMod
         const year = parts[0] || ''
         const make = parts[1] || ''
         const model = parts.slice(2).join(' ') || ''
-        
+
         const res = await fetch('/api/ai/repair-guide', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ year, make, model, part })
+          body: JSON.stringify({ year, make, model, part }),
+          signal: controller.signal
         })
-        
+
         if (!res.ok) {
           throw new Error('Failed to generate guide')
         }
-        
+
         const data = await res.json()
         if (!cancelled) {
           setGuide(data.guide)
           trackAIGenerated(part, vehicleLabel)
         }
       } catch (err: any) {
+        if (err?.name === 'AbortError') return
         if (!cancelled) setGuideError(err.message || 'An error occurred')
       } finally {
         if (!cancelled) setIsGenerating(false)
@@ -53,6 +58,7 @@ export function RepairGuideModal({ vehicleLabel, part, onClose }: RepairGuideMod
 
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [vehicleLabel, part])
 
