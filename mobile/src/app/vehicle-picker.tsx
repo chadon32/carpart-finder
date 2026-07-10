@@ -95,14 +95,18 @@ export default function VehiclePicker() {
     )
   }
 
+  // Distinct keys force a remount per step — without them React reuses the
+  // PickerList instance and the search text typed on one step (e.g. "toy"
+  // to find TOYOTA) silently filters the next step's options to nothing.
   return !year ? (
-    <PickerList title="Year" options={YEARS} onSelect={setYear} />
+    <PickerList key="year" title="Year" options={YEARS} onSelect={setYear} />
   ) : !make ? (
-    <PickerList title="Make" options={makes} loading={loading} searchable onSelect={setMake} />
+    <PickerList key="make" title="Make" options={makes} loading={loading} searchable onSelect={setMake} />
   ) : !model ? (
-    <PickerList title="Model" options={models} loading={loading} searchable onSelect={setModel} />
+    <PickerList key="model" title="Model" options={models} loading={loading} searchable onSelect={setModel} />
   ) : (
     <PickerList
+      key="trim"
       title="Trim (optional)"
       options={['Skip', ...trims]}
       loading={loading}
