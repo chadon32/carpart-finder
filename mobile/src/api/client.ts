@@ -57,3 +57,16 @@ export function searchParts(
 export function decodeVinApi(vin: string): Promise<VinDecodeResult> {
   return getJson(`/api/vin?${new URLSearchParams({ vin })}`)
 }
+
+export async function identifyPartFromImage(
+  base64Image: string
+): Promise<{ identified: boolean; partName: string | null }> {
+  const res = await fetch(`${API_BASE}/api/identify-part`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
+    body: JSON.stringify({ image: base64Image }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+  return data as { identified: boolean; partName: string | null }
+}

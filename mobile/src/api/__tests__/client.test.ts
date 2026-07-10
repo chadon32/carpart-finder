@@ -1,4 +1,4 @@
-import { fetchMakes, searchParts, fetchPrices, API_BASE } from '../client'
+import { fetchMakes, searchParts, fetchPrices, identifyPartFromImage, API_BASE } from '../client'
 
 const mockFetch = jest.fn()
 globalThis.fetch = mockFetch as unknown as typeof fetch
@@ -33,6 +33,17 @@ test('fetchPrices joins ids into one query', async () => {
   const res = await fetchPrices(['a', 'b'])
   expect(res.prices.a.price).toBe(9)
   expect(mockFetch.mock.calls[0][0]).toBe(`${API_BASE}/api/prices?ids=a%2Cb`)
+})
+
+test('identifyPartFromImage POSTs the photo', async () => {
+  mockFetch.mockReturnValue(jsonResponse({ identified: true, partName: 'Brake Pads' }))
+  const res = await identifyPartFromImage('b64')
+  expect(res.partName).toBe('Brake Pads')
+  const [url, init] = mockFetch.mock.calls[0]
+  expect(url).toBe(`${API_BASE}/api/identify-part`)
+  expect(init.method).toBe('POST')
+  expect(JSON.parse(init.body).image).toBe('b64')
+  expect(init.headers['X-App-Platform']).toBe('ios')
 })
 
 test('non-OK responses throw the server error message', async () => {

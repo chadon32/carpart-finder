@@ -10,7 +10,10 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.carpartsradar.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +29,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "CarPartsRadar uses the camera to identify a part from a photo or scan your VIN."
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
