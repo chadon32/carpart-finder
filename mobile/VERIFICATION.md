@@ -35,3 +35,28 @@
 - [ ] Compare: select 2+ → floating bar above tab bar; Compare screen scrolls columns; Clear resets
 - [ ] Recent searches appear on Search home and re-run the search
 - [ ] Dark mode across all new screens
+
+## Phase 3 — Automated (2026-07-09)
+
+- [x] `npm test` — 25/25 passing (adds extractVin, identify-part client)
+- [x] `npx tsc --noEmit` — clean
+- [x] EAS development build with camera modules — FINISHED (e2ed0dd8)
+- [x] Data-URL fix verified against the API's identify-part validation
+
+## Phase 3 — On-device (camera build)
+
+- [ ] Part picker: "Identify from a photo" → camera → identified part lands on results
+- [ ] Unidentifiable photo → honest "couldn't identify" message (no guessed part)
+- [ ] Vehicle picker: VIN scan photo → decoded vehicle in garage (photo stays on device)
+- [ ] Manual 17-char VIN entry decodes
+- [ ] Camera permission denial shows the Settings hint
+
+## Phase 4 — Store readiness (2026-07-09)
+
+- [x] Branded 1024px app icon (radar mark on cobalt, no alpha) + splash
+- [x] Privacy policy live at https://carpartsradar.com/privacy.html (HTTP 200)
+- [x] Production build — FINISHED (buildNumber 2)
+- [x] Uploaded to App Store Connect / TestFlight (user-confirmed submission)
+- [ ] TestFlight install verified on device
+- [ ] Screenshots captured for App Store listing
+- [ ] Submit for App Review (user action in App Store Connect)
