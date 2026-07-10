@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
+import { useFocusEffect } from 'expo-router'
 import { useAuth } from '../stores/auth'
 import { getPriceAlerts, deleteSavedSearch, type PriceAlert } from '../api/client'
 import { useThemeColors, brand, dataFont } from '../theme'
@@ -16,15 +17,19 @@ export function AccountCard() {
   const [msg, setMsg] = useState<string | null>(null)
   const [alerts, setAlerts] = useState<PriceAlert[] | null>(null)
 
-  useEffect(() => {
-    if (status !== 'signedIn') {
-      setAlerts(null)
-      return
-    }
-    getPriceAlerts()
-      .then((r) => setAlerts(r.alerts))
-      .catch(() => setAlerts(null))
-  }, [status])
+  // Refetch on every focus of the Garage tab so alerts created from a
+  // listing (while this card stayed mounted) show up immediately.
+  useFocusEffect(
+    useCallback(() => {
+      if (status !== 'signedIn') {
+        setAlerts(null)
+        return
+      }
+      getPriceAlerts()
+        .then((r) => setAlerts(r.alerts))
+        .catch(() => setAlerts(null))
+    }, [status])
+  )
 
   const submit = async () => {
     setBusy(true)
@@ -73,7 +78,7 @@ export function AccountCard() {
         gap: 10,
       }}
     >
-      <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+      <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
         ACCOUNT
       </Text>
 
@@ -90,7 +95,7 @@ export function AccountCard() {
           </Text>
           {alerts && alerts.length > 0 && (
             <View style={{ gap: 8 }}>
-              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+              <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
                 PRICE ALERTS
               </Text>
               {alerts.map((a) => (

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-nati
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { fetchRecalls, type Recall } from '@/api/client'
 import { maintenanceForVehicle } from '@/data/maintenanceSchedule'
+import { isElectricVehicle } from '@/data/electricVehicles'
 import { useThemeColors, brand } from '@/theme'
 
 export default function VehicleHealth() {
@@ -26,7 +27,7 @@ export default function VehicleHealth() {
     }, [year, make, model, attempt])
   )
 
-  const maintenance = maintenanceForVehicle(false)
+  const maintenance = maintenanceForVehicle(isElectricVehicle(String(make), String(model)))
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: c.bg }} contentContainerStyle={{ padding: 16, gap: 14 }}>

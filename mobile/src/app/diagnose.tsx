@@ -33,6 +33,14 @@ export default function Diagnose() {
 
   const pickedParts = Object.keys(picked).filter((k) => picked[k])
 
+  // Changing the selection invalidates any fetched quote — its totals no
+  // longer describe what's picked.
+  const togglePick = (name: string) => {
+    setPicked((p) => ({ ...p, [name]: !p[name] }))
+    setQuote(null)
+    setQuoteError(false)
+  }
+
   const runQuote = async () => {
     setQuoting(true)
     setQuoteError(false)
@@ -81,7 +89,7 @@ export default function Diagnose() {
     return (
       <Pressable
         onPress={() => goToResults(name)}
-        onLongPress={() => setPicked((p) => ({ ...p, [name]: !p[name] }))}
+        onLongPress={() => togglePick(name)}
         style={{
           minHeight: 44,
           paddingHorizontal: 14,
@@ -100,7 +108,7 @@ export default function Diagnose() {
           {tag ? <Text style={{ color: c.subtext, fontWeight: '400' }}>  {tag}</Text> : null}
         </Text>
         <Pressable
-          onPress={() => setPicked((p) => ({ ...p, [name]: !p[name] }))}
+          onPress={() => togglePick(name)}
           hitSlop={10}
           accessibilityLabel={selected ? `Remove ${name} from quote` : `Add ${name} to quote`}
         >

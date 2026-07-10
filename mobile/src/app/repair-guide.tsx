@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import Markdown from 'react-native-markdown-display'
@@ -15,20 +15,28 @@ export default function RepairGuide() {
   }>()
   const [guide, setGuide] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   const run = useCallback(async () => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setFailed(false)
     setGuide(null)
     try {
-      const r = await fetchRepairGuide(year, make, model, part)
+      const r = await fetchRepairGuide(year, make, model, part, controller.signal)
       setGuide(r.guide)
-    } catch {
+    } catch (e) {
+      // A deliberate dismissal is not a failure.
+      if ((e as Error)?.name === 'AbortError') return
       setFailed(true)
     }
   }, [year, make, model, part])
 
   useEffect(() => {
     run()
+    // Cancel the in-flight generation when the sheet is dismissed.
+    return () => abortRef.current?.abort()
   }, [run])
 
   return (

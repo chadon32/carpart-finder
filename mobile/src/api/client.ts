@@ -4,6 +4,16 @@ export const API_BASE = 'https://carpartsradar.com'
 
 // credentials 'include': auth rides the same httpOnly cpf_token cookie the
 // website uses — iOS persists it natively, so app and site share accounts.
+// Thrown for non-OK responses; carries the HTTP status so callers can tell
+// "you are signed out" (401) apart from "the network hiccuped".
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'X-App-Platform': 'ios' },
@@ -11,7 +21,10 @@ async function getJson<T>(path: string): Promise<T> {
   })
   const data = await res.json()
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+    throw new ApiError(
+      (data as { error?: string }).error || `Request failed (${res.status})`,
+      res.status
+    )
   }
   return data as T
 }
@@ -57,6 +70,20 @@ export type PriceInfo = { available: boolean; price?: number | null }
 
 export function fetchPrices(ids: string[]): Promise<{ prices: Record<string, PriceInfo> }> {
   return getJson(`/api/prices?${new URLSearchParams({ ids: ids.join(',') })}`)
+}
+
+// The API validates query length, so an unbounded watchlist must not go out
+// as one giant ids param. Batches of 10, in parallel; a failed batch
+// contributes nothing (its items honestly show no live quote).
+export async function fetchPricesChunked(ids: string[]): Promise<Record<string, PriceInfo>> {
+  const batches: string[][] = []
+  for (let i = 0; i < ids.length; i += 10) batches.push(ids.slice(i, i + 10))
+  const settled = await Promise.allSettled(batches.map((b) => fetchPrices(b)))
+  const merged: Record<string, PriceInfo> = {}
+  for (const s of settled) {
+    if (s.status === 'fulfilled') Object.assign(merged, s.value.prices)
+  }
+  return merged
 }
 
 export function searchParts(
@@ -154,12 +181,14 @@ export async function fetchRepairGuide(
   year: string,
   make: string,
   model: string,
-  part: string
+  part: string,
+  signal?: AbortSignal
 ): Promise<{ guide: string }> {
   const res = await fetch(`${API_BASE}/api/ai/repair-guide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
     body: JSON.stringify({ year, make, model, part }),
+    signal,
   })
   const data = await res.json()
   if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)

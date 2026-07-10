@@ -5,7 +5,7 @@ import { Image } from 'expo-image'
 import { useFocusEffect } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import * as Haptics from 'expo-haptics'
-import { fetchPrices, type PriceInfo } from '@/api/client'
+import { fetchPricesChunked, type PriceInfo } from '@/api/client'
 import { useWatchlist } from '@/stores/watchlist'
 import { priceDelta } from '@/lib/priceDelta'
 import { useThemeColors, displayFont, brand } from '@/theme'
@@ -26,8 +26,8 @@ export default function WatchlistScreen() {
   useFocusEffect(
     useCallback(() => {
       if (items.length === 0) return
-      fetchPrices(items.map((i) => i.id))
-        .then((r) => setPrices(r.prices))
+      fetchPricesChunked(items.map((i) => i.id))
+        .then(setPrices)
         .catch(() => {})
     }, [items])
   )
@@ -72,11 +72,16 @@ export default function WatchlistScreen() {
                     <Text style={{ color: c.text, fontWeight: '800', fontSize: 16 }}>
                       ${(current ?? item.priceAtAdd).toFixed(2)}
                     </Text>
-                    <Text style={{ color: deltaColors[delta.direction], fontWeight: '700', fontSize: 13 }}>
-                      {delta.direction === 'down' ? '↓ ' : delta.direction === 'up' ? '↑ ' : ''}
-                      {delta.text}
-                      {delta.direction === 'unknown' ? ' since added' : ''}
-                    </Text>
+                    {delta.direction === 'unknown' ? (
+                      // Honesty: without a live quote the big number is the
+                      // price when added — say so instead of implying live.
+                      <Text style={{ color: c.subtext, fontSize: 13 }}>at add · no live quote</Text>
+                    ) : (
+                      <Text style={{ color: deltaColors[delta.direction], fontWeight: '700', fontSize: 13 }}>
+                        {delta.direction === 'down' ? '↓ ' : delta.direction === 'up' ? '↑ ' : ''}
+                        {delta.text}
+                      </Text>
+                    )}
                   </View>
                 </View>
               </View>

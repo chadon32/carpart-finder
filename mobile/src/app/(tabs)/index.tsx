@@ -43,7 +43,7 @@ export default function SearchScreen() {
 
         {vehicles.length > 0 && (
           <View style={{ gap: 10 }}>
-            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+            <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
               YOUR GARAGE
             </Text>
             {vehicles.slice(0, 3).map((v, i) => (
@@ -59,7 +59,7 @@ export default function SearchScreen() {
         {recents.length > 0 && (
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+              <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
                 RECENT SEARCHES
               </Text>
               <Pressable onPress={clearRecents} hitSlop={8}>

@@ -72,28 +72,40 @@ export default function Results() {
   const [filters, setFilters] = useState<ListingFilters>(defaultFilters)
   const [sheetOpen, setSheetOpen] = useState(false)
   const zip = usePrefs((s) => s.zip)
-  const setZip = usePrefs((s) => s.setZip)
+  const prefsHydrated = usePrefs((s) => s.hydrated)
+  // Draft ZIP edited in the sheet; committed to the store (triggering ONE
+  // re-search) only when the sheet closes — never per keystroke.
+  const [zipDraft, setZipDraft] = useState(zip)
   const [history, setHistory] = useState<PriceObservation[]>([])
+  // Guards against out-of-order responses when searches overlap
+  // (pull-to-refresh during a ZIP change): only the newest call may land.
+  const runSeq = useRef(0)
 
   const run = useCallback(async () => {
+    const seq = ++runSeq.current
     setFailed(false)
     try {
       const r = await searchParts(
         year, make, model, part, trim || undefined,
         usePrefs.getState().zip || undefined
       )
+      if (seq !== runSeq.current) return
       setResponse(r)
       if (r.results.length > 0) {
         useRecents.getState().record({ year, make, model, trim: trim ?? '' }, part)
       }
     } catch {
+      if (seq !== runSeq.current) return
       setFailed(true)
     }
   }, [year, make, model, part, trim])
 
   useEffect(() => {
+    // Wait for prefs rehydration so a persisted ZIP doesn't cause a second
+    // search right after the first.
+    if (!prefsHydrated) return
     run()
-  }, [run, zip])
+  }, [run, zip, prefsHydrated])
 
   useEffect(() => {
     fetchPriceHistory(year, make, model, part)
@@ -135,7 +147,7 @@ export default function Results() {
   // to the very end; falls back to the list footer on short result sets.
   const retailerBlock = (
     <View style={{ paddingHorizontal: 16, gap: 10, paddingVertical: 8 }}>
-      <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+      <Text style={{ color: c.subtext, fontSize: 11, letterSpacing: 1, fontFamily: dataFont }}>
         COMPARE AT OTHER STORES
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -220,7 +232,12 @@ export default function Results() {
         <>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 }}>
             <Pressable
-              onPress={() => setSheetOpen(true)}
+              onPress={() => {
+                // Re-sync the draft: a stacked results screen may have
+                // committed a different ZIP since this screen mounted.
+                setZipDraft(usePrefs.getState().zip)
+                setSheetOpen(true)
+              }}
               style={{
                 minHeight: 44,
                 paddingHorizontal: 14,
@@ -259,7 +276,7 @@ export default function Results() {
               style={{ flexGrow: 0 }}
               contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingTop: 10, alignItems: 'center' }}
             >
-              <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+              <Text style={{ color: c.subtext, fontSize: 11, letterSpacing: 1, fontFamily: dataFont }}>
                 COMPLETE THE JOB
               </Text>
               {companions.map((name) => (
@@ -314,7 +331,7 @@ export default function Results() {
               <View style={{ paddingHorizontal: 16, gap: 14, paddingTop: 8 }}>
                 {history.length >= 5 && (
                   <View style={{ gap: 6 }}>
-                    <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+                    <Text style={{ color: c.subtext, fontSize: 11, letterSpacing: 1, fontFamily: dataFont }}>
                       PRICE HISTORY ({history.length} DAYS)
                     </Text>
                     <View
@@ -404,7 +421,7 @@ export default function Results() {
             ] as const
           ).map(([label, key, options]) => (
             <View key={key} style={{ gap: 8 }}>
-              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+              <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
                 {label.toUpperCase()}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -442,12 +459,12 @@ export default function Results() {
           </View>
 
           <View style={{ gap: 8 }}>
-            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+            <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
               SHIPPING ZIP (EXACT SHIPPING COSTS)
             </Text>
             <TextInput
-              value={zip}
-              onChangeText={setZip}
+              value={zipDraft}
+              onChangeText={(t) => setZipDraft(t.replace(/\D/g, '').slice(0, 5))}
               placeholder="e.g. 90210"
               placeholderTextColor={c.subtext}
               keyboardType="number-pad"
@@ -467,7 +484,12 @@ export default function Results() {
 
           <View style={{ flex: 1 }} />
           <Pressable
-            onPress={() => setSheetOpen(false)}
+            onPress={() => {
+              setSheetOpen(false)
+              // Committing the draft changes the store zip, which re-runs the
+              // search once via the effect above.
+              usePrefs.getState().setZip(zipDraft)
+            }}
             style={{
               backgroundColor: brand,
               borderRadius: 14,

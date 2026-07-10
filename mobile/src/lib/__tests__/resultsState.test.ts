@@ -17,3 +17,9 @@ test('stale flagged results stay marked stale', () =>
 
 test('live when results and not stale', () =>
   expect(deriveResultsState({ ...base, results: [listing] }, false)).toBe('live'))
+
+test('failed refresh keeps existing results visible as stale', () =>
+  expect(deriveResultsState({ ...base, results: [listing] }, true)).toBe('stale'))
+
+test('failed refresh with nothing to show is an error', () =>
+  expect(deriveResultsState(base, true)).toBe('error'))

@@ -162,7 +162,7 @@ export default function VehiclePicker() {
   return !year ? (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 8 }}>
-        <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
+        <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
           HAVE YOUR VIN? (FASTEST)
         </Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -226,9 +226,27 @@ export default function VehiclePicker() {
       <PickerList key="year" title="Or pick the year" options={YEARS} onSelect={setYear} />
     </View>
   ) : !make ? (
-    <PickerList key="make" title="Make" options={makes} loading={loading} searchable onSelect={setMake} />
+    <PickerList
+      key="make"
+      title="Make"
+      options={makes}
+      loading={loading}
+      searchable
+      onSelect={setMake}
+      onBack={() => setYear(null)}
+      backLabel={`Year · ${year}`}
+    />
   ) : !model ? (
-    <PickerList key="model" title="Model" options={models} loading={loading} searchable onSelect={setModel} />
+    <PickerList
+      key="model"
+      title="Model"
+      options={models}
+      loading={loading}
+      searchable
+      onSelect={setModel}
+      onBack={() => setMake(null)}
+      backLabel={`Make · ${make}`}
+    />
   ) : (
     <PickerList
       key="trim"
@@ -236,6 +254,8 @@ export default function VehiclePicker() {
       options={['Skip', ...trims]}
       loading={loading}
       onSelect={(t) => finish(t === 'Skip' ? '' : t)}
+      onBack={() => setModel(null)}
+      backLabel={`Model · ${model}`}
     />
   )
 }

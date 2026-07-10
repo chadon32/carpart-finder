@@ -38,13 +38,30 @@ export default function PartPicker() {
       setIdentifyMsg('Camera access is off — enable it for CarPartsRadar in Settings.')
       return
     }
-    const shot = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 })
-    if (shot.canceled || !shot.assets[0]?.base64) return
+    const shot = await ImagePicker.launchCameraAsync({ quality: 1 })
+    if (shot.canceled || !shot.assets[0]?.uri) return
     setIdentifying(true)
     try {
+      // Downscale before upload: full-res phone photos exceed the API's 2 MB
+      // body limit (the web client does the same at ~1024px). Lazy import —
+      // the module is native and absent from older builds.
+      let base64: string
+      try {
+        const ImageManipulator = await import('expo-image-manipulator')
+        const small = await ImageManipulator.manipulateAsync(
+          shot.assets[0].uri,
+          [{ resize: { width: 1024 } }],
+          { format: ImageManipulator.SaveFormat.JPEG, compress: 0.7, base64: true }
+        )
+        if (!small.base64) throw new Error('no base64')
+        base64 = small.base64
+      } catch {
+        setIdentifyMsg('Photo identification needs the newest app build — update from the install link.')
+        setIdentifying(false)
+        return
+      }
       // The API validates a Data URL shape, not raw base64.
-      const mime = shot.assets[0].mimeType ?? 'image/jpeg'
-      const r = await identifyPartFromImage(`data:${mime};base64,${shot.assets[0].base64}`)
+      const r = await identifyPartFromImage(`data:image/jpeg;base64,${base64}`)
       if (r.identified && r.partName) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
         goToResults(r.partName)
@@ -172,7 +189,6 @@ export default function PartPicker() {
             paddingHorizontal: 16,
             paddingBottom: 8,
             fontSize: 12,
-            fontWeight: '700',
             letterSpacing: 1,
             fontFamily: dataFont,
           }}
