@@ -6,7 +6,8 @@ import { searchParts } from '@/api/client'
 import type { Listing, SearchResponse } from '@/api/types'
 import { deriveResultsState } from '@/lib/resultsState'
 import { ListingCard } from '@/components/ListingCard'
-import { useThemeColors } from '@/theme'
+import { useCompare } from '@/stores/compare'
+import { useThemeColors, brand } from '@/theme'
 
 function SkeletonCard() {
   const c = useThemeColors()
@@ -51,6 +52,9 @@ export default function Results() {
   const [response, setResponse] = useState<SearchResponse | null>(null)
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const compare = useCompare((s) => s.listings)
+  const toggleCompare = useCompare((s) => s.toggle)
+  const isComparing = useCompare((s) => s.isComparing)
 
   const run = useCallback(async () => {
     setFailed(false)
@@ -171,11 +175,59 @@ export default function Results() {
                 listing={item}
                 isBestValue={index === 0}
                 isCheapest={item.id === cheapestId}
+                isComparing={isComparing(item.id)}
                 onPress={() => openListing(item)}
+                onToggleCompare={() => {
+                  Haptics.selectionAsync()
+                  toggleCompare(item)
+                }}
               />
             )}
           />
         </>
+      )}
+
+      {compare.length > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            backgroundColor: '#0f172a',
+            borderRadius: 16,
+            padding: 14,
+            shadowColor: '#000',
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 4 },
+          }}
+        >
+          <Text style={{ color: '#e2e8f0', fontWeight: '600', flex: 1 }}>
+            {compare.length} selected
+          </Text>
+          <Pressable onPress={() => useCompare.getState().clear()} hitSlop={8}>
+            <Text style={{ color: '#94a3b8', fontWeight: '700' }}>Clear</Text>
+          </Pressable>
+          <Pressable
+            disabled={compare.length < 2}
+            onPress={() => router.push('/compare')}
+            style={{
+              backgroundColor: compare.length < 2 ? '#334155' : brand,
+              borderRadius: 12,
+              minHeight: 44,
+              paddingHorizontal: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Compare</Text>
+          </Pressable>
+        </View>
       )}
     </View>
   )

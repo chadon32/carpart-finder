@@ -11,11 +11,13 @@ function Pill({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   )
 }
 
-export function ListingCard({ listing, isBestValue, isCheapest, onPress }: {
+export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onPress, onToggleCompare }: {
   listing: Listing
   isBestValue: boolean
   isCheapest: boolean
+  isComparing: boolean
   onPress: () => void
+  onToggleCompare: () => void
 }) {
   const c = useThemeColors()
   const shipping =
@@ -73,6 +75,22 @@ export function ListingCard({ listing, isBestValue, isCheapest, onPress }: {
           {listing.sellerFeedbackPercentage ? ` · ${listing.sellerFeedbackPercentage}%` : ''}
           {listing.sellerFeedbackScore != null ? ` (${listing.sellerFeedbackScore})` : ''}
         </Text>
+        <Pressable
+          onPress={onToggleCompare}
+          style={{
+            minHeight: 44,
+            borderRadius: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: isComparing ? brand : c.border,
+            backgroundColor: 'transparent',
+          }}
+        >
+          <Text style={{ color: isComparing ? brand : c.subtext, fontWeight: '700' }}>
+            {isComparing ? 'Remove from compare' : 'Compare'}
+          </Text>
+        </Pressable>
       </View>
     </Pressable>
   )

@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="part-picker" options={{ title: 'Choose part' }} />
         <Stack.Screen name="results" options={{ title: 'Live listings' }} />
         <Stack.Screen name="listing-detail" options={{ title: 'Listing', presentation: 'modal' }} />
+        <Stack.Screen name="compare" options={{ title: 'Compare', presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   )
