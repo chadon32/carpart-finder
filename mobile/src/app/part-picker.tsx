@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics'
 import { identifyPartFromImage } from '@/api/client'
 import { partTypesForVehicle } from '@/data/partTypes'
 import { isElectricVehicle } from '@/data/electricVehicles'
-import { useThemeColors, displayFont } from '@/theme'
+import { useThemeColors, displayFont, dataFont } from '@/theme'
 
 export default function PartPicker() {
   const c = useThemeColors()
@@ -174,6 +174,7 @@ export default function PartPicker() {
             fontSize: 12,
             fontWeight: '700',
             letterSpacing: 1,
+            fontFamily: dataFont,
           }}
         >
           POPULAR

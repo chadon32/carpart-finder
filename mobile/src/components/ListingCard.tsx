@@ -1,12 +1,12 @@
 import { View, Text, Pressable } from 'react-native'
 import { Image } from 'expo-image'
 import type { Listing } from '../api/types'
-import { useThemeColors, brand } from '../theme'
+import { useThemeColors, brand, dataFont, dataFontBold } from '../theme'
 
 function Pill({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return (
     <View style={{ backgroundColor: bg, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-      <Text style={{ color: fg, fontSize: 11, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color: fg, fontSize: 10, fontFamily: dataFont, letterSpacing: 0.5 }}>{label}</Text>
     </View>
   )
 }
@@ -60,7 +60,7 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
           {listing.verifiedFitment && <Pill label="VERIFIED FITMENT" bg="#d1fae5" fg="#047857" />}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-          <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>
+          <Text style={{ color: c.text, fontSize: 21, fontFamily: dataFontBold }}>
             ${listing.price.toFixed(2)}
           </Text>
           {listing.originalPrice ? (

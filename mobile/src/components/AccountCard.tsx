@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
 import { useAuth } from '../stores/auth'
 import { getPriceAlerts, deleteSavedSearch, type PriceAlert } from '../api/client'
-import { useThemeColors, brand } from '../theme'
+import { useThemeColors, brand, dataFont } from '../theme'
 
 // Sign in / sign up / signed-in summary with the user's price alerts.
 // Accounts are shared with carpartsradar.com — same email works both places.
@@ -73,7 +73,7 @@ export function AccountCard() {
         gap: 10,
       }}
     >
-      <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+      <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
         ACCOUNT
       </Text>
 
@@ -90,7 +90,7 @@ export function AccountCard() {
           </Text>
           {alerts && alerts.length > 0 && (
             <View style={{ gap: 8 }}>
-              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
                 PRICE ALERTS
               </Text>
               {alerts.map((a) => (

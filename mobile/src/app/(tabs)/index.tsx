@@ -3,8 +3,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useGarage } from '@/stores/garage'
 import { useRecents } from '@/stores/recents'
-import { useThemeColors, brand, displayFont } from '@/theme'
+import { useThemeColors, brand, displayFont, dataFont } from '@/theme'
 import { VehicleCard } from '@/components/VehicleCard'
+import { RadarMark } from '@/components/RadarMark'
 
 export default function SearchScreen() {
   const c = useThemeColors()
@@ -16,9 +17,12 @@ export default function SearchScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         <View style={{ paddingTop: 8 }}>
-          <Text style={{ color: c.text, fontSize: 38, fontFamily: displayFont, letterSpacing: 0.5 }}>
-            CARPARTS<Text style={{ color: brand }}>RADAR</Text>
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <RadarMark size={34} color={c.brand} sweeping />
+            <Text style={{ color: c.text, fontSize: 38, fontFamily: displayFont, letterSpacing: 0.5 }}>
+              CARPARTS<Text style={{ color: brand }}>RADAR</Text>
+            </Text>
+          </View>
           <Text style={{ color: c.subtext, marginTop: 4 }}>
             Live part prices, checked against your exact vehicle.
           </Text>
@@ -39,7 +43,7 @@ export default function SearchScreen() {
 
         {vehicles.length > 0 && (
           <View style={{ gap: 10 }}>
-            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
               YOUR GARAGE
             </Text>
             {vehicles.slice(0, 3).map((v, i) => (
@@ -55,7 +59,7 @@ export default function SearchScreen() {
         {recents.length > 0 && (
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
                 RECENT SEARCHES
               </Text>
               <Pressable onPress={clearRecents} hitSlop={8}>

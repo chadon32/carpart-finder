@@ -6,6 +6,11 @@ export const brand = '#2050c8'
 // uppercase. Use for screen titles and the wordmark, never body text.
 export const displayFont = 'BarlowCondensed_700Bold'
 
+// The site's data/label face (.font-data / .eyebrow): JetBrains Mono. Use for
+// uppercase eyebrows, badges, and price figures.
+export const dataFont = 'JetBrainsMono_500Medium'
+export const dataFontBold = 'JetBrainsMono_700Bold'
+
 const light = {
   bg: '#fafafa',
   card: '#ffffff',

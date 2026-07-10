@@ -6,7 +6,7 @@ import { PickerList } from '@/components/PickerList'
 import { fetchMakes, fetchModels, fetchTrims, decodeVinApi } from '@/api/client'
 import { extractVin } from '@/lib/extractVin'
 import { useGarage } from '@/stores/garage'
-import { useThemeColors } from '@/theme'
+import { useThemeColors, dataFont } from '@/theme'
 
 const YEARS = Array.from({ length: 2027 - 1990 }, (_, i) => String(2026 - i))
 
@@ -162,7 +162,7 @@ export default function VehiclePicker() {
   return !year ? (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 8 }}>
-        <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+        <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
           HAVE YOUR VIN? (FASTEST)
         </Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>

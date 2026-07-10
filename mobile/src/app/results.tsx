@@ -20,7 +20,8 @@ import {
 import { ListingCard } from '@/components/ListingCard'
 import { useCompare } from '@/stores/compare'
 import { useRecents } from '@/stores/recents'
-import { useThemeColors, brand } from '@/theme'
+import { RadarMark } from '@/components/RadarMark'
+import { useThemeColors, brand, dataFont } from '@/theme'
 
 function SkeletonCard() {
   const c = useThemeColors()
@@ -138,7 +139,12 @@ export default function Results() {
 
       {state === 'loading' && (
         <View style={{ paddingTop: 12 }}>
-          <SkeletonCard />
+          <View style={{ alignItems: 'center', gap: 8, paddingVertical: 14 }}>
+            <RadarMark size={44} color={c.brand} sweeping />
+            <Text style={{ color: c.subtext, fontSize: 12, fontFamily: dataFont, letterSpacing: 1 }}>
+              SCANNING LIVE LISTINGS
+            </Text>
+          </View>
           <SkeletonCard />
           <SkeletonCard />
         </View>
@@ -223,7 +229,7 @@ export default function Results() {
               style={{ flexGrow: 0 }}
               contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingTop: 10, alignItems: 'center' }}
             >
-              <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>
+              <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
                 COMPLETE THE JOB
               </Text>
               {companions.map((name) => (
@@ -278,7 +284,7 @@ export default function Results() {
               <View style={{ paddingHorizontal: 16, gap: 14, paddingTop: 8 }}>
                 {history.length >= 5 && (
                   <View style={{ gap: 6 }}>
-                    <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>
+                    <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
                       PRICE HISTORY ({history.length} DAYS)
                     </Text>
                     <View
@@ -313,7 +319,7 @@ export default function Results() {
                     </Text>
                   </View>
                 )}
-                <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>
+                <Text style={{ color: c.subtext, fontSize: 11, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
                   COMPARE AT OTHER STORES
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -388,7 +394,7 @@ export default function Results() {
             ] as const
           ).map(([label, key, options]) => (
             <View key={key} style={{ gap: 8 }}>
-              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+              <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
                 {label.toUpperCase()}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -426,7 +432,7 @@ export default function Results() {
           </View>
 
           <View style={{ gap: 8 }}>
-            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+            <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700', letterSpacing: 1, fontFamily: dataFont }}>
               SHIPPING ZIP (EXACT SHIPPING COSTS)
             </Text>
             <TextInput
