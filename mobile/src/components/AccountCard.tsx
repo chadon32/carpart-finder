@@ -14,7 +14,7 @@ export function AccountCard() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
   const [alerts, setAlerts] = useState<PriceAlert[] | null>(null)
 
   // Refetch on every focus of the Garage tab so alerts created from a
@@ -32,15 +32,33 @@ export function AccountCard() {
   )
 
   const submit = async () => {
+    // Explicit validation messages — a silently disabled button reads as
+    // "nothing happens".
+    if (!email.trim()) {
+      setMsg({ text: 'Enter your email address.', kind: 'error' })
+      return
+    }
+    if (password.length < 8) {
+      setMsg({ text: 'Password must be at least 8 characters.', kind: 'error' })
+      return
+    }
     setBusy(true)
     setMsg(null)
     try {
       const r = await (mode === 'login' ? login(email.trim(), password) : signup(email.trim(), password))
       if (r.confirmationRequired) {
-        setMsg('Check your email to confirm your account, then log in here.')
+        setMsg({
+          text: '✓ Account created — check your email for the confirmation link, then log in here.',
+          kind: 'info',
+        })
+        setMode('login')
+        setPassword('')
       }
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Something went wrong — try again.')
+      setMsg({
+        text: e instanceof Error ? e.message : 'Something went wrong — try again.',
+        kind: 'error',
+      })
     } finally {
       setBusy(false)
     }
@@ -154,16 +172,20 @@ export function AccountCard() {
             secureTextEntry
             style={field}
           />
-          {msg ? <Text style={{ color: '#be123c', fontSize: 13 }}>{msg}</Text> : null}
+          {msg ? (
+            <Text style={{ color: msg.kind === 'error' ? '#be123c' : '#047857', fontSize: 13, fontWeight: '600' }}>
+              {msg.text}
+            </Text>
+          ) : null}
           <Pressable
             onPress={submit}
-            disabled={busy || !email.trim() || password.length < 8}
+            disabled={busy}
             style={{
               minHeight: 48,
               borderRadius: 12,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: !busy && email.trim() && password.length >= 8 ? brand : c.border,
+              backgroundColor: busy ? c.border : brand,
             }}
           >
             {busy ? (
