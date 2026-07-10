@@ -95,6 +95,7 @@
 - [x] `npm test` — 43/43 passing (adds auth store)
 - [x] `npx tsc --noEmit` — clean; iOS bundle exports
 - [x] Production accounts verified live (login returns real Supabase errors, /me 401s unauthenticated)
+- [x] Final production build (all 7 phases) uploaded to TestFlight — processing 2026-07-09
 
 ### On-device
 - [ ] Garage → Account: create account or log in with the SAME email as the website — session persists across app restarts (cookie)
