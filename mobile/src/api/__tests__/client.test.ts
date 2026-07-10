@@ -35,14 +35,14 @@ test('fetchPrices joins ids into one query', async () => {
   expect(mockFetch.mock.calls[0][0]).toBe(`${API_BASE}/api/prices?ids=a%2Cb`)
 })
 
-test('identifyPartFromImage POSTs the photo', async () => {
+test('identifyPartFromImage POSTs the photo as a data URL', async () => {
   mockFetch.mockReturnValue(jsonResponse({ identified: true, partName: 'Brake Pads' }))
-  const res = await identifyPartFromImage('b64')
+  const res = await identifyPartFromImage('data:image/jpeg;base64,b64')
   expect(res.partName).toBe('Brake Pads')
   const [url, init] = mockFetch.mock.calls[0]
   expect(url).toBe(`${API_BASE}/api/identify-part`)
   expect(init.method).toBe('POST')
-  expect(JSON.parse(init.body).image).toBe('b64')
+  expect(JSON.parse(init.body).image).toBe('data:image/jpeg;base64,b64')
   expect(init.headers['X-App-Platform']).toBe('ios')
 })
 

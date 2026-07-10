@@ -41,7 +41,9 @@ export default function PartPicker() {
     if (shot.canceled || !shot.assets[0]?.base64) return
     setIdentifying(true)
     try {
-      const r = await identifyPartFromImage(shot.assets[0].base64)
+      // The API validates a Data URL shape, not raw base64.
+      const mime = shot.assets[0].mimeType ?? 'image/jpeg'
+      const r = await identifyPartFromImage(`data:${mime};base64,${shot.assets[0].base64}`)
       if (r.identified && r.partName) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
         goToResults(r.partName)
