@@ -8,6 +8,7 @@ type PrefsState = {
   // network work on `zip` wait for this to avoid a double fetch on launch.
   hydrated: boolean
   setZip: (z: string) => void
+  reset: () => void
   setHydrated: () => void
 }
 
@@ -17,6 +18,7 @@ export const usePrefs = create<PrefsState>()(
       zip: '',
       hydrated: false,
       setZip: (z) => set({ zip: z.replace(/\D/g, '').slice(0, 5) }),
+      reset: () => set({ zip: '' }),
       setHydrated: () => set({ hydrated: true }),
     }),
     {

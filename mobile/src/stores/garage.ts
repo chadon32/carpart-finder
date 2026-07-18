@@ -7,6 +7,7 @@ type GarageState = {
   vehicles: GarageVehicle[]
   addVehicle: (v: GarageVehicle) => void
   removeVehicle: (index: number) => void
+  clear: () => void
 }
 
 const sameCar = (a: GarageVehicle, b: GarageVehicle) =>
@@ -22,6 +23,7 @@ export const useGarage = create<GarageState>()(
         })),
       removeVehicle: (index) =>
         set((s) => ({ vehicles: s.vehicles.filter((_, i) => i !== index) })),
+      clear: () => set({ vehicles: [] }),
     }),
     { name: 'cpr-garage', storage: createJSONStorage(() => AsyncStorage) }
   )

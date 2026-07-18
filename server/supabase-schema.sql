@@ -103,6 +103,47 @@ create unique index if not exists idx_guest_alerts_unique
   on public.guest_alerts (email, year, make, model, part);
 
 -- ============================================
+-- ACCOUNT DELETION
+-- ============================================
+-- The API calls this function with the service-role client after it has
+-- authenticated the request. Keeping application-row cleanup in one
+-- transaction prevents a failed delete from leaving a half-cleaned account.
+-- The function is not callable by client roles; Auth deletion happens next on
+-- the trusted server through auth.admin.deleteUser(..., false).
+create or replace function public.delete_user_data(
+  p_user_id uuid,
+  p_email text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_user_id is null then
+    raise exception 'user id is required';
+  end if;
+
+  -- Delete children explicitly so this remains correct even if a future
+  -- migration changes a foreign key action.
+  delete from public.price_alerts where user_id = p_user_id;
+  delete from public.saved_searches where user_id = p_user_id;
+
+  -- Guest alerts are not FK-linked to auth.users, but an authenticated user
+  -- may have created one with the same email before signing up. Remove those
+  -- email-owned rows as part of the user's personal-data deletion.
+  if p_email is not null and pg_catalog.btrim(p_email) <> '' then
+    delete from public.guest_alerts
+      where pg_catalog.lower(email) = pg_catalog.lower(pg_catalog.btrim(p_email));
+  end if;
+end;
+$$;
+
+revoke execute on function public.delete_user_data(uuid, text) from public;
+revoke execute on function public.delete_user_data(uuid, text) from anon, authenticated;
+grant execute on function public.delete_user_data(uuid, text) to service_role;
+
+-- ============================================
 -- PRICE HISTORY (daily observed lows per search signature)
 -- ============================================
 -- Written only by the server with the service-role key (organic searches and

@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import { supabase, supabaseAdmin, isMockMode } from '../supabase.js'
 import { requireAuth, AUTH_COOKIE } from '../middleware/auth.js'
 import { requireAccountsAvailable } from '../middleware/accountsAvailable.js'
+import { deleteAccountPermanently } from '../lib/accountDeletion.js'
 
 const router = express.Router()
 
@@ -223,6 +224,44 @@ router.use(requireAuth)
 // Get current user (uses req.user set by requireAuth)
 router.get('/me', async (req, res) => {
   res.json({ user: req.user })
+})
+
+// Permanently delete the authenticated account. The target user id is never
+// accepted from the client: it always comes from requireAuth's verified JWT.
+router.delete('/account', async (req, res) => {
+  if (req.body?.confirmation !== 'DELETE') {
+    return res.status(400).json({ error: 'Type DELETE to confirm account deletion' })
+  }
+
+  if (isMockMode) {
+    for (let i = mockPriceAlerts.length - 1; i >= 0; i--) {
+      if (mockPriceAlerts[i].user_id === req.user.id) mockPriceAlerts.splice(i, 1)
+    }
+    for (let i = mockSavedSearches.length - 1; i >= 0; i--) {
+      if (mockSavedSearches[i].user_id === req.user.id) mockSavedSearches.splice(i, 1)
+    }
+    clearAuthCookie(res)
+    return res.json({ success: true })
+  }
+
+  const result = await deleteAccountPermanently({
+    admin: supabaseAdmin,
+    userId: req.user.id,
+    email: req.user.email,
+  })
+
+  if (!result.success) {
+    console.error(`[supabase] account deletion failed at ${result.stage} stage:`, result.error?.message)
+    if (result.stage === 'auth') {
+      return res.status(502).json({
+        error: 'Your data was removed, but account closure could not be completed. Please try again.',
+      })
+    }
+    return res.status(500).json({ error: 'Could not remove your account data. Please try again.' })
+  }
+
+  clearAuthCookie(res)
+  return res.json({ success: true, alreadyDeleted: result.alreadyDeleted })
 })
 
 // Get user's saved searches

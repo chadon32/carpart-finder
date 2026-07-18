@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react'
-import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { View, Text, TextInput, Pressable, ActivityIndicator, Linking } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
 import { useAuth } from '../stores/auth'
 import { getPriceAlerts, deleteSavedSearch, type PriceAlert } from '../api/client'
 import { useThemeColors, brand, dataFont } from '../theme'
+import { PRIVACY_POLICY_URL } from '../lib/legal'
 
 // Sign in / sign up / signed-in summary with the user's price alerts.
 // Accounts are shared with carpartsradar.com — same email works both places.
@@ -139,6 +140,19 @@ export function AccountCard() {
             </View>
           )}
           <Pressable
+            onPress={() => router.push('/profile')}
+            style={{
+              minHeight: 44,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: c.border,
+            }}
+          >
+            <Text style={{ color: c.text, fontWeight: '700' }}>Profile & Settings</Text>
+          </Pressable>
+          <Pressable
             onPress={logout}
             style={{
               minHeight: 44,
@@ -213,6 +227,13 @@ export function AccountCard() {
           </Text>
         </>
       )}
+      <Pressable
+        onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
+        hitSlop={8}
+        style={{ alignItems: 'center', minHeight: 32, justifyContent: 'center' }}
+      >
+        <Text style={{ color: brand, fontWeight: '600' }}>Privacy Policy</Text>
+      </Pressable>
     </View>
   )
 }

@@ -38,7 +38,10 @@ async function postJson<T>(path: string, body: unknown, method = 'POST'): Promis
   })
   const data = await res.json()
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+    throw new ApiError(
+      (data as { error?: string }).error || `Request failed (${res.status})`,
+      res.status
+    )
   }
   return data as T
 }
@@ -215,6 +218,12 @@ export function signup(email: string, password: string, name?: string): Promise<
 
 export function logout(): Promise<{ success?: boolean }> {
   return postJson('/api/supabase/logout', {})
+}
+
+export type AccountDeletionResponse = { success: boolean; alreadyDeleted?: boolean }
+
+export function deleteAccount(confirmation: string): Promise<AccountDeletionResponse> {
+  return postJson('/api/supabase/account', { confirmation }, 'DELETE')
 }
 
 export function getMe(): Promise<{ user: AuthUser }> {

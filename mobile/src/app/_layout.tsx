@@ -29,6 +29,10 @@ export default function RootLayout() {
         <Stack.Screen name="diagnose" options={{ title: 'Diagnose' }} />
         <Stack.Screen name="vehicle-health" options={{ title: 'Vehicle health' }} />
         <Stack.Screen name="repair-guide" options={{ title: 'Repair guide', presentation: 'modal' }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="account" options={{ title: 'Account' }} />
+        <Stack.Screen name="delete-account" options={{ title: 'Delete Account' }} />
       </Stack>
     </ThemeProvider>
   )
