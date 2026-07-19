@@ -45,6 +45,38 @@ test('data cleanup failure never attempts Auth deletion', async () => {
   assert.deepEqual(events, [['rpc', 'delete_user_data', { p_user_id: 'user-data-failure', p_email: null }]])
 })
 
+test('missing RPC falls back to ordered direct deletes', async () => {
+  const events = []
+  const missingRpcError = {
+    code: 'PGRST202',
+    message: 'Could not find the function public.delete_user_data(p_email, p_user_id)',
+  }
+  const admin = fakeAdmin({ events, dataError: missingRpcError })
+  admin.from = (table) => ({
+    delete: () => ({
+      eq: async (column, value) => {
+        events.push(['row', table, column, value])
+        return { error: null }
+      },
+    }),
+  })
+
+  const result = await deleteAccountPermanently({
+    admin,
+    userId: 'user-fallback',
+    email: 'USER@example.com',
+  })
+
+  assert.equal(result.success, true)
+  assert.deepEqual(events, [
+    ['rpc', 'delete_user_data', { p_user_id: 'user-fallback', p_email: 'USER@example.com' }],
+    ['row', 'price_alerts', 'user_id', 'user-fallback'],
+    ['row', 'saved_searches', 'user_id', 'user-fallback'],
+    ['row', 'guest_alerts', 'email', 'user@example.com'],
+    ['auth', 'user-fallback', false],
+  ])
+})
+
 test('an already-deleted Auth user is treated as an idempotent success', async () => {
   const result = await deleteAccountPermanently({
     admin: fakeAdmin({ authError: { status: 404, message: 'User not found' } }),

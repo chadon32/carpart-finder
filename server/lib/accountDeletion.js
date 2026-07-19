@@ -17,6 +17,33 @@ function withTimeout(promise, timeoutMs, operation) {
 
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
+
+function isMissingDeleteFunctionError(error) {
+  return error?.code === 'PGRST202' || /could not find the function public\.delete_user_data/i.test(String(error?.message ?? ''))
+}
+
+async function deleteRowsWithoutRpc({ admin, userId, email, timeoutMs }) {
+  const rows = [
+    ['price_alerts', 'user_id', userId],
+    ['saved_searches', 'user_id', userId],
+  ]
+  if (email) rows.push(['guest_alerts', 'email', String(email).trim().toLowerCase()])
+
+  for (const [table, column, value] of rows) {
+    try {
+      const { error } = await withTimeout(
+        admin.from(table).delete().eq(column, value),
+        timeoutMs,
+        `Account data deletion (${table})`
+      )
+      if (error) return { error }
+    } catch (error) {
+      return { error }
+    }
+  }
+  return { error: null }
+}
+
 export function isAlreadyDeletedAuthError(error) {
   const status = Number(error?.status ?? error?.statusCode)
   const code = String(error?.code ?? '').toLowerCase()
@@ -51,6 +78,13 @@ export function deleteAccountPermanently({
       )
     } catch (error) {
       return { success: false, stage: 'data', error }
+    }
+
+    if (dataResult?.error && isMissingDeleteFunctionError(dataResult.error)) {
+      // This compatibility path lets an already-running production backend
+      // finish deletion before the SQL migration is applied. It is ordered
+      // child-first and idempotent; the RPC remains the preferred atomic path.
+      dataResult = await deleteRowsWithoutRpc({ admin, userId, email, timeoutMs })
     }
 
     if (dataResult?.error) {
