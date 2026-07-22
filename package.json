@@ -4,13 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "generate:editorial": "node scripts/generate-editorial-pages.mjs",
+    "predev": "npm run generate:editorial",
     "dev": "vite",
     "dev:server": "npm run dev --prefix server",
     "dev:all": "concurrently -n web,api -c blue,green \"npm run dev\" \"npm run dev:server\"",
+    "prebuild": "npm run generate:editorial",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test \"server/**/*.test.js\" \"api/**/*.test.js\"",
+    "pretest": "npm run generate:editorial",
+    "test": "node --test \"server/**/*.test.js\" \"api/**/*.test.js\" \"scripts/**/*.test.mjs\"",
     "test:diagnose": "node server/scripts/testDiagnosis.js"
   },
   "dependencies": {

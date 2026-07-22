@@ -1,7 +1,7 @@
 import { useEffect, useState, Suspense, lazy } from 'react'
 import { Toaster } from 'sonner'
 import { Helmet } from 'react-helmet-async'
-import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
+import { Car as CarIcon, Bookmark, BookOpen, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
 import { RadarMark } from './components/RadarMark'
 import { BottomNav } from './components/BottomNav'
 import { CarSelector, type Car } from './components/CarSelector'
@@ -100,9 +100,9 @@ function App() {
   return (
     <div className="app-bg flex min-h-screen flex-col text-slate-900 dark:text-slate-100">
       <Helmet>
-        <title>CarPartsRadar — Compare Car Part Prices & Find Cheap Auto Parts</title>
+        <title>CarPartsRadar | Compare Car Part Prices and Fitment</title>
         <meta name="description" content="Compare car part prices instantly. Find the cheapest live auto parts and listings from eBay and major retailers that fit your exact vehicle." />
-        <meta property="og:title" content="CarPartsRadar — Compare Car Part Prices & Find Cheap Auto Parts" />
+        <meta property="og:title" content="CarPartsRadar | Compare Car Part Prices and Fitment" />
         <meta property="og:description" content="Real-time price comparison for auto parts. Compare eBay listings and major retailers instantly for your exact vehicle." />
       </Helmet>
       
@@ -122,6 +122,14 @@ function App() {
           </button>
 
           <div className="flex items-center gap-2">
+            <a
+              href="/guides.html"
+              className="btn btn-secondary hidden px-3 py-2.5 text-sm sm:inline-flex sm:px-4"
+              aria-label="Open buying guides"
+            >
+              <BookOpen size={17} strokeWidth={2.3} />
+              <span className="hidden lg:inline">Guides</span>
+            </a>
             <button
               type="button"
               onClick={() => setShowWatchlist(true)}
@@ -277,30 +285,44 @@ function App() {
       </main>
 
       <footer className="border-t border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/60">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
-                <RadarMark className="h-5 w-5" />
-              </span>
-              <span className="font-display text-lg leading-none text-slate-900 dark:text-slate-100">
-                CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
-              </span>
+        <div className="mx-auto max-w-6xl px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-10 sm:pb-10">
+          <div className="grid gap-8 sm:grid-cols-[minmax(0,1.4fr)_auto_auto] sm:gap-10">
+            <div>
+              <div className="flex items-center justify-center gap-2.5 sm:justify-start">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
+                  <RadarMark className="h-5 w-5" />
+                </span>
+                <span className="font-display text-lg leading-none text-slate-900 dark:text-slate-100">
+                  CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
+                </span>
+              </div>
+              <div className="mt-4 max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-left">
+                <p>
+                  We compare live listings from third-party marketplaces. Prices and availability are set by sellers
+                  and may change. Always confirm details on the retailer's site before buying.
+                </p>
+                <p>
+                  Some outbound links are affiliate links, meaning we may earn a commission if you make a purchase
+                  at no extra cost to you.
+                </p>
+              </div>
             </div>
-            <div className="max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-right">
-              <p>
-                We compare live listings from third-party marketplaces. Prices and availability are set by sellers
-                and may change — always confirm details on the retailer's site before buying.
-              </p>
-              <p>
-                Affiliate disclosure: some outbound links are affiliate links, meaning we may earn a commission if
-                you make a purchase — at no extra cost to you. As an Amazon Associate, CarPartsRadar earns from
-                qualifying purchases. CarPartsRadar is also a member of the eBay Partner Network.
-              </p>
-            </div>
+            <nav aria-label="Explore" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:gap-2">
+              <span className="w-full text-center font-semibold text-slate-900 dark:text-slate-100 sm:text-left">Explore</span>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/guides.html">Buying guides</a>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/methodology.html">Methodology</a>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/about.html">About</a>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/contact.html">Contact</a>
+            </nav>
+            <nav aria-label="Policies" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:gap-2">
+              <span className="w-full text-center font-semibold text-slate-900 dark:text-slate-100 sm:text-left">Policies</span>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/privacy.html">Privacy</a>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/terms.html">Terms</a>
+              <a className="text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400" href="/affiliate-disclosure.html">Affiliate disclosure</a>
+            </nav>
           </div>
           <p className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-400 dark:border-slate-800/60">
-            © {new Date().getFullYear()} CarPartsRadar — Not affiliated with eBay, Amazon, or any retailer listed.
+            © {new Date().getFullYear()} CarPartsRadar. We are not a retailer and do not sell listed products.
           </p>
         </div>
       </footer>
