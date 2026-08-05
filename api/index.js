@@ -17,9 +17,19 @@ import { checkPriceAlerts } from '../server/workers/priceChecker.js'
 import { recordPriceObservation, getPriceHistory } from '../server/priceHistory.js'
 import { diagnoseSymptom } from '../server/symptoms.js'
 import { generateRepairGuide } from '../server/routes/ai.js'
+import { pickVerifiedListingForPart } from '../server/lib/quotePolicy.js'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { API_RELEASE, FITMENT_CONTRACT_VERSION } from '../shared/apiContract.js'
 
 const app = express()
+const API_BUILD_ID = String(
+  process.env.API_BUILD_ID || process.env.VERCEL_GIT_COMMIT_SHA || 'development'
+).slice(0, 64)
+
+function affiliateChannelFromRequest(req) {
+  const platform = String(req.get('X-App-Platform') || '').trim().toLowerCase()
+  return platform === 'ios' || platform === 'android' ? platform : 'web'
+}
 // 100kb is fine for every JSON body except the AI photo-identify endpoint,
 // whose base64 image (client-downscaled to ~1024px JPEG) can land higher.
 // 2mb comfortably covers that while still well under Vercel's serverless
@@ -51,8 +61,18 @@ function isDevLanOrigin(origin) {
   )
 }
 
+function isDevLocalOrigin(origin) {
+  if (process.env.NODE_ENV === 'production') return false
+  try {
+    const url = new URL(origin)
+    return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+  } catch {
+    return false
+  }
+}
+
 function isAllowedOrigin(origin) {
-  return allowedOrigins.includes(origin) || isDevLanOrigin(origin)
+  return allowedOrigins.includes(origin) || isDevLocalOrigin(origin) || isDevLanOrigin(origin)
 }
 
 app.use(cors({
@@ -67,7 +87,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-App-Platform'],
 }))
 
 // cors() omits the CORS headers for a disallowed origin but still calls next().
@@ -192,6 +212,15 @@ function vehicleError({ year, make, model, trim, part }) {
   }
   return null
 }
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    apiRelease: API_RELEASE,
+    buildId: API_BUILD_ID,
+    fitmentContractVersion: FITMENT_CONTRACT_VERSION,
+  })
+})
 
 app.get('/api/makes', async (req, res) => {
   try {
@@ -375,55 +404,7 @@ app.get('/api/diagnose', (req, res) => {
 // The cheapest raw search hit is often an accessory (a $7 "rotor screw" for a
 // "Brake Rotors" search), so a quote that auto-picks one listing must check
 // the title actually names the part. Tokens match by prefix so "pad" ≈ "pads".
-const QUOTE_STOPWORDS = new Set(['and', 'the', 'of', 'for', 'with', 'kit', 'set'])
-const QUOTE_ACCESSORY_WORDS = [
-  'screw', 'bolt', 'clip', 'pin', 'washer', 'retainer', 'grommet', 'bracket',
-  'decal', 'sticker', 'emblem', 'shim', 'grease', 'cleaner', 'paint', 'tool',
-  'gauge', 'sensor', 'switch', 'connector', 'wire', 'harness', 'relay', 'fuse', 'cap',
-  // Novelty/cosmetic add-ons and damaged goods that undercut real parts
-  'cover', 'universal', 'pedal', 'defect', 'damaged', 'broken', 'cracked',
-]
-
-function pickListingForPart(results, part) {
-  const partTokens = part
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 2 && !QUOTE_STOPWORDS.has(t))
-    .map((t) => t.replace(/s$/, ''))
-  if (partTokens.length === 0) return results[0] || null
-
-  // All tokens must appear for short names; allow one miss for longer ones
-  // ("Sway Bar End Links" should still match a "Sway Bar Link" title). Cap the
-  // requirement so a long free-text part name ("Front Left Lower Control Arm
-  // with Ball Joint Assembly") doesn't demand so many token hits that every
-  // real listing is filtered out.
-  const base = partTokens.length >= 3 ? partTokens.length - 1 : partTokens.length
-  const required = Math.min(base, 4)
-  // Accessory words only disqualify a title when they're not part of what was
-  // asked for (an "Oxygen Sensor" quote may of course contain "sensor").
-  const blocked = QUOTE_ACCESSORY_WORDS.filter((w) => !partTokens.some((t) => t.startsWith(w) || w.startsWith(t)))
-
-  const candidates = results.filter((r) => {
-    // Never quote broken/for-parts listings, however cheap.
-    if (/parts only|not working/i.test(r.condition || '')) return false
-    const titleTokens = r.title.toLowerCase().split(/[^a-z0-9]+/).map((t) => t.replace(/s$/, ''))
-    const hits = partTokens.filter((pt) => titleTokens.some((tt) => tt.startsWith(pt))).length
-    if (hits < required) return false
-    return !titleTokens.some((tt) => blocked.includes(tt))
-  })
-
-  if (candidates.length === 0) return null
-  // Prefer listings eBay's compatibility engine verified for this exact
-  // vehicle; only fall back to unverified keyword matches when there are none.
-  const verified = candidates.filter((r) => r.verifiedFitment !== false)
-  const pool = verified.length > 0 ? verified : candidates
-  return pool.reduce((best, r) => {
-    const total = r.price + (r.shippingCost || 0)
-    return total < best.total ? { total, listing: r } : best
-  }, { total: Infinity, listing: null }).listing
-}
-
-// Price a list of parts for one vehicle: cheapest fitting listing per part
+// Price a list of parts for one vehicle using the lowest delivered-price marketplace match per part.
 // (by price + shipping, matching how the results UI ranks value) plus totals.
 app.get('/api/quote', async (req, res) => {
   const { year, make, model, trim, zip } = req.query
@@ -453,6 +434,7 @@ app.get('/api/quote', async (req, res) => {
             trim: trim ? String(trim) : undefined,
             part,
             zip: cleanZip,
+            channel: affiliateChannelFromRequest(req),
             // Take the provider's full page (eBay returns 50 per call no
             // matter what): the relevance filter below discards cheap
             // accessory listings (screw kits, covers), so we want the
@@ -462,7 +444,7 @@ app.get('/api/quote', async (req, res) => {
             // rotors is 100% screw kits — real parts never appear at all.
             sort: 'relevance',
           })
-          return { part, listing: pickListingForPart(results, part) }
+          return { part, listing: pickVerifiedListingForPart(results, part) }
         } catch {
           return { part, listing: null, error: true }
         }
@@ -479,6 +461,7 @@ app.get('/api/quote', async (req, res) => {
       shipping: Number(shipping.toFixed(2)),
       total: Number((subtotal + shipping).toFixed(2)),
       currency: 'USD',
+      fitmentContractVersion: FITMENT_CONTRACT_VERSION,
     })
   } catch (err) {
     console.error(err)
@@ -562,6 +545,7 @@ app.get('/api/search', async (req, res) => {
       trim: trim ? String(trim) : undefined,
       part: String(part),
       zip: cleanZip,
+      channel: affiliateChannelFromRequest(req),
     })
     // Record the day's observed low from genuinely live results only (cache
     // hits re-observe nothing; stale results are old data). Awaited because
@@ -574,7 +558,10 @@ app.get('/api/search', async (req, res) => {
       )
       await recordPriceObservation({ year, make, model, part, total: cheapestTotal })
     }
-    res.json(result)
+    res.json({
+      ...result,
+      fitmentContractVersion: FITMENT_CONTRACT_VERSION,
+    })
   } catch (err) {
     console.error(err)
     res.status(502).json({ error: 'Failed to fetch data' })

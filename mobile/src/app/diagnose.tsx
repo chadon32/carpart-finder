@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { View, Text, TextInput, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { diagnoseProblem, fetchQuote, type DiagnosisMatch, type QuoteResponse } from '@/api/client'
-import * as WebBrowser from 'expo-web-browser'
 import { lookupDtc, type DtcEntry } from '@/data/dtcCodes'
+import { openOutboundLink } from '@/lib/outboundLinks'
+import { AffiliateDisclosure } from '@/components/AffiliateDisclosure'
 import { useThemeColors, brand } from '@/theme'
 
 const confidenceColors: Record<string, { bg: string; fg: string }> = {
@@ -283,12 +284,13 @@ export default function Diagnose() {
                 gap: 10,
               }}
             >
+              <AffiliateDisclosure />
               {quote.items.map((item) => (
                 <View key={item.part} style={{ gap: 2 }}>
                   <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700' }}>{item.part}</Text>
                   {item.listing ? (
                     <Pressable
-                      onPress={() => WebBrowser.openBrowserAsync(item.listing!.link)}
+                      onPress={() => openOutboundLink(item.listing!.link)}
                       style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, minHeight: 44, alignItems: 'center' }}
                     >
                       <Text numberOfLines={1} style={{ color: c.text, flex: 1 }}>{item.listing.title}</Text>

@@ -1,6 +1,15 @@
 import type { Listing, SearchResponse, VehicleType, VinDecodeResult } from './types'
 
-export const API_BASE = 'https://carpartsradar.com'
+const configuredApiBase = process.env.EXPO_PUBLIC_API_BASE_URL?.trim()
+export const API_BASE = (configuredApiBase || 'https://carpartsradar.com').replace(/\/+$/, '')
+const FITMENT_CONTRACT_VERSION = 2
+
+function assertFitmentContract<T extends { fitmentContractVersion?: number }>(payload: T): T {
+  if (payload.fitmentContractVersion !== FITMENT_CONTRACT_VERSION) {
+    throw new Error('The search service is out of date. Update the app or try again later.')
+  }
+  return payload
+}
 
 // credentials 'include': auth rides the same httpOnly cpf_token cookie the
 // website uses — iOS persists it natively, so app and site share accounts.
@@ -29,21 +38,36 @@ async function getJson<T>(path: string): Promise<T> {
   return data as T
 }
 
-async function postJson<T>(path: string, body: unknown, method = 'POST'): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new ApiError(
-      (data as { error?: string }).error || `Request failed (${res.status})`,
-      res.status
-    )
+async function postJson<T>(path: string, body: unknown, method = 'POST', timeoutMs?: number): Promise<T> {
+  const controller = timeoutMs ? new AbortController() : null
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+      ...(controller ? { signal: controller.signal } : {}),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new ApiError(
+        (data as { error?: string }).error || `Request failed (${res.status})`,
+        res.status
+      )
+    }
+    return data as T
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TypeError('The account request timed out.')
+    }
+    throw error
+  } finally {
+    if (timeout) clearTimeout(timeout)
   }
-  return data as T
 }
 
 export function fetchMakes(type: VehicleType = 'all'): Promise<{ makes: string[] }> {
@@ -89,7 +113,7 @@ export async function fetchPricesChunked(ids: string[]): Promise<Record<string, 
   return merged
 }
 
-export function searchParts(
+export async function searchParts(
   year: string,
   make: string,
   model: string,
@@ -100,7 +124,8 @@ export function searchParts(
   const params = new URLSearchParams({ year, make, model, part })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  return getJson(`/api/search?${params}`)
+  const response = await getJson<SearchResponse>(`/api/search?${params}`)
+  return assertFitmentContract(response)
 }
 
 export type PriceObservation = { date: string; price: number }
@@ -180,21 +205,32 @@ export function fetchRecalls(year: string, make: string, model: string): Promise
   return getJson(`/api/recalls?${new URLSearchParams({ year, make, model })}`)
 }
 
+export type RepairGuideRequest = {
+  year: string
+  make: string
+  model: string
+  trim?: string
+  part: string
+  listingId: string
+  source: string
+  fitmentProof: string
+}
+
 export async function fetchRepairGuide(
-  year: string,
-  make: string,
-  model: string,
-  part: string,
+  request: RepairGuideRequest,
   signal?: AbortSignal
 ): Promise<{ guide: string }> {
   const res = await fetch(`${API_BASE}/api/ai/repair-guide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
-    body: JSON.stringify({ year, make, model, part }),
+    credentials: 'include',
+    body: JSON.stringify(request),
     signal,
   })
   const data = await res.json()
-  if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
+  if (!res.ok) {
+    throw new ApiError((data as { error?: string }).error || `Request failed (${res.status})`, res.status)
+  }
   return data as { guide: string }
 }
 
@@ -223,7 +259,10 @@ export function logout(): Promise<{ success?: boolean }> {
 export type AccountDeletionResponse = { success: boolean; alreadyDeleted?: boolean }
 
 export function deleteAccount(confirmation: string): Promise<AccountDeletionResponse> {
-  return postJson('/api/supabase/account', { confirmation }, 'DELETE')
+  // The server enforces a 20-second deletion timeout. Give it a small network
+  // margin, then surface an actionable timeout instead of leaving the screen
+  // busy indefinitely on a broken connection.
+  return postJson('/api/supabase/account', { confirmation }, 'DELETE', 25_000)
 }
 
 export function getMe(): Promise<{ user: AuthUser }> {

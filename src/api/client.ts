@@ -1,3 +1,6 @@
+import { friendlyApiError, readJsonResponse } from '../lib/apiErrors.js'
+import { assertFitmentContract } from '../../shared/apiContract.js'
+
 export type Listing = {
   id: string
   title: string
@@ -22,14 +25,35 @@ export type Listing = {
   shippingCost?: number | null
   deliveryMin?: string | null
   deliveryMax?: string | null
-  // False when eBay's compatibility filter couldn't be applied and the results
-  // came from a relaxed keyword search instead.
+  // True only when the provider returned explicit exact compatibility evidence.
+  // Missing/false is always unverified and must never render as a guarantee.
   verifiedFitment?: boolean
+  fitmentTier?: 'verified' | 'fallback'
+  fitmentProof?: string | null
+  fitmentEvidence?: {
+    provider: string
+    matchType: 'EXACT' | null
+    scope: 'year-make-model' | 'year-make-model-trim' | 'keyword-only'
+    matchedVehicle: {
+      year: string
+      make: string
+      model: string
+      trim?: string
+    } | null
+    checkedAt: string
+    note: string
+  }
 }
 
 export type SearchResponse = {
+  fitmentContractVersion: 2
   query: string
+  // Primary results contain only structured provider compatibility matches.
   results: Listing[]
+  // Broad marketplace candidates are kept separate and are never ranked or
+  // automatically selected as fitting choices.
+  fallbackResults?: Listing[]
+  fitmentSummary?: { verified: number; fallback: number; hiddenIrrelevantFallbacks?: number }
   providerErrors: Record<string, string>
   skippedProviders: string[]
   cached?: boolean
@@ -38,12 +62,13 @@ export type SearchResponse = {
 }
 
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`)
+  try {
+    const res = await fetch(url)
+    return readJsonResponse<T>(res, url)
+  } catch (error) {
+    if (error instanceof Error) throw error
+    throw new Error(friendlyApiError(url, 0))
   }
-  return data as T
 }
 
 export type VehicleType = 'all' | 'car' | 'suv' | 'truck'
@@ -128,6 +153,7 @@ export type QuoteItem = {
 }
 
 export type QuoteResponse = {
+  fitmentContractVersion: 2
   items: QuoteItem[]
   subtotal: number
   shipping: number
@@ -135,7 +161,7 @@ export type QuoteResponse = {
   currency: string
 }
 
-export function fetchQuote(
+export async function fetchQuote(
   year: string,
   make: string,
   model: string,
@@ -146,10 +172,11 @@ export function fetchQuote(
   const params = new URLSearchParams({ year, make, model, parts: parts.join(',') })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  return getJson(`/api/quote?${params.toString()}`)
+  const response = await getJson<QuoteResponse>(`/api/quote?${params.toString()}`)
+  return assertFitmentContract(response)
 }
 
-export function searchParts(
+export async function searchParts(
   year: string,
   make: string,
   model: string,
@@ -160,7 +187,20 @@ export function searchParts(
   const params = new URLSearchParams({ year, make, model, part })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  return getJson(`/api/search?${params.toString()}`)
+  const response = await getJson<SearchResponse>(`/api/search?${params.toString()}`)
+  return assertFitmentContract(response)
+}
+
+export type ApiHealth = {
+  status: 'ok'
+  apiRelease: string
+  buildId: string
+  fitmentContractVersion: 2
+}
+
+export async function fetchApiHealth(): Promise<ApiHealth> {
+  const response = await getJson<ApiHealth>('/api/health')
+  return assertFitmentContract(response)
 }
 
 export type PriceObservation = { date: string; price: number }
@@ -212,10 +252,5 @@ export function identifyPartFromImage(base64Image: string): Promise<{ identified
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ image: base64Image }),
-  }).then(async (res) => {
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to identify part')
-    return data
-  })
+  }).then((res) => readJsonResponse<{ identified: boolean; partName: string | null }>(res, '/api/identify-part'))
 }
-

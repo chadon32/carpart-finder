@@ -86,6 +86,13 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   font-feature-settings: "cv11", "ss01", "ss03";
   overscroll-behavior-y: none;
@@ -159,6 +166,12 @@ html.dark {
   /* Safe-area helper for fixed bottom UI (tab bar, sheets, sticky CTAs). */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .break-anywhere {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /* Hide scrollbars on horizontal chip/tab rows while keeping scrollability. */
@@ -323,7 +336,7 @@ html.dark {
 
   /* Premium button system */
   .btn {
-    @apply inline-flex touch-manipulation items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.975];
+    @apply inline-flex min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.975];
   }
 
   .btn-primary {
@@ -364,7 +377,7 @@ html.dark {
   }
 
   .field {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:bg-slate-50;
+    @apply min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:bg-slate-50;
   }
 
   .dark .field {
@@ -409,7 +422,7 @@ html.dark {
 
   /* Filter pill — the white ring-bordered controls in the results toolbar */
   .filter-pill {
-    @apply inline-flex touch-manipulation items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 transition;
+    @apply inline-flex min-h-11 touch-manipulation items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 transition sm:min-h-0;
   }
 
   .dark .filter-pill {

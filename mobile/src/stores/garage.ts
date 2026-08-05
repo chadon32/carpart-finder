@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { GarageVehicle } from '../api/types'
+import { skipServerWebHydration } from '../lib/persistence'
 
 type GarageState = {
   vehicles: GarageVehicle[]
@@ -25,6 +26,10 @@ export const useGarage = create<GarageState>()(
         set((s) => ({ vehicles: s.vehicles.filter((_, i) => i !== index) })),
       clear: () => set({ vehicles: [] }),
     }),
-    { name: 'cpr-garage', storage: createJSONStorage(() => AsyncStorage) }
+    {
+      name: 'cpr-garage',
+      storage: createJSONStorage(() => AsyncStorage),
+      skipHydration: skipServerWebHydration,
+    }
   )
 )

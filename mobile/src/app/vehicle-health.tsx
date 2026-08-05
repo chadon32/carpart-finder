@@ -21,6 +21,7 @@ export default function VehicleHealth() {
   useFocusEffect(
     useCallback(() => {
       setFailed(false)
+      if (attempt > 0) setRecalls(null)
       fetchRecalls(year, make, model)
         .then((r) => setRecalls(r.recalls))
         .catch(() => setFailed(true))
@@ -41,11 +42,12 @@ export default function VehicleHealth() {
       </Text>
 
       {failed ? (
-        <View style={{ gap: 10 }}>
+        <View accessibilityRole="alert" style={{ gap: 10 }}>
           <Text style={{ color: c.subtext }}>
             Couldn't load recall data — this does NOT mean there are no recalls.
           </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() => setAttempt((a) => a + 1)}
             style={{
               alignSelf: 'flex-start',

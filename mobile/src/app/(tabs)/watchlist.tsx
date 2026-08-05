@@ -3,11 +3,12 @@ import { View, Text, FlatList, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useFocusEffect } from 'expo-router'
-import * as WebBrowser from 'expo-web-browser'
 import * as Haptics from 'expo-haptics'
 import { fetchPricesChunked, type PriceInfo } from '@/api/client'
 import { useWatchlist } from '@/stores/watchlist'
 import { priceDelta } from '@/lib/priceDelta'
+import { openOutboundLink } from '@/lib/outboundLinks'
+import { AffiliateDisclosure } from '@/components/AffiliateDisclosure'
 import { useThemeColors, displayFont, brand } from '@/theme'
 
 const deltaColors: Record<string, string> = {
@@ -41,6 +42,7 @@ export default function WatchlistScreen() {
         data={items}
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 24 }}
+        ListHeaderComponent={<AffiliateDisclosure />}
         renderItem={({ item }) => {
           const current = prices[item.id]?.available ? prices[item.id]?.price : undefined
           const delta = priceDelta(item.priceAtAdd, current)
@@ -87,7 +89,7 @@ export default function WatchlistScreen() {
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Pressable
-                  onPress={() => WebBrowser.openBrowserAsync(item.link)}
+                  onPress={() => openOutboundLink(item.link)}
                   style={{
                     flex: 1,
                     minHeight: 44,

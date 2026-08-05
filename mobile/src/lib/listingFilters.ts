@@ -22,6 +22,15 @@ const rating = (l: Listing): number | null => {
 
 const total = (l: Listing) => l.price + (l.shippingCost ?? 0)
 
+export function valueScore(l: Listing) {
+  const feedback = rating(l) ?? 92
+  const trust = Math.min(100, Math.max(80, feedback))
+  const penalty = (100 - trust) / 100
+  let effective = total(l) * (1 + penalty)
+  if (l.topRatedSeller) effective *= 0.95
+  return effective
+}
+
 export function applyListingFilters(results: Listing[], f: ListingFilters): Listing[] {
   let out = results.filter((l) => {
     if (f.hideOverseas && l.crossBorder) return false
@@ -37,6 +46,7 @@ export function applyListingFilters(results: Listing[], f: ListingFilters): List
   else if (f.sort === 'total') out = [...out].sort((a, b) => total(a) - total(b))
   else if (f.sort === 'rating')
     out = [...out].sort((a, b) => (rating(b) ?? -1) - (rating(a) ?? -1))
+  else if (f.sort === 'best') out = [...out].sort((a, b) => valueScore(a) - valueScore(b))
   return out
 }
 

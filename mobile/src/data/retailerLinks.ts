@@ -6,10 +6,17 @@ export type RetailerLink = { name: string; buildUrl: (query: string) => string }
 
 const q = encodeURIComponent
 
-const AMAZON_ASSOCIATE_TAG = 'carpartsradar-20'
+const amazonAssociateTag = process.env.EXPO_PUBLIC_AMAZON_MOBILE_TAG?.trim() ?? ''
+
+export const isMobileAmazonAffiliateEnabled = amazonAssociateTag.length > 0
+
+export function buildAmazonSearchUrl(query: string) {
+  const search = `https://www.amazon.com/s?k=${q(query)}`
+  return isMobileAmazonAffiliateEnabled ? `${search}&tag=${q(amazonAssociateTag)}` : search
+}
 
 export const retailerLinks: RetailerLink[] = [
-  { name: 'Amazon', buildUrl: (query) => `https://www.amazon.com/s?k=${q(query)}&tag=${AMAZON_ASSOCIATE_TAG}` },
+  { name: 'Amazon', buildUrl: buildAmazonSearchUrl },
   { name: 'AutoZone', buildUrl: (query) => `https://www.autozone.com/searchresult?searchText=${q(query)}` },
   { name: 'RockAuto', buildUrl: (query) => `https://www.rockauto.com/en/partsearch/?partname=${q(query)}` },
   { name: "O'Reilly", buildUrl: (query) => `https://www.oreillyauto.com/search?q=${q(query)}` },

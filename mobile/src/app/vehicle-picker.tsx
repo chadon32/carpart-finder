@@ -5,10 +5,11 @@ import * as Haptics from 'expo-haptics'
 import { PickerList } from '@/components/PickerList'
 import { fetchMakes, fetchModels, fetchTrims, decodeVinApi } from '@/api/client'
 import { extractVin } from '@/lib/extractVin'
+import { vehicleYears } from '@/lib/vehicleYears'
 import { useGarage } from '@/stores/garage'
 import { useThemeColors, dataFont } from '@/theme'
 
-const YEARS = Array.from({ length: 2027 - 1990 }, (_, i) => String(2026 - i))
+const YEARS = vehicleYears()
 
 export default function VehiclePicker() {
   const c = useThemeColors()
@@ -140,6 +141,7 @@ export default function VehiclePicker() {
           Check your connection and try again.
         </Text>
         <Pressable
+          accessibilityRole="button"
           onPress={() => setAttempt((a) => a + 1)}
           style={{
             backgroundColor: c.brand,
@@ -167,6 +169,7 @@ export default function VehiclePicker() {
         </Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TextInput
+            accessibilityLabel="Vehicle identification number"
             value={vin}
             onChangeText={(t) => setVin(t.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17))}
             placeholder="17-character VIN"
@@ -186,6 +189,7 @@ export default function VehiclePicker() {
             }}
           />
           <Pressable
+            accessibilityRole="button"
             onPress={() => decodeVin(vin)}
             disabled={vin.length !== 17 || vinBusy}
             style={{
@@ -204,6 +208,7 @@ export default function VehiclePicker() {
             )}
           </Pressable>
           <Pressable
+            accessibilityRole="button"
             onPress={scanVin}
             disabled={vinBusy}
             accessibilityLabel="Scan VIN with camera"
@@ -251,6 +256,7 @@ export default function VehiclePicker() {
     <PickerList
       key="trim"
       title="Trim (optional)"
+      helperText="Trim is the package name, such as LE, Sport, or Limited. Skip it if you are not sure."
       options={['Skip', ...trims]}
       loading={loading}
       onSelect={(t) => finish(t === 'Skip' ? '' : t)}

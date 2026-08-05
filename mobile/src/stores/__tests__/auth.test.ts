@@ -8,7 +8,7 @@ const jsonResponse = (body: unknown, ok = true, status = 200) =>
 
 beforeEach(() => {
   mockFetch.mockReset()
-  useAuth.setState({ user: null, status: 'unknown' })
+  useAuth.setState({ user: null, status: 'unknown', reauthEmail: null })
 })
 
 test('login success signs in and sends credentials', async () => {
@@ -73,6 +73,7 @@ test('expired deletion session signs out locally and requires reauthentication',
 
   await expect(useAuth.getState().deleteAccount('DELETE')).rejects.toThrow(/expired token/)
   expect(useAuth.getState().status).toBe('signedOut')
+  expect(useAuth.getState().reauthEmail).toBe('a@b.c')
 })
 
 test('network error does not clear local account state', async () => {

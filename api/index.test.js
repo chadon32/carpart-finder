@@ -21,6 +21,28 @@ test('an unknown route returns a 404 JSON body, not HTML', async () => {
   assert.equal((await res.json()).error, 'Not found')
 })
 
+test('health reports the fitment contract required by the frontend', async () => {
+  const res = await fetch(`${base}/api/health`)
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.status, 'ok')
+  assert.equal(body.fitmentContractVersion, 2)
+  assert.match(body.apiRelease, /^\d{4}-\d{2}-\d{2}/)
+  assert.equal(typeof body.buildId, 'string')
+})
+
+test('search responses carry the fail-closed fitment contract version', async () => {
+  const res = await fetch(`${base}/api/search?year=2020&make=Toyota&model=Camry&part=Brake+Pads`)
+  assert.equal(res.status, 200)
+  assert.equal((await res.json()).fitmentContractVersion, 2)
+})
+
+test('quote responses carry the fail-closed fitment contract version', async () => {
+  const res = await fetch(`${base}/api/quote?year=2020&make=Toyota&model=Camry&parts=Brake+Pads`)
+  assert.equal(res.status, 200)
+  assert.equal((await res.json()).fitmentContractVersion, 2)
+})
+
 test('malformed JSON returns 400 JSON, not an HTML stack page', async () => {
   const res = await fetch(`${base}/api/ai/repair-guide`, {
     method: 'POST',
@@ -31,6 +53,24 @@ test('malformed JSON returns 400 JSON, not an HTML stack page', async () => {
   assert.match(res.headers.get('content-type') ?? '', /application\/json/)
   const body = await res.json()
   assert.equal(body.error, 'Malformed JSON body')
+})
+
+test('repair guide requires a server-issued fitment proof', async () => {
+  const res = await fetch(`${base}/api/ai/repair-guide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      year: '2020',
+      make: 'Toyota',
+      model: 'Camry',
+      part: 'Brake Pads',
+      listingId: 'forged-listing',
+      source: 'eBay',
+      fitmentProof: 'forged-proof',
+    }),
+  })
+  assert.equal(res.status, 409)
+  assert.match((await res.json()).error, /not currently verified/i)
 })
 
 test('a disallowed Origin gets 403, not 500', async () => {

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { skipServerWebHydration } from '../lib/persistence'
 
 type PrefsState = {
   zip: string
@@ -24,6 +25,7 @@ export const usePrefs = create<PrefsState>()(
     {
       name: 'cpr-prefs',
       storage: createJSONStorage(() => AsyncStorage),
+      skipHydration: skipServerWebHydration,
       partialize: (s) => ({ zip: s.zip }),
       onRehydrateStorage: () => () => {
         usePrefs.getState().setHydrated()

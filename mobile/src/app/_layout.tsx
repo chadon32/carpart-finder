@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
 import { DarkTheme, DefaultTheme, ThemeProvider, Stack } from 'expo-router'
 import { useColorScheme } from 'react-native'
-import { useFonts, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed'
-import { JetBrainsMono_500Medium, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono'
+import { useFonts } from 'expo-font'
+import { BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed/700Bold'
+import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium'
+import { JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono/700Bold'
 import { useAuth } from '@/stores/auth'
 
 export default function RootLayout() {

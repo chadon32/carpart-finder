@@ -1,22 +1,36 @@
 import { useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { ApiError } from '@/api/client'
-import { accountDeletionErrorMessage, ACCOUNT_DELETION_CONFIRMATION, isAccountDeletionConfirmation } from '@/lib/accountDeletion'
+import {
+  accountDeletionErrorMessage,
+  ACCOUNT_DELETION_CONFIRMATION,
+  ACCOUNT_DELETION_DATA_ITEMS,
+  isAccountDeletedLocalCleanupError,
+  isAccountDeletionConfirmation,
+} from '@/lib/accountDeletion'
 import { useAuth } from '@/stores/auth'
 import { useThemeColors, displayFont } from '@/theme'
 
 export default function DeleteAccountScreen() {
   const c = useThemeColors()
   const deleteAccount = useAuth((s) => s.deleteAccount)
+  const authStatus = useAuth((s) => s.status)
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [reauthRequired, setReauthRequired] = useState(false)
   const busyRef = useRef(false)
+  const authenticationRequired = reauthRequired || authStatus === 'signedOut'
 
   const submit = async () => {
     if (busyRef.current) return
+    if (authStatus !== 'signedIn') {
+      setReauthRequired(true)
+      setMessage('Sign in again before retrying account deletion.')
+      return
+    }
     if (!isAccountDeletionConfirmation(confirmation)) {
       setMessage(`Type ${ACCOUNT_DELETION_CONFIRMATION} exactly to confirm.`)
       return
@@ -27,16 +41,26 @@ export default function DeleteAccountScreen() {
     setMessage(null)
     try {
       await deleteAccount(confirmation)
-      Alert.alert('Account deleted', 'Your account has been permanently deleted.')
       // Remove the account/settings screens from the navigation history so a
       // back gesture cannot reveal a stale account surface after deletion.
       router.dismissAll()
-      router.replace('/(tabs)/garage')
+      router.replace({ pathname: '/account', params: { outcome: 'deleted' } })
     } catch (error) {
       // Keep the confirmation screen available for a safe retry. A stale
       // session is deliberately not treated as a successful deletion.
+      if (isAccountDeletedLocalCleanupError(error)) {
+        router.dismissAll()
+        router.replace({
+          pathname: '/account',
+          params: { outcome: 'deleted', cleanup: 'failed' },
+        })
+        return
+      }
       setMessage(accountDeletionErrorMessage(error))
-      if (error instanceof ApiError && error.status === 401) setConfirmation('')
+      if (error instanceof ApiError && error.status === 401) {
+        setConfirmation('')
+        setReauthRequired(true)
+      }
     } finally {
       busyRef.current = false
       setBusy(false)
@@ -51,13 +75,11 @@ export default function DeleteAccountScreen() {
           <Text style={{ color: c.text, fontSize: 17, fontWeight: '700' }}>
             Deleting your account will permanently remove:
           </Text>
-          {['Profile', 'Saved addresses', 'Solar reports', 'Saved calculations', 'Preferences', 'Any other user-generated data'].map(
-            (item) => (
+          {ACCOUNT_DELETION_DATA_ITEMS.map((item) => (
               <Text key={item} style={{ color: c.text, fontSize: 16 }}>
                 • {item}
               </Text>
-            )
-          )}
+            ))}
           <Text style={{ color: '#be123c', fontSize: 16, fontWeight: '700', marginTop: 4 }}>
             This action cannot be undone.
           </Text>
@@ -69,10 +91,13 @@ export default function DeleteAccountScreen() {
           </Text>
           <TextInput
             value={confirmation}
-            onChangeText={setConfirmation}
+            onChangeText={(value) => {
+              setConfirmation(value)
+              setMessage(null)
+            }}
             autoCapitalize="characters"
             autoCorrect={false}
-            editable={!busy}
+            editable={!busy && !authenticationRequired && authStatus !== 'unknown'}
             placeholder="DELETE"
             placeholderTextColor={c.subtext}
             accessibilityLabel="Type DELETE to confirm"
@@ -90,11 +115,38 @@ export default function DeleteAccountScreen() {
           />
         </View>
 
-        {message ? <Text style={{ color: '#be123c', fontSize: 14, fontWeight: '600' }}>{message}</Text> : null}
+        {message ? (
+          <Text accessibilityRole="alert" style={{ color: '#be123c', fontSize: 14, fontWeight: '600' }}>
+            {message}
+          </Text>
+        ) : null}
+
+        {authStatus === 'unknown' ? (
+          <Text accessible accessibilityLabel="Checking account session" style={{ color: c.subtext, fontSize: 14 }}>
+            Checking your account session...
+          </Text>
+        ) : null}
+
+        {authenticationRequired ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.replace({ pathname: '/account', params: { action: 'reauth-delete' } })}
+            style={{
+              minHeight: 48,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: c.brand,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Sign in again</Text>
+          </Pressable>
+        ) : null}
 
         <View style={{ gap: 10, marginTop: 4 }}>
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ disabled: busy }}
             onPress={() => router.back()}
             disabled={busy}
             style={{
@@ -111,8 +163,9 @@ export default function DeleteAccountScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ busy, disabled: busy || authenticationRequired || authStatus === 'unknown' }}
             onPress={submit}
-            disabled={busy}
+            disabled={busy || authenticationRequired || authStatus === 'unknown'}
             style={{
               minHeight: 50,
               borderRadius: 12,

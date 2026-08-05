@@ -2,10 +2,12 @@ import { create } from 'zustand'
 import * as api from '../api/client'
 import { ApiError } from '../api/client'
 import type { AuthUser } from '../api/client'
+import { AccountDeletedLocalCleanupError } from '../lib/accountDeletion'
 import { clearLocalUserData } from '../lib/clearLocalUserData'
 
 type AuthState = {
   user: AuthUser | null
+  reauthEmail: string | null
   // 'unknown' until the first /me check completes on launch.
   status: 'unknown' | 'signedOut' | 'signedIn'
   loadMe: (retryOnNetworkError?: boolean) => Promise<void>
@@ -19,11 +21,12 @@ let deleteInFlight: Promise<void> | null = null
 
 export const useAuth = create<AuthState>()((set, get) => ({
   user: null,
+  reauthEmail: null,
   status: 'unknown',
   loadMe: async (retryOnNetworkError = true) => {
     try {
       const { user } = await api.getMe()
-      set({ user, status: 'signedIn' })
+      set({ user, status: 'signedIn', reauthEmail: null })
     } catch (e) {
       // Only a definitive 401 means signed out. A network blip or 5xx gets
       // one delayed retry before falling back, so a launch-time hiccup
@@ -41,19 +44,19 @@ export const useAuth = create<AuthState>()((set, get) => ({
   },
   login: async (email, password) => {
     const r = await api.login(email, password)
-    if (!r.confirmationRequired) set({ user: r.user, status: 'signedIn' })
+    if (!r.confirmationRequired) set({ user: r.user, status: 'signedIn', reauthEmail: null })
     return { confirmationRequired: r.confirmationRequired }
   },
   signup: async (email, password, name) => {
     const r = await api.signup(email, password, name)
-    if (!r.confirmationRequired) set({ user: r.user, status: 'signedIn' })
+    if (!r.confirmationRequired) set({ user: r.user, status: 'signedIn', reauthEmail: null })
     return { confirmationRequired: r.confirmationRequired }
   },
   logout: async () => {
     try {
       await api.logout()
     } finally {
-      set({ user: null, status: 'signedOut' })
+      set({ user: null, status: 'signedOut', reauthEmail: null })
     }
   },
   deleteAccount: (confirmation) => {
@@ -67,7 +70,11 @@ export const useAuth = create<AuthState>()((set, get) => ({
         // pretend the account was deleted. The UI will ask the user to log in
         // again before retrying.
         if (e instanceof ApiError && e.status === 401) {
-          set({ user: null, status: 'signedOut' })
+          set({
+            user: null,
+            status: 'signedOut',
+            reauthEmail: get().user?.email ?? null,
+          })
         }
         throw e
       }
@@ -87,11 +94,11 @@ export const useAuth = create<AuthState>()((set, get) => ({
           // still cleared even if this best-effort cookie clear cannot reach
           // the network.
         }
-        set({ user: null, status: 'signedOut' })
+        set({ user: null, status: 'signedOut', reauthEmail: null })
       }
 
       if (cleanupError) {
-        throw new Error('Your account was deleted, but this device could not clear its cached data.')
+        throw new AccountDeletedLocalCleanupError()
       }
     })()
 
