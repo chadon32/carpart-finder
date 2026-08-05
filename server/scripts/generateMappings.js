@@ -50,10 +50,10 @@ async function run() {
   let text = result.response.text()
   
   // Clean up markdown fences if present
-  if (text.includes('\`\`\`json')) {
-    text = text.split('\`\`\`json')[1].split('\`\`\`')[0]
-  } else if (text.includes('\`\`\`')) {
-    text = text.split('\`\`\`')[1].split('\`\`\`')[0]
+  if (text.includes('```json')) {
+    text = text.split('```json')[1].split('```')[0]
+  } else if (text.includes('```')) {
+    text = text.split('```')[1].split('```')[0]
   }
   
   const mapping = JSON.parse(text.trim())

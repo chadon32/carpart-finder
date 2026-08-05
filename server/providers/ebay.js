@@ -2,6 +2,7 @@ import { EBAY_API_ROOT, getAccessToken, isConfigured } from '../ebayAuth.js'
 import { categoryForPart } from '../partCategories.js'
 import { fetchWithRetry } from '../httpClient.js'
 import { mapWithConcurrency } from '../lib/concurrency.js'
+import { listingDoesNotContradictVehicle } from '../lib/fitmentPolicy.js'
 
 const SEARCH_URL = `${EBAY_API_ROOT}/buy/browse/v1/item_summary/search`
 const ITEM_URL = `${EBAY_API_ROOT}/buy/browse/v1/item`
@@ -56,14 +57,15 @@ const BASE_FILTER =
 // is the EPN (eBay Partner Network) campaign — when present, eBay returns
 // itemAffiliateWebUrl and clicks become commissionable. contextualLocation makes
 // shipping costs/dates accurate for the buyer's ZIP. Exported for tests.
-export function buildEndUserCtx({ zip, campaignId } = {}) {
+export function buildEndUserCtx({ zip, campaignId, referenceId } = {}) {
   const parts = []
   if (campaignId) parts.push(`affiliateCampaignId=${campaignId}`)
+  if (campaignId && referenceId) parts.push(`affiliateReferenceId=${encodeURIComponent(referenceId)}`)
   if (zip) parts.push(`contextualLocation=${encodeURIComponent(`country=US,zip=${zip}`)}`)
   return parts.length > 0 ? parts.join(',') : undefined
 }
 
-async function runSearch(token, { q, categoryId, compatibilityFilter, zip, sort = 'price' }) {
+async function runSearch(token, { q, categoryId, compatibilityFilter, zip, affiliate, sort = 'price' }) {
   const params = new URLSearchParams({
     q,
     limit: '50',
@@ -83,7 +85,11 @@ async function runSearch(token, { q, categoryId, compatibilityFilter, zip, sort 
   }
   // EPN campaign id is read at call time so a config change doesn't require
   // a code change, and tests can exercise the pure builder directly.
-  const endUserCtx = buildEndUserCtx({ zip, campaignId: process.env.EBAY_EPN_CAMPAIGN_ID })
+  const endUserCtx = buildEndUserCtx({
+    zip,
+    campaignId: affiliate?.campaignId,
+    referenceId: affiliate?.referenceId,
+  })
   if (endUserCtx) {
     headers['X-EBAY-C-ENDUSERCTX'] = endUserCtx
   }
@@ -107,10 +113,60 @@ function isValidItem(item) {
   return Boolean(item.title && item.itemWebUrl && Number(item.price?.value) > 0)
 }
 
-export function mapItem(item, { verifiedFitment }) {
+// Browse search can return items that are only POSSIBLE matches, or items with
+// no compatibilityProperties at all, even when compatibility_filter is used.
+// Only an explicit EXACT result is safe to present as verified. This must be
+// derived from eBay's response rather than from the fact that we sent a filter.
+export function isExactCompatibility(item) {
+  return item.compatibilityMatch === 'EXACT'
+}
+
+export function filterExactCompatibility(items) {
+  return items.filter(isExactCompatibility)
+}
+
+export function marketplaceSearchKeyword(ctx) {
+  return String(ctx?.part || '').trim() || String(ctx?.query || '').trim()
+}
+
+export function buildSearchAttempts(ctx, { categoryId, compatibilityFilter, zip, sort }) {
+  const q = marketplaceSearchKeyword(ctx)
+  return [
+    // Fetch compatibility matches by marketplace relevance so cheap clips,
+    // hardware, and damaged inventory do not crowd exact matches out of the
+    // first provider page. The server still ranks accepted results by total.
+    { q, categoryId, compatibilityFilter, zip, sort: 'relevance' },
+    { q, categoryId, zip, sort },
+    { q: ctx.query, categoryId: undefined, compatibilityFilter: undefined, zip, sort },
+  ]
+}
+
+export function mapItem(item, { compatibilityFilterUsed = false, vehicle = null } = {}) {
+  const exactProviderMatch = compatibilityFilterUsed && isExactCompatibility(item)
+  const titleConsistent = listingDoesNotContradictVehicle(item, vehicle)
+  const verifiedFitment = exactProviderMatch && titleConsistent
   return {
     id: `ebay-${item.itemId}`,
     verifiedFitment,
+    fitmentTier: verifiedFitment ? 'verified' : 'fallback',
+    fitmentEvidence: {
+      provider: 'eBay',
+      matchType: verifiedFitment ? 'EXACT' : null,
+      scope: 'year-make-model',
+      matchedVehicle: vehicle
+        ? {
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+          }
+        : null,
+      checkedAt: new Date().toISOString(),
+      note: verifiedFitment
+        ? 'The marketplace returned an exact year, make, and model compatibility match. Trim, engine, drivetrain, and option-level fitment may still require confirmation.'
+        : exactProviderMatch && !titleConsistent
+          ? 'The marketplace compatibility response conflicted with the vehicle or model years stated in the listing, so CarPartsRadar did not treat it as a match.'
+          : 'This is a broad marketplace result. Compatibility was not confirmed.',
+    },
     title: item.title,
     price: Number(item.price?.value ?? 0),
     currency: item.price?.currency ?? 'USD',
@@ -138,6 +194,10 @@ export function mapItem(item, { verifiedFitment }) {
   }
 }
 
+export function filterVehicleContradictions(items, vehicle) {
+  return items.filter((item) => listingDoesNotContradictVehicle(item, vehicle))
+}
+
 // ctx: { year, make, model, trim, part, query }
 export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
   const token = await getAccessToken()
@@ -145,29 +205,37 @@ export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
   const categoryId = ctx.part ? categoryForPart(ctx.part) : undefined
   const compatibilityFilter =
     ctx.year && ctx.make && ctx.model ? `Year:${ctx.year};Make:${ctx.make};Model:${ctx.model}` : undefined
-  // Keyword is just the part name (+ trim) — the category constrains the part
-  // type and the compatibility filter constrains fitment, so we don't want the
-  // full "year make model" string over-narrowing to listings that mention it.
-  const q = [ctx.part, ctx.trim].filter(Boolean).join(' ').trim() || ctx.query
+  // The category constrains the part type and the compatibility filter
+  // constrains the vehicle. A verbose trim label such as "LE Sedan 4-Door"
+  // over-narrows eBay's keyword search, so keep the keyword to the part name.
 
   // Progressively relax: fitment-filtered → category keyword → plain keyword.
   // Each tier trades precision for recall so we still return something useful
   // for vehicles/parts eBay has thin fitment data on.
   const zip = ctx.zip
-  const attempts = [
-    { q, categoryId, compatibilityFilter, zip, sort },
-    { q, categoryId, zip, sort },
-    { q: ctx.query, categoryId: undefined, compatibilityFilter: undefined, zip, sort },
-  ]
+  const attempts = buildSearchAttempts(ctx, { categoryId, compatibilityFilter, zip, sort })
+  const vehicle = {
+    year: ctx.year,
+    make: ctx.make,
+    model: ctx.model,
+    ...(ctx.trim ? { trim: ctx.trim } : {}),
+  }
 
   let items = []
-  let verifiedFitment = false
+  let compatibilityFilterUsed = false
   for (const attempt of attempts) {
-    items = (await runSearch(token, attempt)).filter(isValidItem)
+    const rawItems = (await runSearch(token, { ...attempt, affiliate: ctx.affiliate })).filter(isValidItem)
+    // eBay documents that compatibility-filtered searches can include
+    // POSSIBLE and non-matching items. Exclude those from the filtered tier;
+    // if no EXACT result exists, the next tier is intentionally unverified.
+    const compatibleItems = attempt.compatibilityFilter ? filterExactCompatibility(rawItems) : rawItems
+    // Unknown fitment can remain in a clearly labeled fallback group, but an
+    // explicit wrong make, model, or year is never useful. Filter before
+    // deciding an attempt succeeded so a contradictory tier cannot prevent a
+    // later, more useful fallback attempt from running.
+    items = filterVehicleContradictions(compatibleItems, vehicle)
     if (items.length > 0) {
-      // Only tier 1 runs eBay's compatibility filter; results from the relaxed
-      // tiers are keyword matches whose fitment the user must verify themselves.
-      verifiedFitment = Boolean(attempt.compatibilityFilter)
+      compatibilityFilterUsed = Boolean(attempt.compatibilityFilter)
       break
     }
   }
@@ -180,7 +248,10 @@ export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
     if (seenSellers.has(seller) || seenItemIds.has(item.itemId)) continue
     seenSellers.add(seller)
     seenItemIds.add(item.itemId)
-    results.push(mapItem(item, { verifiedFitment }))
+    results.push(mapItem(item, {
+      compatibilityFilterUsed,
+      vehicle,
+    }))
     if (results.length >= limit) break
   }
 

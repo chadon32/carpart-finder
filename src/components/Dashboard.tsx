@@ -1,17 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Trash2, ChevronLeft, LogOut, Search, Bell } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAppContext } from '../contexts/AppContext'
+import { useAppContext } from '../contexts/useAppContext'
 import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert, ApiError } from '../api/supabase'
+import { DeleteAccountPanel } from './DeleteAccountPanel'
+import { isRequiredAccountDeletionEmail } from '../lib/accountDeletionState.js'
 
 interface DashboardProps {
   onClose: () => void
   onRunSearch: (car: { year: string; make: string; model: string; trim?: string }, part: string) => void
+  onAccountDeleted?: () => void
 }
 
-export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
+type AccountTab = 'searches' | 'alerts'
+
+export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardProps) {
   const { user, setUser, accountData, setAccountData } = useAppContext()
-  const [accountTab, setAccountTab] = useState<'searches' | 'alerts'>('searches')
+  const [accountTab, setAccountTab] = useState<AccountTab>('searches')
+  const [accountLoading, setAccountLoading] = useState(false)
+  const [accountLoadError, setAccountLoadError] = useState<{ searches: boolean; alerts: boolean } | null>(null)
+  const accountTabRefs = useRef<Record<AccountTab, HTMLButtonElement | null>>({ searches: null, alerts: null })
   
   // Auth state
   const [signupName, setSignupName] = useState('')
@@ -21,26 +29,60 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
   const [authError, setAuthError] = useState<string | null>(null)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
+  const [authFieldErrors, setAuthFieldErrors] = useState<{ email?: string; password?: string }>({})
+  const [resumeAccountDeletion, setResumeAccountDeletion] = useState(false)
+  const [reauthEmail, setReauthEmail] = useState<string | null>(null)
+
+  const loadAccountData = useCallback(async () => {
+    setAccountLoading(true)
+
+    const [searchesResult, alertsResult] = await Promise.allSettled([
+      getSavedSearches(),
+      getPriceAlerts(),
+    ])
+    const searchesFailed = searchesResult.status === 'rejected'
+    const alertsFailed = alertsResult.status === 'rejected'
+
+    setAccountData((previous) => ({
+      searches: searchesFailed ? previous?.searches ?? [] : searchesResult.value.searches || [],
+      alerts: alertsFailed ? previous?.alerts ?? [] : alertsResult.value.alerts || [],
+    }))
+    setAccountLoadError(searchesFailed || alertsFailed ? { searches: searchesFailed, alerts: alertsFailed } : null)
+    setAccountLoading(false)
+  }, [setAccountData])
 
   useEffect(() => {
-    if (user) {
-      Promise.all([
-        getSavedSearches().catch(() => ({ searches: [] })),
-        getPriceAlerts().catch(() => ({ alerts: [] }))
-      ]).then(([searchesRes, alertsRes]) => {
-        setAccountData({
-          searches: searchesRes.searches || [],
-          alerts: alertsRes.alerts || []
-        })
-      })
+    if (user) void loadAccountData()
+  }, [user, loadAccountData])
+
+  const selectAccountTab = (tab: AccountTab) => {
+    setAccountTab(tab)
+    accountTabRefs.current[tab]?.focus()
+  }
+
+  const handleAccountTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const tabs: AccountTab[] = ['searches', 'alerts']
+    const currentIndex = tabs.indexOf(accountTab)
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+    else if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = tabs.length - 1
+
+    if (nextIndex !== null) {
+      event.preventDefault()
+      selectAccountTab(tabs[nextIndex])
     }
-  }, [user, setAccountData])
+  }
 
   const handleLogout = async () => {
     setAuthLoading(true)
     try {
       await logoutUser()
       localStorage.removeItem('carpartsradar-user')
+      setResumeAccountDeletion(false)
+      setReauthEmail(null)
       setUser(null)
       toast.success('Logged out successfully')
     } catch (err: any) {
@@ -55,12 +97,23 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
     const password = signupPassword
     const name = signupName.trim()
 
-    if (!email || !password) {
-      setAuthError('Email and password are required.')
+    const nextFieldErrors: { email?: string; password?: string } = {}
+    if (!email) nextFieldErrors.email = 'Enter your email address.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) nextFieldErrors.email = 'Enter a valid email address.'
+    else if (resumeAccountDeletion && !isRequiredAccountDeletionEmail(email, reauthEmail)) {
+      nextFieldErrors.email = `Sign in with ${reauthEmail} to continue account deletion.`
+    }
+    if (!password) nextFieldErrors.password = 'Enter your password.'
+    else if (isRegisterMode && password.length < 8) nextFieldErrors.password = 'Use at least 8 characters.'
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setAuthFieldErrors(nextFieldErrors)
+      setAuthError(null)
       return
     }
 
     setAuthLoading(true)
+    setAuthFieldErrors({})
     setAuthError(null)
     setAuthNotice(null)
 
@@ -92,7 +145,7 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
       setUser(newUser)
 
       setSignupName('')
-      setSignupEmail('')
+      setSignupEmail(resumeAccountDeletion ? email : '')
       setSignupPassword('')
       setAuthError(null)
       setAuthNotice(null)
@@ -110,26 +163,53 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
     }
   }
 
+  const handleAccountDeleted = () => {
+    setResumeAccountDeletion(false)
+    setReauthEmail(null)
+    setAccountData(null)
+    setUser(null)
+    onAccountDeleted?.()
+    toast.success('Your account has been permanently deleted.')
+    onClose()
+  }
+
+  const handleDeletionSessionExpired = () => {
+    if (!user) return
+
+    setResumeAccountDeletion(true)
+    setReauthEmail(user.email)
+    setSignupEmail(user.email)
+    setSignupPassword('')
+    setIsRegisterMode(false)
+    setAuthError(null)
+    setAuthNotice('Your session expired. Sign in again to continue account deletion.')
+    setAccountData(null)
+    localStorage.removeItem('carpartsradar-user')
+    setUser(null)
+  }
+
   if (!user) {
     return (
       <div className="mx-auto max-w-md card p-8 mt-12 animate-slide-up">
         <button onClick={onClose} className="btn btn-ghost -ml-3 mb-6 px-3 text-sm font-medium text-slate-500 hover:text-brand-600">
           <ChevronLeft size={16} /> Back to Search
         </button>
-        <form onSubmit={(e) => { e.preventDefault(); handleAuth(); }}>
+        <form noValidate onSubmit={(e) => { e.preventDefault(); handleAuth(); }}>
           <div className="mb-6 text-center">
             <h3 className="section-title dark:text-white">
-              {isRegisterMode ? 'Create your account' : 'Welcome back'}
+              {resumeAccountDeletion ? 'Sign in again' : isRegisterMode ? 'Create your account' : 'Welcome back'}
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              {isRegisterMode
-                ? 'Save searches and get price-drop alerts.'
-                : 'Sign in to your saved searches and alerts.'}
+              {resumeAccountDeletion
+                ? 'Reauthenticate to continue permanent account deletion.'
+                : isRegisterMode
+                  ? 'Save searches and get price-drop alerts.'
+                  : 'Sign in to your saved searches and alerts.'}
             </p>
           </div>
 
           {authError && (
-            <p className="mb-4 animate-fade-in rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-medium text-rose-700">
+            <p role="alert" className="mb-4 animate-fade-in rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-medium text-rose-700">
               {authError}
             </p>
           )}
@@ -140,33 +220,38 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
             </p>
           )}
 
-          <a
-            href="/api/supabase/oauth/google"
-            className="btn w-full py-3 mb-4 flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition shadow-sm rounded-xl font-medium"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.16v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.16C1.43 8.55 1 10.22 1 12s.43 3.45 1.16 4.93l3.68-2.84z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.16 7.07l3.68 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Continue with Google
-          </a>
+          {!resumeAccountDeletion && (
+            <>
+              <a
+                href="/api/supabase/oauth/google"
+                className="btn w-full py-3 mb-4 flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition shadow-sm rounded-xl font-medium"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.16v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.16C1.43 8.55 1 10.22 1 12s.43 3.45 1.16 4.93l3.68-2.84z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.16 7.07l3.68 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Continue with Google
+              </a>
 
-          <div className="relative mb-6 flex items-center py-1">
-            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-            <span className="shrink-0 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Or</span>
-            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-          </div>
+              <div className="relative mb-6 flex items-center py-1">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="shrink-0 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Or</span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              </div>
+            </>
+          )}
 
           {isRegisterMode && (
             <div className="mb-4">
-              <label htmlFor="auth-name" className="field-label">Full name</label>
+              <label htmlFor="auth-name" className="field-label">Full name <span className="font-normal text-slate-400">(optional)</span></label>
               <input
                 id="auth-name"
                 type="text"
                 autoComplete="name"
                 placeholder="Jane Doe"
+                maxLength={80}
                 className="field"
                 value={signupName}
                 onChange={(e) => setSignupName(e.target.value)}
@@ -181,10 +266,17 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
               type="email"
               autoComplete="email"
               placeholder="you@example.com"
+              maxLength={254}
+              aria-invalid={Boolean(authFieldErrors.email)}
+              aria-describedby={authFieldErrors.email ? 'auth-email-error' : undefined}
               className="field"
               value={signupEmail}
-              onChange={(e) => setSignupEmail(e.target.value)}
+              onChange={(e) => {
+                setSignupEmail(e.target.value)
+                setAuthFieldErrors((current) => ({ ...current, email: undefined }))
+              }}
             />
+            {authFieldErrors.email && <p id="auth-email-error" role="alert" className="mt-1.5 text-xs text-rose-600">{authFieldErrors.email}</p>}
           </div>
 
           <div className="mb-6">
@@ -193,11 +285,24 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
               id="auth-password"
               type="password"
               autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
+              minLength={isRegisterMode ? 8 : undefined}
+              maxLength={128}
+              aria-invalid={Boolean(authFieldErrors.password)}
+              aria-describedby={
+                isRegisterMode
+                  ? authFieldErrors.password ? 'auth-password-help auth-password-error' : 'auth-password-help'
+                  : authFieldErrors.password ? 'auth-password-error' : undefined
+              }
               placeholder="••••••••"
               className="field"
               value={signupPassword}
-              onChange={(e) => setSignupPassword(e.target.value)}
+              onChange={(e) => {
+                setSignupPassword(e.target.value)
+                setAuthFieldErrors((current) => ({ ...current, password: undefined }))
+              }}
             />
+            {isRegisterMode && <p id="auth-password-help" className="mt-1.5 text-xs text-slate-500">Use at least 8 characters.</p>}
+            {authFieldErrors.password && <p id="auth-password-error" role="alert" className="mt-1.5 text-xs text-rose-600">{authFieldErrors.password}</p>}
           </div>
 
           <button
@@ -208,23 +313,26 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
             {authLoading ? 'Please wait…' : isRegisterMode ? 'Create Account' : 'Sign In'}
           </button>
 
-          <div className="mt-6 border-t border-slate-100 pt-5 text-center dark:border-slate-800/60">
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegisterMode(!isRegisterMode)
-                setAuthError(null)
-                setAuthNotice(null)
-              }}
-              className="text-sm font-medium text-slate-500 transition hover:text-brand-600"
-            >
-              {isRegisterMode ? (
-                <>Already have an account? <span className="font-bold text-brand-600">Sign in</span></>
-              ) : (
-                <>Don't have an account? <span className="font-bold text-brand-600">Create one</span></>
-              )}
-            </button>
-          </div>
+          {!resumeAccountDeletion && (
+            <div className="mt-6 border-t border-slate-100 pt-5 text-center dark:border-slate-800/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegisterMode(!isRegisterMode)
+                  setAuthError(null)
+                  setAuthNotice(null)
+                  setAuthFieldErrors({})
+                }}
+                className="inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium text-slate-500 transition hover:text-brand-600"
+              >
+                {isRegisterMode ? (
+                  <>Already have an account? <span className="font-bold text-brand-600">Sign in</span></>
+                ) : (
+                  <>Don't have an account? <span className="font-bold text-brand-600">Create one</span></>
+                )}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     )
@@ -241,32 +349,81 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
         </button>
       </div>
 
+      {resumeAccountDeletion && (
+        <DeleteAccountPanel
+          startExpanded
+          onDeleted={handleAccountDeleted}
+          onSessionExpired={handleDeletionSessionExpired}
+        />
+      )}
+
       <div className="card p-6 sm:p-8">
         <h2 className="section-title mb-2 dark:text-white">Welcome, {user.name.split(' ')[0]}</h2>
         <p className="text-sm text-slate-500 mb-8">Manage your saved searches and active price alerts.</p>
 
         {accountData ? (
           <div>
-            <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
+            {accountLoadError && (
+              <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                <p>
+                  We couldn't load {accountLoadError.searches && accountLoadError.alerts ? 'your saved searches or price alerts' : accountLoadError.searches ? 'your saved searches' : 'your price alerts'}. {accountData.searches.length > 0 || accountData.alerts.length > 0 ? 'Any data shown may be from an earlier load.' : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void loadAccountData()}
+                  disabled={accountLoading}
+                  className="btn btn-secondary shrink-0 px-3 py-1.5 text-xs"
+                >
+                  {accountLoading ? 'Retrying…' : 'Retry'}
+                </button>
+              </div>
+            )}
+
+            <div role="tablist" aria-label="Account data" className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
               <button
                 type="button"
+                ref={(element) => { accountTabRefs.current.searches = element }}
+                role="tab"
+                id="account-searches-tab"
+                aria-selected={accountTab === 'searches'}
+                aria-controls="account-searches-panel"
+                tabIndex={accountTab === 'searches' ? 0 : -1}
                 onClick={() => setAccountTab('searches')}
+                onKeyDown={handleAccountTabKeyDown}
                 className={`tab text-base px-6 py-3 ${accountTab === 'searches' ? 'tab-active' : ''}`}
               >
                 Saved Searches <span className="ml-2 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs">{accountData.searches.length}</span>
               </button>
               <button
                 type="button"
+                ref={(element) => { accountTabRefs.current.alerts = element }}
+                role="tab"
+                id="account-alerts-tab"
+                aria-selected={accountTab === 'alerts'}
+                aria-controls="account-alerts-panel"
+                tabIndex={accountTab === 'alerts' ? 0 : -1}
                 onClick={() => setAccountTab('alerts')}
+                onKeyDown={handleAccountTabKeyDown}
                 className={`tab text-base px-6 py-3 ${accountTab === 'alerts' ? 'tab-active' : ''}`}
               >
                 Price Alerts <span className="ml-2 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs">{accountData.alerts.length}</span>
               </button>
             </div>
 
-            <div className="min-h-[300px]">
+            <div
+              role="tabpanel"
+              id={accountTab === 'searches' ? 'account-searches-panel' : 'account-alerts-panel'}
+              aria-labelledby={accountTab === 'searches' ? 'account-searches-tab' : 'account-alerts-tab'}
+              tabIndex={0}
+              className="min-h-[300px]"
+            >
               {accountTab === 'searches' ? (
-                accountData.searches.length > 0 ? (
+                accountLoadError?.searches && accountData.searches.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Saved searches are unavailable right now</p>
+                    <p className="mt-1 max-w-xs text-sm text-slate-500">Retry loading your account data to see your saved searches.</p>
+                  </div>
+                ) : accountData.searches.length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {accountData.searches.map((s: any, i: number) => (
                       <div
@@ -326,7 +483,12 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
                   </div>
                 )
               ) : (
-                accountData.alerts.length > 0 ? (
+                accountLoadError?.alerts && accountData.alerts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                    <p className="font-semibold text-slate-700 dark:text-slate-200">Price alerts are unavailable right now</p>
+                    <p className="mt-1 max-w-xs text-sm text-slate-500">Retry loading your account data to see your price alerts.</p>
+                  </div>
+                ) : accountData.alerts.length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {accountData.alerts.map((a: any, i: number) => (
                       <div
@@ -401,6 +563,13 @@ export function Dashboard({ onClose, onRunSearch }: DashboardProps) {
           </div>
         )}
       </div>
+
+      {!resumeAccountDeletion && (
+        <DeleteAccountPanel
+          onDeleted={handleAccountDeleted}
+          onSessionExpired={handleDeletionSessionExpired}
+        />
+      )}
     </div>
   )
 }

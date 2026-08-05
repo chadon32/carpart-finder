@@ -1,8 +1,10 @@
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { Image } from 'expo-image'
 import { Stack, router } from 'expo-router'
-import * as WebBrowser from 'expo-web-browser'
 import { useCompare } from '@/stores/compare'
+import { openOutboundLink } from '@/lib/outboundLinks'
+import { AffiliateDisclosure } from '@/components/AffiliateDisclosure'
+import { hasMobileAffiliatePrograms } from '@/lib/affiliatePrograms'
 import { useThemeColors, brand } from '@/theme'
 
 export default function CompareScreen() {
@@ -28,6 +30,11 @@ export default function CompareScreen() {
           ),
         }}
       />
+      {hasMobileAffiliatePrograms ? (
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <AffiliateDisclosure />
+        </View>
+      ) : null}
       <ScrollView horizontal contentContainerStyle={{ padding: 16, gap: 12 }}>
         {listings.map((l) => {
           const shipping =
@@ -78,7 +85,7 @@ export default function CompareScreen() {
                 ) : null}
                 <View style={{ flex: 1 }} />
                 <Pressable
-                  onPress={() => WebBrowser.openBrowserAsync(l.link)}
+                  onPress={() => openOutboundLink(l.link)}
                   style={{
                     minHeight: 44,
                     borderRadius: 12,

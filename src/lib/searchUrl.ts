@@ -1,4 +1,5 @@
 import type { Car } from '../components/CarSelector'
+import { isValidPartQuery, normalizePartQuery } from './searchInput.js'
 
 export type Step = 'car' | 'part' | 'results'
 
@@ -18,7 +19,8 @@ export function routeFromSearch(search: string): AppRoute {
   const make = p.get('make')?.trim() || ''
   const model = p.get('model')?.trim() || ''
   const trim = p.get('trim')?.trim() || ''
-  const part = p.get('part')?.trim() || ''
+  const rawPart = normalizePartQuery(p.get('part') || '')
+  const part = isValidPartQuery(rawPart) ? rawPart : ''
 
   const carComplete = Boolean(year && make && model)
   if (!carComplete) return { step: 'car', car: null, part: null }
@@ -35,7 +37,8 @@ export function searchFromRoute(route: AppRoute): string {
   p.set('make', route.car.make)
   p.set('model', route.car.model)
   if (route.car.trim) p.set('trim', route.car.trim)
-  if (route.step === 'results' && route.part) p.set('part', route.part)
+  const normalizedPart = normalizePartQuery(route.part || '')
+  if (route.step === 'results' && isValidPartQuery(normalizedPart)) p.set('part', normalizedPart)
   const qs = p.toString()
   return qs ? `?${qs}` : ''
 }

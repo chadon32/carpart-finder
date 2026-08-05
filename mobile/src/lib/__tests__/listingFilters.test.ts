@@ -4,10 +4,10 @@ import type { Listing } from '../../api/types'
 const l = (over: Partial<Listing>): Listing =>
   ({ id: Math.random().toString(), price: 10, condition: 'New', crossBorder: false, sellerFeedbackPercentage: '99.0', ...over }) as Listing
 
-test('best preserves server order', () => {
+test('best ranks by total cost and seller trust instead of assuming server order', () => {
   const a = l({ id: 'a', price: 30 })
   const b = l({ id: 'b', price: 10 })
-  expect(applyListingFilters([a, b], defaultFilters).map((x) => x.id)).toEqual(['a', 'b'])
+  expect(applyListingFilters([a, b], defaultFilters).map((x) => x.id)).toEqual(['b', 'a'])
 })
 
 test('price and total sort ascending', () => {

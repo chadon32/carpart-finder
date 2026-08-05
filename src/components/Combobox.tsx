@@ -48,6 +48,8 @@ export function Combobox({
   disabled,
   allowFreeText,
   enterKeyHint,
+  maxLength,
+  onInvalidFreeTextSubmit,
 }: {
   label: string
   placeholder: string
@@ -58,11 +60,15 @@ export function Combobox({
   disabled?: boolean
   allowFreeText?: boolean
   enterKeyHint?: 'search' | 'go' | 'done' | 'next'
+  maxLength?: number
+  onInvalidFreeTextSubmit?: () => void
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [emptySubmit, setEmptySubmit] = useState(false)
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestInputValue = useRef('')
   const listId = useId()
 
   const trimmedQuery = query.trim()
@@ -108,7 +114,7 @@ export function Combobox({
     }
 
     return { entries, items }
-  }, [options, groups, trimmedQuery, allowFreeText])
+  }, [options, groups, trimmedQuery, allowFreeText, value])
 
   // Reset keyboard highlight whenever the candidate list changes.
   useEffect(() => {
@@ -124,8 +130,10 @@ export function Combobox({
 
   const submit = (val: string) => {
     onChange(val)
+    setEmptySubmit(false)
     setOpen(false)
     setQuery('')
+    latestInputValue.current = ''
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -144,9 +152,17 @@ export function Combobox({
       if (open && activeIndex >= 0 && items[activeIndex]) {
         e.preventDefault()
         submit(items[activeIndex].value)
-      } else if (allowFreeText && trimmedQuery) {
+      } else if (allowFreeText) {
+        // Track input events outside React's render cycle so a rapid clear +
+        // Enter cannot submit the value from the previous render.
+        const currentValue = latestInputValue.current.trim()
+        if (!currentValue) {
+          setEmptySubmit(true)
+          onInvalidFreeTextSubmit?.()
+          return
+        }
         e.preventDefault()
-        submit(trimmedQuery)
+        submit(currentValue)
       }
       return
     }
@@ -175,18 +191,24 @@ export function Combobox({
           disabled={disabled}
           placeholder={placeholder}
           enterKeyHint={enterKeyHint}
+          maxLength={maxLength}
           value={open ? query : value}
           onFocus={(e) => {
             if (blurTimeout.current) clearTimeout(blurTimeout.current)
             setOpen(true)
             setQuery(value)
+            latestInputValue.current = value
             e.currentTarget.select()
           }}
           onChange={(e) => {
+            latestInputValue.current = e.target.value
+            setEmptySubmit(false)
             setQuery(e.target.value)
             if (!open) setOpen(true)
           }}
           onKeyDown={handleKeyDown}
+          aria-invalid={emptySubmit || undefined}
+          aria-describedby={emptySubmit ? `${listId}-empty-submit` : undefined}
           onBlur={() => {
             blurTimeout.current = setTimeout(() => setOpen(false), 150)
           }}
@@ -244,6 +266,11 @@ export function Combobox({
             )
           )}
         </ul>
+      )}
+      {allowFreeText && emptySubmit && (
+        <p id={`${listId}-empty-submit`} role="alert" className="mt-1.5 text-xs text-rose-600">
+          Enter a part name or choose a suggested part.
+        </p>
       )}
     </div>
   )

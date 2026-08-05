@@ -28,54 +28,67 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
         : `+$${listing.shippingCost.toFixed(2)} shipping`
 
   return (
-    <Pressable
-      onPress={onPress}
+    <View
       style={{
         backgroundColor: c.card,
         borderRadius: 16,
-        borderWidth: 1,
-        borderColor: c.border,
+        borderWidth: listing.verifiedFitment ? 1 : 2,
+        borderColor: listing.verifiedFitment ? c.border : '#d97706',
         marginHorizontal: 16,
         marginBottom: 12,
         overflow: 'hidden',
       }}
     >
-      <View style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: c.border }}>
-        {listing.image ? (
-          <Image
-            source={{ uri: listing.image }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            transition={150}
-          />
-        ) : null}
-      </View>
-      <View style={{ padding: 12, gap: 8 }}>
-        <Text numberOfLines={2} style={{ color: c.text, fontWeight: '700', fontSize: 15 }}>
-          {listing.title}
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {isBestValue && <Pill label="BEST VALUE" bg={brand} fg="#fff" />}
-          {isCheapest && <Pill label="CHEAPEST" bg="#d1fae5" fg="#047857" />}
-          {listing.verifiedFitment && <Pill label="VERIFIED FITMENT" bg="#d1fae5" fg="#047857" />}
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-          <Text style={{ color: c.text, fontSize: 21, fontFamily: dataFontBold }}>
-            ${listing.price.toFixed(2)}
-          </Text>
-          {listing.originalPrice ? (
-            <Text style={{ color: c.subtext, textDecorationLine: 'line-through' }}>
-              ${listing.originalPrice.toFixed(2)}
-            </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${listing.title}, $${listing.price.toFixed(2)}. ${listing.verifiedFitment ? 'Marketplace compatibility match.' : 'Fitment not verified.'}`}
+        onPress={onPress}
+      >
+        <View style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: c.border }}>
+          {listing.image ? (
+            <Image
+              source={{ uri: listing.image }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              transition={150}
+            />
           ) : null}
-          {shipping ? <Text style={{ color: c.subtext, fontSize: 13 }}>{shipping}</Text> : null}
         </View>
-        <Text style={{ color: c.subtext, fontSize: 13 }}>
-          {listing.condition} · {listing.seller}
-          {listing.sellerFeedbackPercentage ? ` · ${listing.sellerFeedbackPercentage}%` : ''}
-          {listing.sellerFeedbackScore != null ? ` (${listing.sellerFeedbackScore})` : ''}
-        </Text>
+        <View style={{ padding: 12, gap: 8 }}>
+          <Text numberOfLines={2} style={{ color: c.text, fontWeight: '700', fontSize: 15 }}>
+            {listing.title}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {isBestValue && <Pill label="BEST VALUE" bg={brand} fg="#fff" />}
+            {isCheapest && <Pill label="CHEAPEST" bg="#d1fae5" fg="#047857" />}
+            {listing.verifiedFitment ? (
+              <Pill label="MARKETPLACE MATCH" bg="#d1fae5" fg="#047857" />
+            ) : (
+              <Pill label="FITMENT NOT VERIFIED" bg="#fef3c7" fg="#92400e" />
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+            <Text style={{ color: c.text, fontSize: 21, fontFamily: dataFontBold }}>
+              ${listing.price.toFixed(2)}
+            </Text>
+            {listing.originalPrice ? (
+              <Text style={{ color: c.subtext, textDecorationLine: 'line-through' }}>
+                ${listing.originalPrice.toFixed(2)}
+              </Text>
+            ) : null}
+            {shipping ? <Text style={{ color: c.subtext, fontSize: 13 }}>{shipping}</Text> : null}
+          </View>
+          <Text style={{ color: c.subtext, fontSize: 13 }}>
+            {listing.condition} · {listing.seller}
+            {listing.sellerFeedbackPercentage ? ` · ${listing.sellerFeedbackPercentage}%` : ''}
+            {listing.sellerFeedbackScore != null ? ` (${listing.sellerFeedbackScore})` : ''}
+          </Text>
+        </View>
+      </Pressable>
+      <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: isComparing }}
           onPress={onToggleCompare}
           style={{
             minHeight: 44,
@@ -92,6 +105,6 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
           </Text>
         </Pressable>
       </View>
-    </Pressable>
+    </View>
   )
 }

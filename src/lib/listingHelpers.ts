@@ -40,7 +40,7 @@ export function valueScore(l: Listing) {
   const pct = l.sellerFeedbackPercentage ? Number(l.sellerFeedbackPercentage) : 92
   const trust = Math.min(100, Math.max(80, pct))
   const penalty = (100 - trust) / 100
-  let effective = l.price * (1 + penalty)
+  let effective = (l.price + (l.shippingCost || 0)) * (1 + penalty)
   if (l.topRatedSeller) effective *= 0.95
   return effective
 }

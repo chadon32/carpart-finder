@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>CarPartsRadar Buying Guides</title>
+    <link>https://carpartsradar.com/guides.html</link>
+    <description>Independent automotive fitment and parts-buying guidance.</description>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 22 Jul 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>How to Confirm a Car Part Fits Before You Buy</title>
+      <link>https://carpartsradar.com/guides/how-to-confirm-car-part-fitment.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/how-to-confirm-car-part-fitment.html</guid>
+      <description>A practical fitment checklist using the VIN, trim, engine, drivetrain, production date, and manufacturer part numbers.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>OEM vs. Aftermarket Car Parts: How to Choose</title>
+      <link>https://carpartsradar.com/guides/oem-vs-aftermarket-car-parts.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/oem-vs-aftermarket-car-parts.html</guid>
+      <description>Compare original equipment, aftermarket, remanufactured, and used parts by fit, warranty, cost, and repair risk.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Brake Pad Buying Guide: Fit, Material, and Total Cost</title>
+      <link>https://carpartsradar.com/guides/brake-pad-buying-guide.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/brake-pad-buying-guide.html</guid>
+      <description>Choose replacement brake pads by axle, caliper package, friction material, hardware, driving conditions, and rotor condition.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Alternator Buying Guide: Output, Fitment, and Core Charges</title>
+      <link>https://carpartsradar.com/guides/alternator-buying-guide.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/alternator-buying-guide.html</guid>
+      <description>Compare alternators by rated output, connector, pulley, mounting, remanufacturing quality, warranty, and core-return cost.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Starter Motor Buying Guide: Diagnose First, Then Match</title>
+      <link>https://carpartsradar.com/guides/starter-motor-buying-guide.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/starter-motor-buying-guide.html</guid>
+      <description>Select a starter by engine, transmission, tooth count, rotation, mounting, electrical terminals, warranty, and core policy.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Oxygen Sensor Buying Guide: Bank, Position, and Connector</title>
+      <link>https://carpartsradar.com/guides/oxygen-sensor-buying-guide.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/oxygen-sensor-buying-guide.html</guid>
+      <description>Identify the correct upstream or downstream oxygen sensor by bank, sensor number, emissions package, connector, and original part number.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Shocks vs. Struts: What to Check Before Ordering</title>
+      <link>https://carpartsradar.com/guides/shocks-vs-struts-buying-guide.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/shocks-vs-struts-buying-guide.html</guid>
+      <description>Understand shock and strut applications, complete assemblies, electronic suspension options, axle pairing, and alignment costs.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>How to Compare the Real Cost of an Online Car Part</title>
+      <link>https://carpartsradar.com/guides/compare-total-car-part-cost.html</link>
+      <guid isPermaLink="true">https://carpartsradar.com/guides/compare-total-car-part-cost.html</guid>
+      <description>Calculate delivered price, shipping, tax, core deposits, hardware, programming, returns, downtime, and warranty risk.</description>
+      <pubDate>Wed, 22 Jul 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

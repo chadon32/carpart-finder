@@ -94,6 +94,19 @@ export async function search(ctx, { limit = 10 } = {}) {
       link: product.product_detail_url,
       source: 'AliExpress',
       crossBorder: true,
+      // AliExpress results do not provide eBay compatibility evidence. Keep
+      // the provider contract explicit so missing metadata cannot look
+      // verified in a consumer of the API.
+      verifiedFitment: false,
+      fitmentTier: 'fallback',
+      fitmentEvidence: {
+        provider: 'AliExpress',
+        matchType: null,
+        scope: 'keyword-only',
+        matchedVehicle: null,
+        checkedAt: new Date().toISOString(),
+        note: 'This provider did not return structured compatibility evidence for the selected vehicle.',
+      },
       shipsFrom: 'Overseas (China)',
       estimatedDelivery: '2-6 weeks',
     })

@@ -25,14 +25,34 @@ export type Listing = {
   shippingCost?: number | null
   deliveryMin?: string | null
   deliveryMax?: string | null
-  // False when eBay's compatibility filter couldn't be applied and the results
-  // came from a relaxed keyword search instead.
+  // True only when the provider returned explicit exact compatibility evidence.
+  // Missing/false is always unverified and must never render as a guarantee.
   verifiedFitment?: boolean
+  fitmentTier?: 'verified' | 'fallback'
+  fitmentProof?: string | null
+  fitmentEvidence?: {
+    provider: string
+    matchType: 'EXACT' | null
+    scope: 'year-make-model' | 'year-make-model-trim' | 'keyword-only'
+    matchedVehicle: {
+      year: string
+      make: string
+      model: string
+      trim?: string
+    } | null
+    checkedAt: string
+    note: string
+  }
 }
 
 export type SearchResponse = {
+  fitmentContractVersion: 2
   query: string
+  // Only structured marketplace compatibility matches appear here.
   results: Listing[]
+  // Broad keyword results stay separate and are always labeled unverified.
+  fallbackResults?: Listing[]
+  fitmentSummary?: { verified: number; fallback: number; hiddenIrrelevantFallbacks?: number }
   providerErrors: Record<string, string>
   skippedProviders: string[]
   cached?: boolean

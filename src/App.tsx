@@ -1,8 +1,9 @@
 import { useEffect, useState, Suspense, lazy } from 'react'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import { Helmet } from 'react-helmet-async'
-import { Car as CarIcon, Bookmark, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
+import { Car as CarIcon, Bookmark, BookOpen, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
 import { RadarMark } from './components/RadarMark'
+import { ApiReadinessBanner } from './components/ApiReadinessBanner'
 import { BottomNav } from './components/BottomNav'
 import { CarSelector, type Car } from './components/CarSelector'
 
@@ -28,8 +29,9 @@ import { useCart } from './hooks/useCart'
 import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
 import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
-import { useAppContext } from './contexts/AppContext'
+import { useAppContext } from './contexts/useAppContext'
 import { trackSearch } from './lib/analytics'
+import { isValidPartQuery, normalizePartQuery } from './lib/searchInput.js'
 
 function App() {
   const { user, darkMode, setDarkMode } = useAppContext()
@@ -67,10 +69,15 @@ function App() {
   }, [])
 
   const runSearch = (selectedCar: { year: string, make: string, model: string, trim?: string }, selectedPart: string) => {
+    const normalizedPart = normalizePartQuery(selectedPart)
+    if (!isValidPartQuery(normalizedPart)) {
+      toast.error('Enter a part name between 1 and 60 characters.')
+      return
+    }
     const fullCar: Car = { ...selectedCar, trim: selectedCar.trim || '' }
-    recent.record(fullCar, selectedPart)
-    trackSearch(fullCar.year, fullCar.make, fullCar.model, selectedPart)
-    navigate({ step: 'results', car: fullCar, part: selectedPart })
+    recent.record(fullCar, normalizedPart)
+    trackSearch(fullCar.year, fullCar.make, fullCar.model, normalizedPart)
+    navigate({ step: 'results', car: fullCar, part: normalizedPart })
   }
 
   const goHome = () => {
@@ -84,12 +91,12 @@ function App() {
   const goToSearchTab = () => {
     if (showWatchlist) {
       setShowWatchlist(false)
-      return
+      if (step !== 'dashboard') return
     }
     if (step === 'dashboard') {
-      if (car && part) setStep('results')
-      else if (car) setStep('part')
-      else setStep('car')
+      if (car && part) navigate({ step: 'results', car, part })
+      else if (car) navigate({ step: 'part', car, part: null })
+      else navigate({ step: 'car', car: null, part: null })
       return
     }
     goHome()
@@ -98,18 +105,18 @@ function App() {
   const viewKey = showWatchlist ? 'watchlist' : step
 
   return (
-    <div className="app-bg flex min-h-screen flex-col text-slate-900 dark:text-slate-100">
+    <div className="app-bg flex min-h-screen min-w-0 max-w-full flex-col overflow-x-clip text-slate-900 dark:text-slate-100">
       <Helmet>
-        <title>CarPartsRadar — Compare Car Part Prices & Find Cheap Auto Parts</title>
-        <meta name="description" content="Compare car part prices instantly. Find the cheapest live auto parts and listings from eBay and major retailers that fit your exact vehicle." />
-        <meta property="og:title" content="CarPartsRadar — Compare Car Part Prices & Find Cheap Auto Parts" />
-        <meta property="og:description" content="Real-time price comparison for auto parts. Compare eBay listings and major retailers instantly for your exact vehicle." />
+        <title>CarPartsRadar | Compare Car Part Prices and Fitment</title>
+        <meta name="description" content="Compare live car-part prices. Marketplace compatibility matches stay separate from broader keyword results so you can verify fitment before buying." />
+        <meta property="og:title" content="CarPartsRadar | Compare Car Part Prices and Fitment" />
+        <meta property="og:description" content="Compare live auto-part listings with marketplace compatibility evidence and clearly separated broader keyword results." />
       </Helmet>
       
       <Toaster position="top-center" richColors />
       <header ref={headroomRef} className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <button type="button" onClick={goHome} className="group flex min-w-0 items-center gap-2.5 sm:gap-3.5">
+          <button type="button" onClick={goHome} className="group flex min-h-11 min-w-0 items-center gap-2.5 sm:gap-3.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-lg shadow-brand-900/25 transition-all group-hover:scale-[1.03] sm:h-11 sm:w-11 sm:rounded-2xl">
               <RadarMark className="h-6 w-6 sm:h-7 sm:w-7" />
             </span>
@@ -122,6 +129,14 @@ function App() {
           </button>
 
           <div className="flex items-center gap-2">
+            <a
+              href="/guides.html"
+              className="btn btn-secondary hidden px-3 py-2.5 text-sm sm:inline-flex sm:px-4"
+              aria-label="Open buying guides"
+            >
+              <BookOpen size={17} strokeWidth={2.3} />
+              <span className="hidden lg:inline">Guides</span>
+            </a>
             <button
               type="button"
               onClick={() => setShowWatchlist(true)}
@@ -151,7 +166,7 @@ function App() {
             <button
               type="button"
               onClick={() => setDarkMode(!darkMode)}
-              className="btn btn-secondary flex shrink-0 items-center justify-center p-2.5"
+              className="btn btn-secondary flex min-w-11 shrink-0 items-center justify-center p-2.5"
               aria-label="Toggle theme"
             >
               {darkMode ? <Sun size={17} /> : <Moon size={17} />}
@@ -160,7 +175,9 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 sm:pb-10">
+      <ApiReadinessBanner />
+
+      <main className="mx-auto min-w-0 w-full max-w-6xl flex-1 overflow-x-clip px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 sm:pb-10">
         {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
         {/* Entrance animation must be removed once done: a transform animation
             (even filled at identity) makes this div the containing block for
@@ -190,7 +207,8 @@ function App() {
                   else if (car) setStep('part')
                   else setStep('car')
                 }} 
-                onRunSearch={runSearch} 
+                onRunSearch={runSearch}
+                onAccountDeleted={recent.clear}
               />
             </Suspense>
           ) : (
@@ -202,31 +220,31 @@ function App() {
                       Elements stagger in once on load; the sweep keeps the
                       "live scan" idea moving after the entrance settles. */}
                   <div className="blueprint-grid relative mb-10 pt-4 text-center sm:mb-16 sm:pt-10">
-                    <div className="animate-slide-up font-data mx-auto mb-5 inline-flex items-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400 sm:mb-7">
+                    <div className="animate-slide-up font-data mx-auto mb-5 inline-flex max-w-full flex-wrap items-center justify-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400 sm:mb-7">
                       <RadarMark className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                       Live scan — prices pulled per search
                     </div>
 
-                    <h1 className="font-display animate-slide-up mx-auto max-w-4xl text-balance text-4xl text-slate-950 sm:text-7xl md:text-8xl [animation-delay:90ms]">
-                      Parts that fit.
+                    <h1 className="font-display break-anywhere animate-slide-up mx-auto max-w-4xl text-balance text-4xl text-slate-950 sm:text-7xl md:text-8xl [animation-delay:90ms]">
+                      Find the right part.
                       <br />
                       <span className="text-brand-600 dark:text-brand-400">Prices on radar.</span>
                     </h1>
 
                     <p className="animate-slide-up mx-auto mt-4 max-w-lg text-balance text-base text-slate-600 sm:mt-6 sm:text-lg [animation-delay:180ms]">
-                      Pick your year, make, and model. Every listing is checked against real
-                      compatibility data for your exact vehicle — and clearly labeled on the rare one we can't verify.
+                      Pick your year, make, and model. Marketplace compatibility matches stay separate
+                      from broader keyword results, so unknown fitment is never presented as confirmed.
                     </p>
 
                     <div className="animate-slide-up -mx-5 mt-6 flex items-center gap-2.5 overflow-x-auto scrollbar-none px-5 sm:mx-0 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0 [animation-delay:260ms]">
                       <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
-                        <ShieldCheck size={13} className="text-brand-600" /> Fitment matched, not guessed
+                        <ShieldCheck size={13} className="text-brand-600" /> Evidence shown for every match
                       </div>
                       <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
                         <Zap size={13} className="text-brand-600" /> Prices pulled live
                       </div>
                       <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
-                        <Tag size={13} className="text-brand-600" /> Ranked by real value
+                        <Tag size={13} className="text-brand-600" /> Matched results ranked by total value
                       </div>
                     </div>
                   </div>
@@ -240,6 +258,7 @@ function App() {
                       searches={recent.searches}
                       onPick={(s) => runSearch(s.car, s.part)}
                       onClear={recent.clear}
+                      onRemove={recent.remove}
                     />
                     <TrustBanner />
                   </Suspense>
@@ -268,6 +287,10 @@ function App() {
                     }
                     isInWatchlist={watchlist.isInCart}
                     onSearchPart={(p) => runSearch(car, p)}
+                    onOpenAccount={() => {
+                      setStep('dashboard')
+                      setShowWatchlist(false)
+                    }}
                   />
                 </Suspense>
               )}
@@ -277,30 +300,44 @@ function App() {
       </main>
 
       <footer className="border-t border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/60">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
-                <RadarMark className="h-5 w-5" />
-              </span>
-              <span className="font-display text-lg leading-none text-slate-900 dark:text-slate-100">
-                CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
-              </span>
+        <div className="mx-auto max-w-6xl px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-10 sm:pb-10">
+          <div className="grid gap-8 sm:grid-cols-[minmax(0,1.4fr)_auto_auto] sm:gap-10">
+            <div>
+              <div className="flex items-center justify-center gap-2.5 sm:justify-start">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
+                  <RadarMark className="h-5 w-5" />
+                </span>
+                <span className="font-display text-lg leading-none text-slate-900 dark:text-slate-100">
+                  CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
+                </span>
+              </div>
+              <div className="mt-4 max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-left">
+                <p>
+                  We compare live listings from third-party marketplaces. Prices and availability are set by sellers
+                  and may change. Always confirm details on the retailer's site before buying.
+                </p>
+                <p>
+                  As an Amazon Associate I earn from qualifying purchases. Some outbound links are affiliate links,
+                  meaning we may earn a commission if you make a purchase at no extra cost to you.
+                </p>
+              </div>
             </div>
-            <div className="max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-right">
-              <p>
-                We compare live listings from third-party marketplaces. Prices and availability are set by sellers
-                and may change — always confirm details on the retailer's site before buying.
-              </p>
-              <p>
-                Affiliate disclosure: some outbound links are affiliate links, meaning we may earn a commission if
-                you make a purchase — at no extra cost to you. As an Amazon Associate, CarPartsRadar earns from
-                qualifying purchases. CarPartsRadar is also a member of the eBay Partner Network.
-              </p>
-            </div>
+            <nav aria-label="Explore" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:gap-2">
+              <span className="w-full text-center font-semibold text-slate-900 dark:text-slate-100 sm:text-left">Explore</span>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/guides.html">Buying guides</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/methodology.html">Methodology</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/about.html">About</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/contact.html">Contact</a>
+            </nav>
+            <nav aria-label="Policies" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:gap-2">
+              <span className="w-full text-center font-semibold text-slate-900 dark:text-slate-100 sm:text-left">Policies</span>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/privacy.html">Privacy</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/terms.html">Terms</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/affiliate-disclosure.html">Affiliate disclosure</a>
+            </nav>
           </div>
           <p className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-400 dark:border-slate-800/60">
-            © {new Date().getFullYear()} CarPartsRadar — Not affiliated with eBay, Amazon, or any retailer listed.
+            © {new Date().getFullYear()} CarPartsRadar. We are not a retailer and do not sell listed products.
           </p>
         </div>
       </footer>
@@ -333,7 +370,7 @@ function TrustBanner() {
     {
       icon: ShieldCheck,
       title: 'We filter for fitment',
-      body: "Listings are matched against eBay's compatibility data for your exact vehicle, and we label anything we can't verify.",
+      body: "Marketplace compatibility matches are shown first. Broader keyword results stay separate and are never treated as confirmed fitment.",
     },
     {
       icon: Tag,

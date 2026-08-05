@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Listing } from '../api/types'
+import { skipServerWebHydration } from '../lib/persistence'
 
 export type WatchItem = Listing & {
   addedAt: number
@@ -14,6 +15,7 @@ type WatchlistState = {
   items: WatchItem[]
   watch: (listing: Listing, carLabel: string, part: string) => void
   unwatch: (id: string) => void
+  clear: () => void
   isWatched: (id: string) => boolean
 }
 
@@ -29,8 +31,13 @@ export const useWatchlist = create<WatchlistState>()(
           ],
         })),
       unwatch: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
+      clear: () => set({ items: [] }),
       isWatched: (id) => get().items.some((i) => i.id === id),
     }),
-    { name: 'cpr-watchlist', storage: createJSONStorage(() => AsyncStorage) }
+    {
+      name: 'cpr-watchlist',
+      storage: createJSONStorage(() => AsyncStorage),
+      skipHydration: skipServerWebHydration,
+    }
   )
 )

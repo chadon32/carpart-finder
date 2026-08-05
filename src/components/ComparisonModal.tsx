@@ -2,6 +2,17 @@ import { X, ExternalLink, Star, Award, Check, AlertTriangle } from 'lucide-react
 import type { Listing } from '../api/client'
 import { Modal } from './Modal'
 
+const fitmentScopeLabels = {
+  'year-make-model': 'Year, make, and model',
+  'year-make-model-trim': 'Year, make, model, and trim',
+  'keyword-only': 'Keyword-only',
+} as const
+
+function formatCheckedAt(checkedAt: string) {
+  const date = new Date(checkedAt)
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString()
+}
+
 export function ComparisonModal({ listings, onClose }: { listings: Listing[]; onClose: () => void }) {
   const getDeliveryText = (item: Listing) => {
     if (!item.deliveryMin && !item.deliveryMax) return '—'
@@ -35,7 +46,8 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
         </button>
       </div>
 
-      <div className="overflow-x-auto p-6">
+      <p className="px-6 pt-4 text-xs text-slate-500 sm:hidden">Swipe sideways to compare every selected listing.</p>
+      <div className="overflow-x-auto p-6" tabIndex={0} aria-label="Scrollable listing comparison table">
         <table className="w-full min-w-[700px] border-collapse text-left text-xs text-slate-600">
           <thead>
             <tr>
@@ -92,20 +104,34 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
 
             {/* Fitment */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Fitment Check</td>
-              {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
-                  {item.verifiedFitment === false ? (
-                    <span className="inline-flex items-center gap-1.5 font-medium text-amber-700">
-                      <AlertTriangle size={13} /> Unverified Fitment
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
-                      <Check size={13} strokeWidth={3} /> Verified Fitment
-                    </span>
-                  )}
-                </td>
-              ))}
+              <td className="py-4 pr-4 font-semibold text-slate-900">Marketplace compatibility</td>
+              {listings.map((item) => {
+                const evidence = item.fitmentEvidence
+                const checkedAt = evidence ? formatCheckedAt(evidence.checkedAt) : null
+
+                return (
+                  <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
+                    {item.verifiedFitment !== true ? (
+                      <span className="inline-flex items-center gap-1.5 font-medium text-amber-700">
+                        <AlertTriangle size={13} /> Marketplace compatibility not confirmed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
+                        <Check size={13} strokeWidth={3} /> Marketplace compatibility match
+                      </span>
+                    )}
+                    {evidence && (
+                      <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-slate-500">
+                        <div><span className="font-semibold text-slate-600">Scope:</span> {fitmentScopeLabels[evidence.scope]}</div>
+                        {evidence.provider && <div><span className="font-semibold text-slate-600">Provider:</span> {evidence.provider}</div>}
+                        {checkedAt && <div><span className="font-semibold text-slate-600">Checked:</span> {checkedAt}</div>}
+                        {evidence.note && <p>{evidence.note}</p>}
+                        <p className="text-slate-400">Marketplace data can omit engine, drivetrain, options, and part-number details. Confirm before buying.</p>
+                      </div>
+                    )}
+                  </td>
+                )
+              })}
             </tr>
 
             {/* Seller */}

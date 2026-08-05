@@ -1,15 +1,29 @@
 import { useState, Suspense, lazy } from 'react'
-import { X, ExternalLink, Star, Truck, Award, ShieldCheck, Sparkles } from 'lucide-react'
+import { X, ExternalLink, Star, Truck, Award, AlertTriangle, ShieldCheck, Sparkles } from 'lucide-react'
 import type { Listing } from '../api/client'
+import type { Car } from './CarSelector'
 import { Modal } from './Modal'
-import { trackAddedToWatchlist } from '../lib/analytics'
+import { trackAddedToWatchlist, trackRetailerClick } from '../lib/analytics'
+import { AffiliateDisclosure } from './AffiliateDisclosure'
 
 // RepairGuideModal pulls in react-markdown (heavy) and only renders when the
 // user clicks "Generate AI Guide" — load it (and its markdown deps) on demand.
 const RepairGuideModal = lazy(() => import('./RepairGuideModal').then((m) => ({ default: m.RepairGuideModal })))
 
+const fitmentScopeLabels = {
+  'year-make-model': 'Year, make, and model',
+  'year-make-model-trim': 'Year, make, model, and trim',
+  'keyword-only': 'Keyword-only',
+} as const
+
+function formatCheckedAt(checkedAt: string) {
+  const date = new Date(checkedAt)
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString()
+}
+
 interface PartDetailModalProps {
   listing: Listing
+  vehicle: Car
   vehicleLabel: string
   part: string
   companions?: string[]
@@ -21,6 +35,7 @@ interface PartDetailModalProps {
 
 export function PartDetailModal({
   listing,
+  vehicle,
   vehicleLabel,
   part,
   companions,
@@ -29,10 +44,24 @@ export function PartDetailModal({
   onAddToWatchlist,
   isInWatchlist,
 }: PartDetailModalProps) {
+  const isFitmentVerified = listing.verifiedFitment === true
+  const canGenerateGuide = isFitmentVerified && Boolean(listing.fitmentProof)
   const [showGuideModal, setShowGuideModal] = useState(false)
 
+  if (showGuideModal) {
+    return (
+      <Suspense fallback={null}>
+        <RepairGuideModal
+          vehicle={vehicle}
+          listing={listing}
+          part={part}
+          onClose={() => setShowGuideModal(false)}
+        />
+      </Suspense>
+    )
+  }
+
   return (
-    <>
     <Modal label={`${part} — listing details`} onClose={onClose}>
       {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
@@ -105,16 +134,59 @@ export function PartDetailModal({
               </div>
             )}
 
-            {listing.verifiedFitment === false ? (
+            {!isFitmentVerified ? (
               <div className="mt-5 flex items-center gap-2 text-xs text-amber-700">
-                <ShieldCheck size={14} /> Fitment for {vehicleLabel} not verified — check before buying
+                <AlertTriangle size={14} /> Marketplace compatibility not confirmed for {vehicleLabel} — check before buying
               </div>
             ) : (
               <div className="mt-5 flex items-center gap-2 text-xs text-emerald-700">
-                <ShieldCheck size={14} /> Verified to fit {vehicleLabel}
+                <ShieldCheck size={14} /> Marketplace compatibility match for {vehicleLabel}
               </div>
             )}
             
+            {listing.fitmentEvidence && (
+              <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900/40">
+                <summary className="cursor-pointer font-semibold text-slate-800 dark:text-slate-200">
+                  Why this marketplace compatibility label?
+                </summary>
+                <p className="mt-2 leading-relaxed">{listing.fitmentEvidence.note}</p>
+                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  <dt className="font-semibold">Scope</dt>
+                  <dd>{fitmentScopeLabels[listing.fitmentEvidence.scope]}</dd>
+                  {listing.fitmentEvidence.provider && (
+                    <>
+                      <dt className="font-semibold">Provider</dt>
+                      <dd>{listing.fitmentEvidence.provider}</dd>
+                    </>
+                  )}
+                  {listing.fitmentEvidence.matchedVehicle && (
+                    <>
+                      <dt className="font-semibold">Matched fields</dt>
+                      <dd>
+                        {listing.fitmentEvidence.matchedVehicle.year}{' '}
+                        {listing.fitmentEvidence.matchedVehicle.make}{' '}
+                        {listing.fitmentEvidence.matchedVehicle.model}
+                        {listing.fitmentEvidence.matchedVehicle.trim
+                          ? ` ${listing.fitmentEvidence.matchedVehicle.trim}`
+                          : ''}
+                      </dd>
+                    </>
+                  )}
+                  <dt className="font-semibold">Evidence</dt>
+                  <dd>{listing.fitmentEvidence.matchType || 'No structured compatibility match'}</dd>
+                  {formatCheckedAt(listing.fitmentEvidence.checkedAt) && (
+                    <>
+                      <dt className="font-semibold">Checked</dt>
+                      <dd>{formatCheckedAt(listing.fitmentEvidence.checkedAt)}</dd>
+                    </>
+                  )}
+                </dl>
+                <p className="mt-2 text-slate-500">
+                  This marketplace compatibility match is not a fitment guarantee. Confirm engine, drivetrain, options, dimensions, and original part number on the retailer page before buying.
+                </p>
+              </details>
+            )}
+
             {companions && companions.length > 0 && onSearchPart && (
               <div className="mt-5">
                 <div className="eyebrow">Complete the job</div>
@@ -137,15 +209,19 @@ export function PartDetailModal({
                     <h4 className="font-bold text-slate-900 tracking-tight">Need help replacing this?</h4>
                   </div>
                   <p className="text-sm text-slate-600">
-                    Get a custom step-by-step AI repair guide for your {vehicleLabel}.
+                    {canGenerateGuide
+                      ? `Get a cautious step-by-step AI repair overview for your ${vehicleLabel}.`
+                      : 'Repair guidance is available only after the marketplace confirms compatibility for the selected vehicle.'}
                   </p>
                 </div>
-                <button 
-                  onClick={() => setShowGuideModal(true)}
-                  className="btn btn-primary whitespace-nowrap px-4 py-2 text-sm shadow-sm hover:shadow transition-shadow w-full sm:w-auto"
-                >
-                  Generate AI Guide
-                </button>
+                {canGenerateGuide && (
+                  <button
+                    onClick={() => setShowGuideModal(true)}
+                    className="btn btn-primary whitespace-nowrap px-4 py-2 text-sm shadow-sm hover:shadow transition-shadow w-full sm:w-auto"
+                  >
+                    Generate AI Guide
+                  </button>
+                )}
               </div>
             </div>
             
@@ -153,42 +229,42 @@ export function PartDetailModal({
         </div>
 
         {/* Footer Actions — pinned to the sheet bottom on mobile */}
-        <div className="sticky bottom-0 mt-4 flex flex-col gap-3 border-t bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:static sm:flex-row sm:p-6">
-          <button
-            onClick={() => {
-              onAddToWatchlist()
-              trackAddedToWatchlist(part, listing.price, listing.source)
-            }}
-            disabled={isInWatchlist}
-            className={`btn flex-1 py-3 text-base ${isInWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
-          >
-            {isInWatchlist ? 'Added to Watchlist' : 'Add to Watchlist'}
-          </button>
+        <div className="sticky bottom-0 mt-4 border-t bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:static sm:p-6">
+          <AffiliateDisclosure className="mb-3" />
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => {
+                onAddToWatchlist()
+                trackAddedToWatchlist(part, listing.price, listing.source)
+              }}
+              disabled={isInWatchlist}
+              className={`btn flex-1 py-3 text-base ${isInWatchlist ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : 'btn-secondary'}`}
+            >
+              {isInWatchlist ? 'Added to Watchlist' : 'Add to Watchlist'}
+            </button>
 
-          <a
-            href={listing.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-primary flex-1 py-3 text-base"
-          >
-            View on {listing.source} <ExternalLink size={16} />
-          </a>
+            <a
+              href={listing.link}
+              onClick={() => trackRetailerClick({
+                retailer: listing.source,
+                placement: 'listing-detail',
+                vehicleLabel,
+                part,
+                listingId: listing.id,
+                fitmentStatus: listing.verifiedFitment === true ? 'verified' : 'unverified',
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary flex-1 py-3 text-base"
+            >
+              View on {listing.source} <ExternalLink size={16} />
+            </a>
 
-          <button onClick={onClose} className="btn btn-ghost hidden py-3 text-base sm:inline-flex">
-            Close
-          </button>
+            <button onClick={onClose} className="btn btn-ghost hidden py-3 text-base sm:inline-flex">
+              Close
+            </button>
+          </div>
         </div>
     </Modal>
-    
-    {showGuideModal && (
-      <Suspense fallback={null}>
-        <RepairGuideModal
-          vehicleLabel={vehicleLabel}
-          part={part}
-          onClose={() => setShowGuideModal(false)}
-        />
-      </Suspense>
-    )}
-    </>
   )
 }

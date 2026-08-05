@@ -1,45 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { getCurrentUser, logoutUser, ApiError } from '../api/supabase'
-
-interface User {
-  name: string
-  email: string
-}
-
-export interface SavedSearch {
-  id: string
-  year: string
-  make: string
-  model: string
-  trim?: string | null
-  part: string
-  created_at?: string
-}
-
-export interface PriceAlert {
-  id: string
-  saved_search_id?: string
-  target_price: number
-  triggered_at?: string | null
-  last_price?: number | null
-  saved_searches?: Pick<SavedSearch, 'part' | 'year' | 'make' | 'model'> | null
-}
-
-interface AccountData {
-  searches: SavedSearch[]
-  alerts: PriceAlert[]
-}
-
-interface AppContextType {
-  user: User | null
-  setUser: (user: User | null) => void
-  accountData: AccountData | null
-  setAccountData: React.Dispatch<React.SetStateAction<AccountData | null>>
-  darkMode: boolean
-  setDarkMode: (mode: boolean) => void
-}
-
-const AppContext = createContext<AppContextType | undefined>(undefined)
+import { AppContext, type AccountData, type User } from './AppContextValue'
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -153,12 +114,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
       {children}
     </AppContext.Provider>
   )
-}
-
-export function useAppContext() {
-  const context = useContext(AppContext)
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider')
-  }
-  return context
 }

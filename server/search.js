@@ -1,5 +1,9 @@
 import * as ebay from './providers/ebay.js'
 import * as aliexpress from './providers/aliexpress.js'
+import { issueFitmentProof } from './lib/fitmentProof.js'
+import { partitionListingsByFitment } from './lib/fitmentPolicy.js'
+import { filterListingsByPartIntent } from './lib/listingRelevance.js'
+import { affiliateContextForChannel } from './lib/affiliatePolicy.js'
 
 const providers = [
   { name: 'eBay', module: ebay },
@@ -27,13 +31,27 @@ function evictOldestIfNeeded() {
 
 
 // ==================== MAIN SEARCH FUNCTION ====================
-export async function searchCheapestListings({ year, make, model, trim, part, zip, limit = 15, sort = 'price' }) {
+export async function searchCheapestListings({
+  year,
+  make,
+  model,
+  trim,
+  part,
+  zip,
+  channel = 'web',
+  limit = 15,
+  sort = 'price',
+}) {
   const query = `${year} ${make} ${model}${trim ? ` ${trim}` : ''} ${part}`.trim()
-  const ctx = { year, make, model, trim, part, zip, query }
+  const affiliate = affiliateContextForChannel(channel, {
+    campaignId: process.env.EBAY_EPN_CAMPAIGN_ID,
+    mobileApproved: process.env.EBAY_EPN_MOBILE_APPROVED === '1',
+  })
+  const ctx = { year, make, model, trim, part, zip, query, affiliate }
 
   // Delivery estimates vary by ZIP and the result set varies by sort, so the
   // cache key must include both.
-  const cacheKey = `${query}::${limit}::${zip || ''}::${sort}`.toLowerCase()
+  const cacheKey = `${query}::${limit}::${zip || ''}::${sort}::${affiliate?.referenceId || 'nonaffiliate'}`.toLowerCase()
   const cached = cache.get(cacheKey)
 
   if (cached && Date.now() < cached.expiresAt) {
@@ -55,6 +73,8 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
         return {
           query,
           results: [],
+          fallbackResults: [],
+          fitmentSummary: { verified: 0, fallback: 0, hiddenIrrelevantFallbacks: 0 },
           providerErrors: { config: 'No search providers are configured (missing API keys)' },
           skippedProviders: skipped,
         }
@@ -76,31 +96,57 @@ export async function searchCheapestListings({ year, make, model, trim, part, zi
       })
 
 
-      allResults.sort((a, b) => a.price - b.price)
+      // Keep a larger fallback reservoir before applying part-intent checks.
+      // That lets us remove obvious accessory-only keyword results while still
+      // filling the clearly labeled fallback section when useful inventory is
+      // available. Verified provider matches are intentionally untouched.
+      const { verified, fallback } = partitionListingsByFitment(allResults, limit * 3)
+      const results = verified.slice(0, limit).map((item) => ({
+        ...item,
+        fitmentProof: issueFitmentProof({
+          listingId: item.id,
+          year,
+          make,
+          model,
+          trim: trim || '',
+          part,
+          source: item.source,
+        }),
+      }))
+      const relevantFallbacks = filterListingsByPartIntent(fallback, part)
+      const fallbackResults = relevantFallbacks
+        .slice(0, limit)
+        .map((item) => ({ ...item, fitmentProof: null }))
+      const hiddenIrrelevantFallbacks = fallback.length - relevantFallbacks.length
 
-      const seen = new Set()
-      const results = []
-      for (const item of allResults) {
-        const key = `${item.source}:${item.seller}`
-        if (seen.has(key)) continue
-        seen.add(key)
-        results.push(item)
-        if (results.length >= limit) break
+      const data = {
+        query,
+        results,
+        fallbackResults,
+        fitmentSummary: { verified: results.length, fallback: fallbackResults.length, hiddenIrrelevantFallbacks },
+        providerErrors,
+        skippedProviders: skipped,
       }
-
-      const data = { query, results, providerErrors, skippedProviders: skipped }
 
       // Every provider failed and we have nothing to show — fall back to the last
       // known-good results for this exact query if they're recent enough. A stale
       // price beats an error page, as long as the UI says it's stale.
-      const totalFailure = results.length === 0 && Object.keys(providerErrors).length > 0
+      const totalFailure =
+        results.length === 0 &&
+        fallbackResults.length === 0 &&
+        Object.keys(providerErrors).length > 0
       if (totalFailure && cached && Date.now() < cached.staleUntil) {
-        return { ...cached.data, stale: true, providerErrors }
+        return {
+          ...cached.data,
+          results: cached.data.results.map((item) => ({ ...item, fitmentProof: null })),
+          stale: true,
+          providerErrors,
+        }
       }
 
       // Only cache genuinely useful responses so a transient total failure isn't
       // frozen in for 5 minutes.
-      if (results.length > 0) {
+      if (results.length > 0 || fallbackResults.length > 0) {
         evictOldestIfNeeded()
         cache.set(cacheKey, {
           data,

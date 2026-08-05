@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, Animated, Modal, Switch, ScrollView } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { searchParts, fetchPriceHistory, type PriceObservation } from '@/api/client'
 import { companionsForPart } from '@/data/partTypes'
 import { isElectricVehicle } from '@/data/electricVehicles'
 import { retailerLinks } from '@/data/retailerLinks'
+import { AffiliateDisclosure } from '@/components/AffiliateDisclosure'
+import { hasMobileAffiliatePrograms } from '@/lib/affiliatePrograms'
+import { openOutboundLink } from '@/lib/outboundLinks'
 import { sparklineHeights } from '@/lib/sparkline'
 import { usePrefs } from '@/stores/prefs'
 import type { Listing, SearchResponse } from '@/api/types'
-import { deriveResultsState } from '@/lib/resultsState'
+import { deriveResultsState, resultsErrorMessage } from '@/lib/resultsState'
+import { presentListings } from '@/lib/resultsPresentation'
 import {
-  applyListingFilters,
   activeFilterCount,
   defaultFilters,
+  valueScore,
   type ListingFilters,
 } from '@/lib/listingFilters'
 import { ListingCard } from '@/components/ListingCard'
@@ -65,6 +68,7 @@ export default function Results() {
   }>()
   const [response, setResponse] = useState<SearchResponse | null>(null)
   const [failed, setFailed] = useState(false)
+  const [failureMessage, setFailureMessage] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const compare = useCompare((s) => s.listings)
   const toggleCompare = useCompare((s) => s.toggle)
@@ -84,6 +88,7 @@ export default function Results() {
   const run = useCallback(async () => {
     const seq = ++runSeq.current
     setFailed(false)
+    setFailureMessage(null)
     try {
       const r = await searchParts(
         year, make, model, part, trim || undefined,
@@ -91,11 +96,12 @@ export default function Results() {
       )
       if (seq !== runSeq.current) return
       setResponse(r)
-      if (r.results.length > 0) {
+      if (r.results.length > 0 || (r.fallbackResults?.length ?? 0) > 0) {
         useRecents.getState().record({ year, make, model, trim: trim ?? '' }, part)
       }
-    } catch {
+    } catch (error) {
       if (seq !== runSeq.current) return
+      setFailureMessage(resultsErrorMessage(error))
       setFailed(true)
     }
   }, [year, make, model, part, trim])
@@ -117,14 +123,21 @@ export default function Results() {
 
   const state = deriveResultsState(response, failed)
   const results = response?.results ?? []
-  // Badges are computed on the raw server ranking, then filters/sort reorder
-  // the display — Best Value stays the server's pick wherever it lands.
-  const bestValueId = results[0]?.id ?? null
+  const fallbackResults = response?.fallbackResults ?? []
+  const hiddenIrrelevantFallbacks = response?.fitmentSummary?.hiddenIrrelevantFallbacks ?? 0
+  // Badges are computed from the complete verified set, then filters/sort can
+  // reorder the display without changing which listing earned each badge.
+  const bestValueId =
+    results.length > 0
+      ? results.reduce((best, listing) => (valueScore(listing) < valueScore(best) ? listing : best), results[0]).id
+      : null
   const cheapestId =
     results.length > 0
       ? results.reduce((min, l) => (totalCost(l) < totalCost(min) ? l : min), results[0]).id
       : null
-  const shown = applyListingFilters(results, filters)
+  const presentation = presentListings(results, fallbackResults, filters)
+  const shown = presentation.verified
+  const displayItems = presentation.items
   const filterCount = activeFilterCount(filters)
 
   const openListing = (l: Listing) => {
@@ -147,6 +160,7 @@ export default function Results() {
   // to the very end; falls back to the list footer on short result sets.
   const retailerBlock = (
     <View style={{ paddingHorizontal: 16, gap: 10, paddingVertical: 8 }}>
+      <AffiliateDisclosure />
       <Text style={{ color: c.subtext, fontSize: 11, letterSpacing: 1, fontFamily: dataFont }}>
         COMPARE AT OTHER STORES
       </Text>
@@ -161,7 +175,8 @@ export default function Results() {
         {retailerLinks.map((r) => (
           <Pressable
             key={r.name}
-            onPress={() => WebBrowser.openBrowserAsync(r.buildUrl(`${year} ${make} ${model} ${part}`))}
+            accessibilityRole="link"
+            onPress={() => openOutboundLink(r.buildUrl(`${year} ${make} ${model} ${part}`))}
             style={{
               minHeight: 44,
               paddingHorizontal: 14,
@@ -178,7 +193,7 @@ export default function Results() {
       </ScrollView>
     </View>
   )
-  const retailersInline = shown.length >= 3
+  const retailersInline = displayItems.length >= 3
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -205,9 +220,10 @@ export default function Results() {
             Couldn't reach the search service
           </Text>
           <Text style={{ color: c.subtext, textAlign: 'center' }}>
-            Check your connection and try again.
+            {failureMessage ?? 'Check your connection and try again.'}
           </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() => {
               setResponse(null)
               run()
@@ -230,8 +246,48 @@ export default function Results() {
         <View style={{ alignItems: 'center', paddingTop: 48, gap: 6, paddingHorizontal: 24 }}>
           <Text style={{ color: c.text, fontWeight: '700', fontSize: 16 }}>No live listings found</Text>
           <Text style={{ color: c.subtext, textAlign: 'center' }}>
-            Nothing matched this exact vehicle right now. Try a different part name.
+            No marketplace listings are available for this search right now. Try a different part name.
           </Text>
+          {hiddenIrrelevantFallbacks > 0 ? (
+            <Text style={{ color: c.subtext, textAlign: 'center', fontSize: 12, lineHeight: 17 }}>
+              We excluded {hiddenIrrelevantFallbacks} accessory-only {hiddenIrrelevantFallbacks === 1 ? 'listing' : 'listings'} instead of showing them as matches for {part}.
+            </Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 10 }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.back()}
+              style={{
+                minHeight: 44,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.brand,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Choose another part</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setResponse(null)
+                run()
+              }}
+              style={{
+                minHeight: 44,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: c.card,
+              }}
+            >
+              <Text style={{ color: c.text, fontWeight: '700' }}>Retry search</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -239,6 +295,7 @@ export default function Results() {
         <>
           <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 }}>
             <Pressable
+              accessibilityRole="button"
               onPress={() => {
                 // Re-sync the draft: a stacked results screen may have
                 // committed a different ZIP since this screen mounted.
@@ -261,21 +318,12 @@ export default function Results() {
                 Filters{filterCount > 0 ? ` (${filterCount})` : ''}
               </Text>
             </Pressable>
-            <Pressable
-              onPress={() => router.push({ pathname: '/repair-guide', params: { year, make, model, part } })}
-              style={{
-                minHeight: 44,
-                paddingHorizontal: 14,
-                borderRadius: 12,
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: c.border,
-                backgroundColor: c.card,
-              }}
-            >
-              <Text style={{ color: c.subtext, fontWeight: '700' }}>🔧 Repair guide</Text>
-            </Pressable>
           </View>
+          {hasMobileAffiliatePrograms ? (
+            <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+              <AffiliateDisclosure />
+            </View>
+          ) : null}
           {companions.length > 0 && (
             <ScrollView
               horizontal
@@ -291,11 +339,12 @@ export default function Results() {
               {companions.map((name) => (
                 <Pressable
                   key={name}
+                  accessibilityRole="button"
                   onPress={() =>
                     router.push({ pathname: '/results', params: { year, make, model, trim: trim ?? '', part: name } })
                   }
                   style={{
-                    minHeight: 40,
+                    minHeight: 44,
                     paddingHorizontal: 12,
                     borderRadius: 999,
                     justifyContent: 'center',
@@ -325,13 +374,13 @@ export default function Results() {
             </View>
           )}
           <FlatList
-            data={shown}
-            keyExtractor={(l) => l.id}
+            data={displayItems}
+            keyExtractor={(item) => `${item.tier}-${item.listing.id}`}
             ListEmptyComponent={
               <View style={{ alignItems: 'center', paddingTop: 40, paddingHorizontal: 24, gap: 6 }}>
                 <Text style={{ color: c.text, fontWeight: '700' }}>No listings match your filters</Text>
                 <Text style={{ color: c.subtext, textAlign: 'center' }}>
-                  Loosen a filter or reset them to see all {results.length} listings.
+                  Loosen a filter or reset them to see all {results.length + fallbackResults.length} listings.
                 </Text>
               </View>
             }
@@ -390,15 +439,42 @@ export default function Results() {
             }
             renderItem={({ item, index }) => (
               <>
+                {item.tier === 'fallback' && index === shown.length ? (
+                  <View
+                    accessibilityRole="alert"
+                    style={{
+                      backgroundColor: '#fef3c7',
+                      borderColor: '#f59e0b',
+                      borderWidth: 1,
+                      borderRadius: 14,
+                      padding: 14,
+                      marginHorizontal: 16,
+                      marginBottom: 12,
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ color: '#78350f', fontWeight: '800' }}>
+                      {results.length === 0 ? 'No marketplace-confirmed matches' : 'Other marketplace keyword results'}
+                    </Text>
+                    <Text style={{ color: '#92400e', fontSize: 13, lineHeight: 18 }}>
+                      Fitment was not confirmed for the listings below. Verify the part number, engine, drivetrain, and options before buying.
+                    </Text>
+                    {hiddenIrrelevantFallbacks > 0 ? (
+                      <Text style={{ color: '#92400e', fontSize: 12, lineHeight: 17 }}>
+                        We left out {hiddenIrrelevantFallbacks} accessory-only {hiddenIrrelevantFallbacks === 1 ? 'listing' : 'listings'} that did not clearly match {part}.
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
                 <ListingCard
-                  listing={item}
-                  isBestValue={item.id === bestValueId}
-                  isCheapest={item.id === cheapestId}
-                  isComparing={isComparing(item.id)}
-                  onPress={() => openListing(item)}
+                  listing={item.listing}
+                  isBestValue={item.tier === 'verified' && item.listing.id === bestValueId}
+                  isCheapest={item.tier === 'verified' && item.listing.id === cheapestId}
+                  isComparing={isComparing(item.listing.id)}
+                  onPress={() => openListing(item.listing)}
                   onToggleCompare={() => {
                     Haptics.selectionAsync()
-                    toggleCompare(item)
+                    toggleCompare(item.listing)
                   }}
                 />
                 {retailersInline && index === 1 ? retailerBlock : null}
@@ -417,7 +493,12 @@ export default function Results() {
         <View style={{ flex: 1, backgroundColor: c.bg, padding: 20, gap: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>Filters</Text>
-            <Pressable onPress={() => setFilters(defaultFilters)} hitSlop={8}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setFilters(defaultFilters)}
+              hitSlop={8}
+              style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+            >
               <Text style={{ color: brand, fontWeight: '700' }}>Reset</Text>
             </Pressable>
           </View>
@@ -438,10 +519,12 @@ export default function Results() {
                   const active = filters[key] === value
                   return (
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                       key={String(value)}
                       onPress={() => setFilters((f) => ({ ...f, [key]: value }))}
                       style={{
-                        minHeight: 40,
+                        minHeight: 44,
                         paddingHorizontal: 14,
                         borderRadius: 999,
                         justifyContent: 'center',
@@ -493,6 +576,7 @@ export default function Results() {
 
           <View style={{ flex: 1 }} />
           <Pressable
+            accessibilityRole="button"
             onPress={() => {
               setSheetOpen(false)
               // Committing the draft changes the store zip, which re-runs the
@@ -509,7 +593,7 @@ export default function Results() {
             }}
           >
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
-              Show {applyListingFilters(results, filters).length} listings
+              Show {displayItems.length} listings
             </Text>
           </Pressable>
         </View>
@@ -538,10 +622,16 @@ export default function Results() {
           <Text style={{ color: '#e2e8f0', fontWeight: '600', flex: 1 }}>
             {compare.length} selected
           </Text>
-          <Pressable onPress={() => useCompare.getState().clear()} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => useCompare.getState().clear()}
+            hitSlop={8}
+            style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
             <Text style={{ color: '#94a3b8', fontWeight: '700' }}>Clear</Text>
           </Pressable>
           <Pressable
+            accessibilityRole="button"
             disabled={compare.length < 2}
             onPress={() => router.push('/compare')}
             style={{

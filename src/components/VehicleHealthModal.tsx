@@ -24,6 +24,7 @@ export function VehicleHealthModal({
   )
   const [recallsError, setRecallsError] = useState(false)
   const [mileageInput, setMileageInput] = useState(vehicle.mileage != null ? String(vehicle.mileage) : '')
+  const [mileageError, setMileageError] = useState<string | null>(null)
 
   useEffect(() => {
     if (recalls !== null) return // session cache hit
@@ -44,8 +45,26 @@ export function VehicleHealthModal({
   }, [recalls, vehicle.year, vehicle.make, vehicle.model])
 
   const commitMileage = () => {
-    const parsed = Number(mileageInput.replace(/[^0-9]/g, ''))
-    onUpdateMileage(Number.isFinite(parsed) && parsed > 0 ? parsed : undefined)
+    const value = mileageInput.trim()
+    if (!value) {
+      setMileageError(null)
+      onUpdateMileage(undefined)
+      return
+    }
+
+    if (!/^\d+$/.test(value)) {
+      setMileageError('Enter mileage as a whole number.')
+      return
+    }
+
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 1_000_000) {
+      setMileageError('Enter mileage from 0 to 1,000,000.')
+      return
+    }
+
+    setMileageError(null)
+    onUpdateMileage(parsed)
   }
 
   const maintenance = maintenanceForVehicle(isElectricVehicle(vehicle.make, vehicle.model))
@@ -61,17 +80,24 @@ export function VehicleHealthModal({
             <Gauge size={14} className="text-slate-400" />
             Mileage
             <input
+              id="vehicle-mileage"
               type="text"
               inputMode="numeric"
               value={mileageInput}
-              onChange={(e) => setMileageInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 7))}
+              onChange={(e) => {
+                setMileageInput(e.target.value)
+                setMileageError(null)
+              }}
               onBlur={commitMileage}
               placeholder="e.g. 84000"
-              aria-label="Current mileage"
+              aria-invalid={Boolean(mileageError)}
+              aria-describedby={mileageError ? 'vehicle-mileage-help vehicle-mileage-error' : 'vehicle-mileage-help'}
               className="field font-data w-28 px-3 py-1.5 text-sm"
             />
           </label>
         </div>
+        <p id="vehicle-mileage-help" className="mt-1 text-xs text-slate-500">Optional. Enter a whole number from 0 to 1,000,000.</p>
+        {mileageError && <p id="vehicle-mileage-error" role="alert" className="mt-1 text-xs text-rose-600">{mileageError}</p>}
         {vehicle.vin && (
           <p className="font-data mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">VIN · {vehicle.vin}</p>
         )}
@@ -125,6 +151,7 @@ export function VehicleHealthModal({
         <section>
           <h3 className="section-title text-lg">Typical maintenance</h3>
           <p className="mt-0.5 text-xs text-slate-500">Typical intervals — always check your owner's manual.</p>
+          <p className="mt-1 text-xs text-slate-500">Engine-specific services are omitted because this vehicle's engine is unconfirmed; your owner's manual controls.</p>
           <ul className="mt-4 divide-y divide-slate-100 dark:divide-slate-800/60">
             {maintenance.map((m) => (
               <li key={m.part} className="flex items-center justify-between gap-3 py-2.5">

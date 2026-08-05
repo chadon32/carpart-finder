@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import type { CartItem } from '../hooks/useCart'
 import { fetchPricesChunked, type PriceInfo } from '../api/client'
+import { trackRetailerClick } from '../lib/analytics'
+import { AffiliateDisclosure } from './AffiliateDisclosure'
 
 type PriceCheck = Record<string, PriceInfo>
 
@@ -93,6 +95,14 @@ function CompareTable({ items }: { items: CartItem[] }) {
               <td key={item.cartId} className="p-3">
                 <a
                   href={item.link}
+                  onClick={() => trackRetailerClick({
+                    retailer: item.source,
+                    placement: 'watchlist-compare',
+                    vehicleLabel: item.carLabel,
+                    part: item.part,
+                    listingId: item.id,
+                    fitmentStatus: item.verifiedFitment === true ? 'verified' : 'unverified',
+                  })}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-primary px-3 py-1.5 text-xs"
@@ -164,6 +174,8 @@ export function CartPanel({
         </div>
       </div>
 
+      {items.length > 0 && <AffiliateDisclosure className="mt-4" />}
+
       {checkError && <p className="mt-3 text-sm text-red-600">Couldn't check prices: {checkError}</p>}
       {prices && !checkError && (
         <p className="mt-3 text-xs text-slate-400">Re-checked against live listings just now.</p>
@@ -211,6 +223,14 @@ export function CartPanel({
                   <div className="flex gap-1.5">
                     <a
                       href={item.link}
+                      onClick={() => trackRetailerClick({
+                        retailer: item.source,
+                        placement: 'watchlist',
+                        vehicleLabel: item.carLabel,
+                        part: item.part,
+                        listingId: item.id,
+                        fitmentStatus: item.verifiedFitment === true ? 'verified' : 'unverified',
+                      })}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-primary px-3 py-1.5 text-xs"

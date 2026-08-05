@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics'
 import { identifyPartFromImage } from '@/api/client'
 import { partTypesForVehicle } from '@/data/partTypes'
 import { isElectricVehicle } from '@/data/electricVehicles'
+import { isValidPartQuery, MAX_PART_QUERY_LENGTH, normalizePartQuery } from '@/lib/searchInput'
 import { useThemeColors, displayFont, dataFont } from '@/theme'
 
 export default function PartPicker() {
@@ -19,8 +20,12 @@ export default function PartPicker() {
   const [identifying, setIdentifying] = useState(false)
   const [identifyMsg, setIdentifyMsg] = useState<string | null>(null)
 
-  const goToResults = (part: string) =>
-    router.push({ pathname: '/results', params: { year, make, model, trim: trim ?? '', part } })
+  const goToResults = (part: string) => {
+    const normalizedPart = normalizePartQuery(part)
+    if (!isValidPartQuery(normalizedPart)) return
+
+    router.push({ pathname: '/results', params: { year, make, model, trim: trim ?? '', part: normalizedPart } })
+  }
 
   const identifyFromPhoto = async () => {
     setIdentifyMsg(null)
@@ -98,10 +103,12 @@ export default function PartPicker() {
         value={q}
         onChangeText={setQ}
         onSubmitEditing={() => q.trim() && goToResults(q.trim())}
-        placeholder="Search any part (e.g. Brake Rotors)"
+        placeholder="Part name or OEM number (e.g. Brake Rotors)"
         placeholderTextColor={c.subtext}
         returnKeyType="search"
         autoCorrect={false}
+        maxLength={MAX_PART_QUERY_LENGTH}
+        accessibilityLabel="Search by part name or original equipment number"
         style={{
           marginHorizontal: 16,
           marginBottom: 12,
@@ -115,6 +122,9 @@ export default function PartPicker() {
           borderColor: c.border,
         }}
       />
+      <Text style={{ color: c.subtext, paddingHorizontal: 16, marginTop: -6, marginBottom: 12, fontSize: 12 }}>
+        Enter a part name or original equipment number. {q.length}/{MAX_PART_QUERY_LENGTH}
+      </Text>
       {!q && (
         <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}>
           <Pressable
