@@ -66,6 +66,7 @@ test('generated pages expose metadata, policies, and working local navigation', 
     assert.match(html, /<title>[^<]+<\/title>/)
     assert.match(html, /<meta name="description" content="[^"]+" \/>/)
     assert.match(html, /<link rel="canonical" href="https:\/\/carpartsradar\.com\/[^"]*" \/>/)
+    assert.match(html, /<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@graph":/)
     assert.match(html, /href="\/privacy\.html"/)
     assert.match(html, /href="\/terms\.html"/)
     assert.match(html, /href="\/affiliate-disclosure\.html"/)
@@ -83,6 +84,17 @@ test('generated pages expose metadata, policies, and working local navigation', 
       await assert.doesNotReject(stat(localTarget(href)), `${relativePath} has a broken link to ${href}`)
     }
   }
+})
+
+test('homepage remains understandable without JavaScript and exposes publisher identity metadata', async () => {
+  const html = await readFile(resolve(root, 'index.html'), 'utf8')
+  assert.match(html, /<meta name="author" content="CarPartsRadar Editorial" \/>/)
+  assert.match(html, /<link rel="sitemap" type="application\/xml" href="\/sitemap\.xml" \/>/)
+  assert.match(html, /<script type="application\/ld\+json">/)
+  assert.match(html, /<noscript>[\s\S]*CarPartsRadar helps drivers and parts professionals/i)
+  assert.match(html, /href="\/guides\.html"/)
+  assert.match(html, /href="\/methodology\.html"/)
+  assert.match(html, /href="\/affiliate-disclosure\.html"/)
 })
 
 test('sitemap and robots file advertise every public editorial page', async () => {

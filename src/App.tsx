@@ -317,8 +317,8 @@ function App() {
                   and may change. Always confirm details on the retailer's site before buying.
                 </p>
                 <p>
-                  Some outbound links are affiliate links, meaning we may earn a commission if you make a purchase
-                  at no extra cost to you.
+                  As an Amazon Associate I earn from qualifying purchases. Some outbound links are affiliate links,
+                  meaning we may earn a commission if you make a purchase at no extra cost to you.
                 </p>
               </div>
             </div>

@@ -32,7 +32,7 @@ test('save-search auth guidance is actionable and distinct from save errors', as
 })
 
 test('revenue funnel events cover retailer clicks and price-alert creation without collecting email addresses', async () => {
-  const [analytics, listing, results, alerts, disclosure, detail, watchlist] = await Promise.all([
+  const [analytics, listing, results, alerts, disclosure, detail, watchlist, publicDisclosure] = await Promise.all([
     readSource('src/lib/analytics.ts'),
     readSource('src/components/ListingCard.tsx'),
     readSource('src/components/ResultsList.tsx'),
@@ -40,6 +40,7 @@ test('revenue funnel events cover retailer clicks and price-alert creation witho
     readSource('src/components/AffiliateDisclosure.tsx'),
     readSource('src/components/PartDetailModal.tsx'),
     readSource('src/components/CartPanel.tsx'),
+    readSource('public/affiliate-disclosure.html'),
   ])
 
   assert.match(analytics, /Retailer Clicked/)
@@ -51,6 +52,7 @@ test('revenue funnel events cover retailer clicks and price-alert creation witho
   assert.match(alerts, /Price Alert Created/)
   assert.doesNotMatch(alerts, /trackEvent\([^\n]*email/)
   assert.match(disclosure, /As an Amazon Associate I earn from qualifying purchases/)
+  assert.match(publicDisclosure, /As an Amazon Associate I earn from qualifying purchases/)
   assert.match(disclosure, /As an eBay Partner/)
   assert.match(detail, /listing-detail/)
   assert.match(watchlist, /watchlist-compare/)

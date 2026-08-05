@@ -26,6 +26,53 @@ function textWithContactLink(value) {
   return escaped.replaceAll(escapedEmail, `<a href="mailto:${escapedEmail}">${escapedEmail}</a>`)
 }
 
+function structuredData({ title, description, path, type }) {
+  const pageUrl = canonical(path)
+  const organizationId = `${site.origin}/#organization`
+  const websiteId = `${site.origin}/#website`
+  const pageSchema = {
+    '@type': type === 'article' ? 'Article' : 'WebPage',
+    '@id': `${pageUrl}#${type === 'article' ? 'article' : 'webpage'}`,
+    url: pageUrl,
+    name: title,
+    description,
+    isPartOf: { '@id': websiteId },
+    publisher: { '@id': organizationId },
+    ...(type === 'article'
+      ? {
+          author: { '@id': organizationId },
+          dateModified: site.isoDate,
+          mainEntityOfPage: pageUrl,
+        }
+      : {}),
+  }
+
+  const graph = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': organizationId,
+        name: site.name,
+        url: site.origin,
+        logo: `${site.origin}/favicon.svg`,
+        email: `mailto:${site.email}`,
+      },
+      {
+        '@type': 'WebSite',
+        '@id': websiteId,
+        name: site.name,
+        url: site.origin,
+        publisher: { '@id': organizationId },
+      },
+      pageSchema,
+    ],
+  }
+
+  // Keep JSON-LD inert even if future editorial copy contains HTML-sensitive characters.
+  return `<script type="application/ld+json">${JSON.stringify(graph).replaceAll('<', '\\u003c')}</script>`
+}
+
 function header() {
   return `
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -96,6 +143,7 @@ function pageShell({ title, description, path, body, type = 'website' }) {
   <meta property="og:url" content="${pageUrl}" />
   <meta property="og:image" content="${site.origin}/editorial/parts-workbench.webp" />
   <meta name="twitter:card" content="summary_large_image" />
+  ${structuredData({ title: pageTitle, description, path, type })}
 </head>
 <body>
   ${header()}

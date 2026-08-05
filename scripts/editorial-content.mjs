@@ -743,7 +743,7 @@ export const legalPages = {
       {
         heading: 'Current relationships',
         paragraphs: [
-          'CarPartsRadar participates in the eBay Partner Network and may use Commission Junction links for advertisers that have approved the applicable traffic source. As an Amazon Associate, CarPartsRadar earns from qualifying purchases where eligible Amazon links are used.',
+          'CarPartsRadar participates in the eBay Partner Network and may use Commission Junction links for advertisers that have approved the applicable traffic source. As an Amazon Associate I earn from qualifying purchases. CarPartsRadar uses Amazon links only where the applicable program and tracking configuration are in place.',
           'An affiliate relationship applies only to the specific approved program and traffic source. We do not place one traffic source’s tracking links into another unapproved source, and we do not claim a commercial relationship with every retailer displayed.',
         ],
       },

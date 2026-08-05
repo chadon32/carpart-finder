@@ -9,7 +9,9 @@
       name="description"
       content="Compare live car-part listings, review fitment evidence, and use independent buying guides before ordering for your vehicle."
     />
+    <meta name="author" content="CarPartsRadar Editorial" />
     <link rel="canonical" href="https://carpartsradar.com/" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     <link rel="alternate" type="application/rss+xml" title="CarPartsRadar Buying Guides" href="/feed.xml" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="CarPartsRadar" />
@@ -53,9 +55,54 @@
          style injection, and inline style attributes; img-src needs https:
          because eBay and Wikimedia image hostnames rotate. -->
     <script src="https://www.anrdoezrs.net/am/101820027/impressions/page/am.js"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://carpartsradar.com/#organization",
+            "name": "CarPartsRadar",
+            "url": "https://carpartsradar.com",
+            "logo": "https://carpartsradar.com/favicon.svg",
+            "email": "mailto:chadon322@gmail.com"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://carpartsradar.com/#website",
+            "name": "CarPartsRadar",
+            "url": "https://carpartsradar.com",
+            "publisher": { "@id": "https://carpartsradar.com/#organization" }
+          },
+          {
+            "@type": "WebPage",
+            "@id": "https://carpartsradar.com/#webpage",
+            "url": "https://carpartsradar.com/",
+            "name": "CarPartsRadar | Compare Car Part Prices and Fitment",
+            "description": "Compare live car-part listings, review fitment evidence, and use independent buying guides before ordering for your vehicle.",
+            "isPartOf": { "@id": "https://carpartsradar.com/#website" },
+            "publisher": { "@id": "https://carpartsradar.com/#organization" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main style="max-width: 70rem; margin: 0 auto; padding: 3rem 1.25rem; font-family: system-ui, sans-serif; color: #172033">
+        <p style="font-weight: 700; letter-spacing: .08em; text-transform: uppercase">CarPartsRadar</p>
+        <h1>Compare car-part prices with fitment evidence in view.</h1>
+        <p>CarPartsRadar helps drivers and parts professionals compare live automotive listings, review compatibility evidence, and research practical buying guidance before ordering.</p>
+        <p>JavaScript is required for live vehicle lookup. You can still browse our public resources:</p>
+        <ul>
+          <li><a href="/guides.html">Car-part buying guides</a></li>
+          <li><a href="/methodology.html">How we evaluate listings</a></li>
+          <li><a href="/about.html">About CarPartsRadar</a></li>
+          <li><a href="/affiliate-disclosure.html">Affiliate disclosure</a></li>
+        </ul>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
