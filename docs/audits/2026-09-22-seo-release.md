@@ -2,6 +2,8 @@
 
 Research and implementation date: September 22, 2026. Production: https://carpartsradar.com. Baseline source: `e891701` on `ios-app`.
 
+**Final release status: implemented, tested and pushed, but NOT currently live.** Deployment `dpl_HKJaYPG2f7BJ6hyBxGqDbyHjsJDk` built successfully and passed SEO checks, then an actual production search exposed an unavailable Supabase rate-limit RPC. It was rolled back to the preceding working production deployment, `dpl_6vEBNk2ia2hCxT47NP5yunYYHbsw`. Search recovery was verified (HTTP 200, fitment contract 2, 14 broader results). Applying/checking the pending database migration needs user approval before redeployment.
+
 ## Business, audience and coverage
 
 Confirmed from repository and public pages: CarPartsRadar compares third-party automotive listings, exposes compatibility evidence, supports saved searches/watchlists and optional accounts, and sends shoppers to retailers. It is not the retailer. Affiliate commissions are the stated monetization model; actual revenue and network approval were not verified. The useful conversion is a qualified retailer click, not simply a signup.
@@ -102,7 +104,19 @@ Performance: before/after three cold runs per scenario per viewport (27 runs eac
 
 This is **not a demonstrated speed gain**: most median LCP samples are slightly slower, with unchanged layout shift. The added links/metadata increase initial JavaScript gzip from 95,637 to 96,085 bytes (+448 bytes / 0.47%); removing results schema reduces the lazy results chunk (Vite gzip display 12.23 → 11.73 kB). Conditions are compatible. The comparison flags one percentage regression: tablet results local TTFB p75, 3.25 → 4.10 ms (+0.85 ms / 26.2%). No artificial threshold adjustment or claim that the strict comparison gate passed is made. This small localhost timing change is recorded rather than treated as a proven production slowdown. Larger samples and field data are needed for that inference.
 
-Production verification is recorded below after deployment.
+### Deployment verification and rollback evidence
+
+Source implementation commit: `e966e5f`, pushed to `origin/ios-app`. Deployed from a clean detached worktree to the existing Vercel project, with unrelated local files excluded. Vercel reported READY and aliased the deployment to carpartsradar.com.
+
+On that deployment, all 16 sitemap pages returned 200 with distinct metadata, their own canonical, one initial-HTML main heading, and parseable schema. Search/API noindex headers, referral-only homepage indexability, missing-page 404, `/index.html` 308 preserving query, and `/api/health` passed. Manual desktop and 390px phone inspection confirmed the revised guide, no horizontal overflow, working guide-to-comparison link, one rendered description, and the clean homepage canonical. The guide/entry flow produced no logged browser errors at that check.
+
+However, a real parts search returned 503. The Vercel runtime log was `[rate-limit] shared store unavailable { limiter: 'search', errorCode: 'PGRST202' }`. The repository calls `consume_api_rate_limit`; Supabase did not expose the expected function/signature through PostgREST. Its definition is already present in `server/supabase-rate-limit-migration.sql`, introduced in earlier work, not this SEO change. The preceding production deployment was 31 days old: testing local HEAD was not sufficient evidence of production-database compatibility. Whether the function is absent or the schema cache/signature is stale still needs database inspection.
+
+Rollback completed successfully to `carpart-finder-5jeekz1i8-chadon32s-projects.vercel.app`. The same public search then returned 200, `results: 0`, `fallbackResults: 14`, and `fitmentContractVersion: 2`. No compatibility guarantee is inferred from fallback listings. No database change, security fallback, or removal of rate limiting was performed.
+
+**P0 release blocker:** confirm the intended Supabase project, inspect the existing RPC, then apply the narrow existing rate-limit migration only with approval. Verify anonymous/authenticated roles cannot execute it and a service-role request can; rerun a representative search and account-rate-limit checks before promoting the SEO release. Health-only checks cannot catch this prerequisite. `scripts/check-seo.mjs` now includes one read-only actual search and rejects non-200 responses so this failure cannot be mistaken for a complete release again.
+
+The benchmark measurements above describe the local source, not the rolled-back live website. SEO improvements and revised guides remain on GitHub and in the ready Vercel deployment, but are not active on the public domain after rollback.
 
 ## Changed-file inventory
 

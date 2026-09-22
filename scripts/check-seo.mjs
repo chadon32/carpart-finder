@@ -54,6 +54,13 @@ assert.equal(destination.searchParams.get('guide'), 'compare-total-car-part-cost
 const health = await request('/api/health')
 assert.equal(health.status, 200)
 assert.match(health.headers.get('x-robots-tag') || '', /noindex/)
+// Health does not exercise the shared limiter or marketplace dependency.
+// One ordinary read-only search catches missing production RPC prerequisites.
+const search = await request('/api/search?year=2020&make=Toyota&model=Camry&part=Brake+Pads')
+assert.equal(search.status, 200, 'Production parts search must succeed, not just /api/health')
+const results = await search.json()
+assert.equal(results.fitmentContractVersion, 2)
+assert.ok(Array.isArray(results.results) && Array.isArray(results.fallbackResults))
 const robots = await (await request('/robots.txt')).text()
 assert.ok(robots.includes(`Sitemap: ${site.origin}/sitemap.xml`))
-console.log('PASS search/API noindex, homepage indexability, 404, 308 with query preserved, API health and robots.txt')
+console.log('PASS search/API noindex, homepage indexability, 404, 308 with query preserved, API health, live parts search and robots.txt')
