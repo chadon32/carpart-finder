@@ -12,10 +12,22 @@
 import { supabaseAdmin, isMockMode, accountsAvailable } from '../supabase.js'
 import { search as ebaySearch, isConfigured as ebayConfigured } from '../providers/ebay.js'
 import { escapeHtml, safeListingUrl } from '../lib/html.js'
+import { pickVerifiedListingForPart } from '../lib/quotePolicy.js'
 import { recordPriceObservation } from '../priceHistory.js'
 
-// Runs one alert's search and returns the cheapest out-of-pocket option,
-// matching what the UI shows (price + shipping). null = no live listings.
+const configuredBatchSize = Number(process.env.MAX_ALERT_CHECKS_PER_GROUP || 50)
+const MAX_ALERT_CHECKS_PER_GROUP = Number.isInteger(configuredBatchSize)
+  ? Math.min(200, Math.max(1, configuredBatchSize))
+  : 50
+
+export function selectAlertListing(listings, part) {
+  const item = pickVerifiedListingForPart(listings, part)
+  if (!item) return null
+  return { total: item.price + Number(item.shippingCost), item }
+}
+
+// Runs one alert's search and returns the cheapest verified, part-relevant
+// listing with a complete price + known-shipping total. null = no safe match.
 async function findCheapest(searchLike) {
   const ctx = {
     year: searchLike.year,
@@ -25,12 +37,8 @@ async function findCheapest(searchLike) {
     part: searchLike.part,
     query: `${searchLike.year} ${searchLike.make} ${searchLike.model} ${searchLike.part}`.trim(),
   }
-  const listings = await ebaySearch(ctx, { limit: 3 })
-  if (listings.length === 0) return null
-  return listings.reduce((best, item) => {
-    const total = item.price + (item.shippingCost || 0)
-    return total < best.total ? { total, item } : best
-  }, { total: Infinity, item: null })
+  const listings = await ebaySearch(ctx, { limit: 10 })
+  return selectAlertListing(listings, searchLike.part)
 }
 
 export async function checkPriceAlerts() {
@@ -61,6 +69,8 @@ export async function checkPriceAlerts() {
     .from('price_alerts')
     .select('*, saved_searches(*)')
     .eq('is_active', true)
+    .order('last_checked_at', { ascending: true, nullsFirst: true })
+    .limit(MAX_ALERT_CHECKS_PER_GROUP)
 
   if (error) {
     console.error('[PriceChecker] Error fetching alerts:', error)
@@ -109,6 +119,8 @@ export async function checkPriceAlerts() {
     .from('guest_alerts')
     .select('*')
     .eq('is_active', true)
+    .order('last_checked_at', { ascending: true, nullsFirst: true })
+    .limit(MAX_ALERT_CHECKS_PER_GROUP)
 
   if (guestError) {
     console.error('[PriceChecker] Error fetching guest alerts:', guestError)
@@ -145,7 +157,7 @@ export async function checkPriceAlerts() {
   }
 
   console.log(`[PriceChecker] Done. Checked ${checked}, triggered ${triggered}.`)
-  return { checked, triggered }
+  return { checked, triggered, perGroupLimit: MAX_ALERT_CHECKS_PER_GROUP }
 }
 
 // Account alerts only store the user id; the email lives in Supabase Auth.

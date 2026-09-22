@@ -14,6 +14,8 @@ interface RepairGuideModalProps {
   onClose: () => void
 }
 
+const SAFE_GUIDE_ELEMENTS = ['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code'] as const
+
 export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuideModalProps) {
   const [guide, setGuide] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -24,10 +26,15 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
 
   useEffect(() => {
     let cancelled = false
+    let timedOut = false
     const controller = new AbortController()
     const slowTimer = window.setTimeout(() => {
       if (!cancelled) setTakingLong(true)
     }, 15000)
+    const timeoutTimer = window.setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 45000)
 
     const generateGuide = async () => {
       setIsGenerating(true)
@@ -53,15 +60,22 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
         })
 
         const data = await readJsonResponse<{ guide?: string }>(res, '/api/ai/repair-guide')
+        if (typeof data.guide !== 'string' || !data.guide.trim() || data.guide.length > 12_000) {
+          throw new Error('The repair guide response was incomplete. Please try again.')
+        }
         if (!cancelled) {
-          setGuide(data.guide || '')
+          setGuide(data.guide)
           trackAIGenerated(part, vehicleLabel)
         }
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (err instanceof Error && err.name === 'AbortError') {
+          if (timedOut && !cancelled) setGuideError('The repair guide timed out. Please try again.')
+          return
+        }
         if (!cancelled) setGuideError(err instanceof Error ? err.message : 'The guide could not be generated.')
       } finally {
         window.clearTimeout(slowTimer)
+        window.clearTimeout(timeoutTimer)
         if (!cancelled) setIsGenerating(false)
       }
     }
@@ -71,6 +85,7 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
     return () => {
       cancelled = true
       window.clearTimeout(slowTimer)
+      window.clearTimeout(timeoutTimer)
       controller.abort()
     }
   }, [
@@ -98,7 +113,7 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
             <p className="text-xs text-slate-500">{vehicleLabel} • {part}</p>
           </div>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700">
+        <button type="button" onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700">
           <X size={20} />
         </button>
       </div>
@@ -108,7 +123,7 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
           <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-20 text-slate-500">
             <Loader2 size={32} className="mb-4 animate-spin text-brand-500" />
             <p className="text-base font-medium text-slate-700">Gemini is writing your repair guide...</p>
-            <p className="mt-2 text-sm text-slate-400">Preparing a cautious overview for {vehicleLabel}</p>
+            <p className="mt-2 text-sm text-slate-600">Preparing a cautious overview for {vehicleLabel}</p>
             <p className="mt-2 max-w-sm text-center text-xs leading-relaxed text-slate-500">
               {takingLong
                 ? 'Still working. You can close this window to cancel and try again later.'
@@ -118,7 +133,7 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
         )}
 
         {guideError && (
-          <div role="alert" className="flex flex-col items-center justify-center py-12 text-center text-rose-700">
+          <div role="alert" className="flex flex-col items-center justify-center py-12 text-center text-rose-700 dark:text-rose-300">
             <Wrench size={32} className="mb-4 text-rose-400" />
             <p className="text-lg font-medium">Failed to generate guide</p>
             <p className="mt-2 max-w-lg text-sm">{guideError}</p>
@@ -138,15 +153,21 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
         )}
 
         {guide && (
-          <div className="prose prose-slate max-w-none text-slate-700 prose-headings:font-bold prose-h1:text-2xl prose-h2:mt-8 prose-h2:border-b prose-h2:pb-2 prose-h2:text-xl prose-li:my-1">
-            <ReactMarkdown>{guide}</ReactMarkdown>
+          <div className="repair-guide-content text-slate-700">
+            <ReactMarkdown
+              allowedElements={[...SAFE_GUIDE_ELEMENTS]}
+              unwrapDisallowed
+              skipHtml
+            >
+              {guide}
+            </ReactMarkdown>
           </div>
         )}
       </div>
 
       {!isGenerating && !guideError && (
         <div className="flex items-center justify-between rounded-b-2xl border-t bg-slate-50 px-6 py-4">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-600">
             AI overview only. Confirm the exact procedure and specifications in the manufacturer service manual.
           </p>
           <button type="button" onClick={onClose} className="btn btn-secondary ml-4 shrink-0 px-4 py-2">

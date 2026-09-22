@@ -1,0 +1,71 @@
+# EAS archives from the Git repository root even though this Expo app lives in
+# mobile/. Keep the native app source, but exclude unrelated web, audit, video,
+# and local-tooling files from the private build upload.
+
+# Dependencies and generated output
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+mobile/.expo/
+mobile/.release-export/
+mobile/.codex-audit-ios/
+mobile/web-build/
+mobile/ios/
+mobile/android/
+mobile/.kotlin/
+
+# The website/API are deployed separately and are not native build inputs.
+api/
+docs/
+public/
+scripts/
+server/
+shared/*
+!shared/recalls.js
+!shared/recalls.d.ts
+src/
+
+# Local QA, creative, editor, and agent artifacts
+.agents/
+.claude/
+.vercel/
+mobile/.claude/
+mobile/.vscode/
+screenshots/
+shots/
+terminals/
+videos/
+*.mp4
+frame_*.jpg
+generate_audio_*.cjs
+generate_scenes*.cjs
+fix.js
+fix_*.js
+fix_*.cjs
+*.log
+
+# Secrets and machine-local files
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+mobile/.env*.local
+*.local
+*.p8
+*.p12
+*.pem
+*.key
+*.jks
+*.mobileprovision
+
+# Miscellaneous generated/editor files
+.idea/
+.vscode/
+.DS_Store
+*.tsbuildinfo
+mobile/expo-env.d.ts
+mobile/*.orig.*

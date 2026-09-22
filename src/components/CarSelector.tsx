@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
 import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchMakes, fetchModels, fetchTrims, decodeVinApi, type VehicleType } from '../api/client'
 import { Combobox } from './Combobox'
 import { StickyActionBar } from './StickyActionBar'
 import { VehicleThumbnail } from './VehicleThumbnail'
-import { VehicleHealthModal } from './VehicleHealthModal'
 import { cachedRecallCount } from '../lib/recallCache'
+
+const VehicleHealthModal = lazy(() =>
+  import('./VehicleHealthModal').then((module) => ({ default: module.VehicleHealthModal }))
+)
 
 export type Car = {
   year: string
@@ -52,6 +55,7 @@ export function CarSelector({
   const [make, setMake] = useState('')
   const [model, setModel] = useState('')
   const [trim, setTrim] = useState('')
+  const trimInputId = useId()
 
   const [vinInput, setVinInput] = useState('')
   const [vinLoading, setVinLoading] = useState(false)
@@ -249,7 +253,7 @@ export function CarSelector({
       <div>
         <h2 className="section-title">Select your vehicle</h2>
         <p className="mt-1 text-sm text-slate-600">
-          We separate marketplace compatibility matches from broader results for the vehicle you pick.
+          We separate marketplace year, make, and model compatibility evidence from broader results for the vehicle you pick.
         </p>
       </div>
 
@@ -271,7 +275,7 @@ export function CarSelector({
                   type="button"
                   onClick={() => selectGarageVehicle(c)}
                   aria-pressed={year === c.year && make === c.make && model === c.model && trim === c.trim}
-                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 text-left"
+                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 text-left"
                 >
                   <VehicleThumbnail make={c.make} model={c.model} year={c.year} className="h-9 w-14 rounded-lg" iconSize={16} />
                   <div className="min-w-0">
@@ -367,16 +371,17 @@ export function CarSelector({
       </div>
 
       <div className="mt-6">
-        <label className="field-label">Vehicle type</label>
-        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="field-label" id="vehicle-type-label">Vehicle type</div>
+        <div role="group" aria-labelledby="vehicle-type-label" className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {vehicleTypeOptions.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => setVehicleType(opt.value)}
+              aria-pressed={vehicleType === opt.value}
               className={`min-h-11 touch-manipulation rounded-lg px-3.5 py-2.5 text-sm font-medium transition sm:min-h-0 sm:py-1.5 ${
                 vehicleType === opt.value
-                  ? 'bg-white text-brand-700 shadow-sm'
+                  ? 'bg-white text-brand-700 shadow-sm dark:text-brand-400'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -395,11 +400,9 @@ export function CarSelector({
           onChange={(v) => { pendingSelection.current = null; setYear(v); setDecodedVin(null) }}
         />
         <div>
-          <label className="field-label">Make</label>
-
           {/* Single dropdown with Popular Makes at the top, then All Makes */}
           <Combobox
-            label=""
+            label="Make"
             placeholder={makesLoading ? 'Loading makes…' : 'Select make'}
             groups={[
               ...(popularOptions.length > 0 ? [{ label: 'Popular Makes', options: popularOptions }] : []),
@@ -422,9 +425,13 @@ export function CarSelector({
 
       <div className="mt-4">
         <div className="mb-1.5 flex items-center justify-between">
-          <label className="field-label mb-0">Trim (optional)</label>
+          {trims.length > 0 && trims.length <= 8 ? (
+            <span className="field-label mb-0">Trim (optional)</span>
+          ) : (
+            <label htmlFor={trimInputId} className="field-label mb-0">Trim (optional)</label>
+          )}
           {trim && (
-            <button type="button" onClick={() => setTrim('')} className="py-2 -my-2 text-xs font-medium text-brand-600 hover:text-brand-700">
+            <button type="button" onClick={() => setTrim('')} className="-my-2 min-h-11 py-2 text-xs font-medium text-brand-600 hover:text-brand-700">
               Clear selection
             </button>
           )}
@@ -439,13 +446,14 @@ export function CarSelector({
           <>
             {/* Nice card-style selector when there aren't too many options */}
             {trims.length <= 8 ? (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div role="group" aria-label="Trim" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => setTrim('')}
-                  className={`touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
+                  aria-pressed={!trim}
+                  className={`min-h-11 touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
                     !trim
-                      ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
+                      ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20 dark:bg-brand-950 dark:text-brand-400'
                       : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -456,9 +464,10 @@ export function CarSelector({
                     key={t}
                     type="button"
                     onClick={() => setTrim(t)}
-                    className={`touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
+                    aria-pressed={trim === t}
+                    className={`min-h-11 touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
                       trim === t
-                        ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20'
+                        ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20 dark:bg-brand-950 dark:text-brand-400'
                         : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
@@ -467,12 +476,13 @@ export function CarSelector({
                 ))}
               </div>
             ) : (
-              <Combobox label="" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
+              <Combobox id={trimInputId} label="" ariaLabel="Trim (optional)" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
             )}
-            <p className="mt-2 text-xs text-slate-500">Showing real fitment options from eBay compatibility data.</p>
+            <p className="mt-2 text-xs text-slate-500">Showing marketplace year, make, model, and trim compatibility evidence from eBay data.</p>
           </>
         ) : (
           <input
+            id={trimInputId}
             type="text"
             value={trim}
             onChange={(e) => setTrim(e.target.value)}
@@ -499,7 +509,7 @@ export function CarSelector({
                 <div className="mb-1.5 flex items-center gap-1.5">
                   <span className="h-1 w-1 rounded-full bg-emerald-400" />
                   <span className="font-data text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Fitment lock — active
+                    YMM compatibility search — active
                   </span>
                 </div>
 
@@ -564,18 +574,28 @@ export function CarSelector({
       )}
 
       {healthIndex !== null && garage[healthIndex] && (
-        <VehicleHealthModal
-          vehicle={garage[healthIndex]}
-          onClose={() => setHealthIndex(null)}
-          onUpdateMileage={(mileage) =>
-            setGarage((prev) => prev.map((c, i) => (i === healthIndex ? { ...c, mileage } : c)))
-          }
-          onShopPart={(shopPart) => {
-            const v = garage[healthIndex]
-            setHealthIndex(null)
-            onSearchPart?.({ year: v.year, make: v.make, model: v.model, trim: v.trim }, shopPart)
-          }}
-        />
+        <Suspense
+          fallback={(
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45" role="status">
+              <div className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-xl">
+                Loading vehicle health…
+              </div>
+            </div>
+          )}
+        >
+          <VehicleHealthModal
+            vehicle={garage[healthIndex]}
+            onClose={() => setHealthIndex(null)}
+            onUpdateMileage={(mileage) =>
+              setGarage((prev) => prev.map((c, i) => (i === healthIndex ? { ...c, mileage } : c)))
+            }
+            onShopPart={(shopPart) => {
+              const v = garage[healthIndex]
+              setHealthIndex(null)
+              onSearchPart?.({ year: v.year, make: v.make, model: v.model, trim: v.trim }, shopPart)
+            }}
+          />
+        </Suspense>
       )}
     </div>
   )

@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deleteAccountPermanently, isAlreadyDeletedAuthError } from './accountDeletion.js'
+import {
+  deleteAccountPermanently,
+  getAccountDeletionStatus,
+  isAlreadyDeletedAuthError,
+} from './accountDeletion.js'
 
 function fakeAdmin({ dataError = null, authError = null, events = [] } = {}) {
   return {
@@ -107,4 +111,33 @@ test('only expected Auth not-found errors are idempotent', () => {
   assert.equal(isAlreadyDeletedAuthError({ status: 404 }), true)
   assert.equal(isAlreadyDeletedAuthError({ code: 'user_not_found' }), true)
   assert.equal(isAlreadyDeletedAuthError({ status: 403, message: 'permission denied' }), false)
+})
+
+test('a signed receipt can reconcile an Auth deletion that finished after the request timed out', async () => {
+  let authUserExists = true
+  const admin = fakeAdmin()
+  admin.auth.admin.deleteUser = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    authUserExists = false
+    return { error: null }
+  }
+  admin.auth.admin.getUserById = async () => (
+    authUserExists
+      ? { data: { user: { id: 'user-late-delete' } }, error: null }
+      : { data: { user: null }, error: { status: 404, message: 'User not found' } }
+  )
+
+  const timedOut = await deleteAccountPermanently({
+    admin,
+    userId: 'user-late-delete',
+    timeoutMs: 5,
+  })
+  assert.equal(timedOut.success, false)
+  assert.equal(timedOut.stage, 'auth')
+
+  await new Promise((resolve) => setTimeout(resolve, 25))
+  assert.deepEqual(
+    await getAccountDeletionStatus({ admin, userId: 'user-late-delete' }),
+    { success: true, deleted: true }
+  )
 })

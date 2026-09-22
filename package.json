@@ -11,8 +11,12 @@
     "dev:all": "concurrently -n web,api -c blue,green \"npm run dev\" \"npm run dev:server\"",
     "prebuild": "npm run generate:editorial",
     "build": "tsc -b && vite build",
+    "benchmark:web": "node scripts/benchmark-web.mjs",
+    "check:web": "node scripts/check-web-workflows.mjs",
+    "test:e2e": "playwright test",
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "lint": "npm run lint:web && npm run lint:mobile",
-    "lint:web": "oxlint src api server scripts",
+    "lint:web": "oxlint src api server scripts tests/web playwright.config.ts vite.config.ts",
     "lint:mobile": "oxlint mobile/src",
     "preview": "vite preview",
     "pretest": "npm run generate:editorial",
@@ -37,6 +41,8 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

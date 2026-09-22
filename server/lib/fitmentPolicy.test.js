@@ -1,10 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  compareListingsByKnownTotal,
   listingDoesNotContradictVehicle,
   partitionListingsByFitment,
+  totalPrice,
   titleDoesNotContradictVehicle,
 } from './fitmentPolicy.js'
+
+test('unknown shipping is never represented or ranked as free shipping', () => {
+  const known = { id: 'known', price: 20, shippingCost: 5 }
+  const unknown = { id: 'unknown', price: 10, shippingCost: null }
+
+  assert.equal(totalPrice(known), 25)
+  assert.equal(totalPrice(unknown), Infinity)
+  assert.deepEqual([unknown, known].sort(compareListingsByKnownTotal).map((item) => item.id), ['known', 'unknown'])
+})
 
 test('fitment policy keeps uncertain inventory out of verified results', () => {
   const { verified, fallback } = partitionListingsByFitment([

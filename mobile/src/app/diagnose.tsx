@@ -84,38 +84,46 @@ export default function Diagnose() {
     setDtc(entry)
   }
 
-  // Tap shops the part; long-press (or the +) adds it to the multi-part quote.
+  // Shopping and quote selection are separate controls so each action remains
+  // reachable without relying on a long press.
   const PartChip = ({ name, tag }: { name: string; tag?: string }) => {
     const selected = !!picked[name]
     return (
-      <Pressable
-        onPress={() => goToResults(name)}
-        onLongPress={() => togglePick(name)}
+      <View
         style={{
           minHeight: 44,
-          paddingHorizontal: 14,
           borderRadius: 12,
-          justifyContent: 'center',
           borderWidth: 1,
           borderColor: selected ? brand : c.border,
           backgroundColor: selected ? '#e8eefb' : c.card,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
         }}
       >
-        <Text style={{ color: brand, fontWeight: '700' }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Shop for ${name}`}
+          accessibilityHint="Shows listings for this part"
+          onPress={() => goToResults(name)}
+          style={{ flex: 1, minHeight: 44, paddingLeft: 14, paddingRight: 8, justifyContent: 'center' }}
+        >
+          <Text style={{ color: brand, fontWeight: '700' }}>
           {selected ? '✓ ' : ''}{name}
           {tag ? <Text style={{ color: c.subtext, fontWeight: '400' }}>  {tag}</Text> : null}
-        </Text>
+          </Text>
+        </Pressable>
         <Pressable
+          accessibilityRole="checkbox"
           onPress={() => togglePick(name)}
           hitSlop={10}
           accessibilityLabel={selected ? `Remove ${name} from quote` : `Add ${name} to quote`}
+          accessibilityHint="Selects this part for a combined quote"
+          accessibilityState={{ checked: selected }}
+          style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
         >
           <Text style={{ color: c.subtext, fontSize: 16, fontWeight: '700' }}>{selected ? '−' : '+'}</Text>
         </Pressable>
-      </Pressable>
+      </View>
     )
   }
 
@@ -131,6 +139,8 @@ export default function Diagnose() {
             What's the car doing?
           </Text>
           <TextInput
+            accessibilityLabel="Describe the car problem"
+            accessibilityHint="Enter symptoms, when they occur, and any sounds you notice"
             value={input}
             onChangeText={setInput}
             placeholder={'e.g. "Metallic grinding noise when I press the brake pedal"'}
@@ -149,6 +159,10 @@ export default function Diagnose() {
             }}
           />
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Diagnose problem"
+            accessibilityHint="Analyzes the symptoms you entered"
+            accessibilityState={{ busy, disabled: !input.trim() || busy }}
             onPress={runSymptom}
             disabled={!input.trim() || busy}
             style={{
@@ -169,6 +183,8 @@ export default function Diagnose() {
           </Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TextInput
+              accessibilityLabel="OBD-II trouble code"
+              accessibilityHint="Enter a five-character trouble code, such as P0302"
               value={input}
               onChangeText={(t) => setInput(t.toUpperCase())}
               placeholder="e.g. P0302"
@@ -189,6 +205,9 @@ export default function Diagnose() {
               }}
             />
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Look up OBD-II code"
+              accessibilityHint="Shows the meaning of the entered trouble code"
               onPress={runDtc}
               style={{
                 minHeight: 44,
@@ -205,7 +224,7 @@ export default function Diagnose() {
         </>
       )}
 
-      {error ? <Text style={{ color: '#be123c', fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={{ color: '#be123c', fontSize: 13 }}>{error}</Text> : null}
 
       {matches && matches.length === 0 && (
         <Text style={{ color: c.subtext }}>
@@ -250,6 +269,10 @@ export default function Diagnose() {
       {pickedParts.length > 0 && (
         <View style={{ gap: 10 }}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Get combined quote for ${pickedParts.length} ${pickedParts.length === 1 ? 'part' : 'parts'}`}
+            accessibilityHint="Finds a combined quote for the selected parts"
+            accessibilityState={{ busy: quoting, disabled: quoting }}
             onPress={runQuote}
             disabled={quoting}
             style={{
@@ -269,7 +292,7 @@ export default function Diagnose() {
             )}
           </Pressable>
           {quoteError && (
-            <Text style={{ color: '#be123c', fontSize: 13 }}>
+            <Text accessibilityRole="alert" style={{ color: '#be123c', fontSize: 13 }}>
               Couldn't build the quote — try again.
             </Text>
           )}
@@ -290,6 +313,9 @@ export default function Diagnose() {
                   <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700' }}>{item.part}</Text>
                   {item.listing ? (
                     <Pressable
+                      accessibilityRole="link"
+                      accessibilityLabel={`View ${item.listing.title} for ${item.part}`}
+                      accessibilityHint="Opens this seller listing in your browser"
                       onPress={() => openOutboundLink(item.listing!.link)}
                       style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, minHeight: 44, alignItems: 'center' }}
                     >

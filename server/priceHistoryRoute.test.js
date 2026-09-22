@@ -1,5 +1,5 @@
-// /api/price-history in production with Supabase unconfigured: valid requests
-// get an honest empty series (the UI hides the card), junk gets 400.
+// /api/price-history shares the production search budget. Until the shared
+// limiter migration is applied, every request fails closed with 503.
 process.env.NODE_ENV = 'production'
 process.env.SUPABASE_URL = ''
 process.env.SUPABASE_ANON_KEY = ''
@@ -17,16 +17,16 @@ test.after(() => server.close())
 
 test('a missing part is rejected', async () => {
   const res = await fetch(`${base}/api/price-history?year=2018&make=Honda&model=Civic`)
-  assert.equal(res.status, 400)
+  assert.equal(res.status, 503)
 })
 
 test('an invalid year is rejected', async () => {
   const res = await fetch(`${base}/api/price-history?year=1492&make=Honda&model=Civic&part=Brake+Pads`)
-  assert.equal(res.status, 400)
+  assert.equal(res.status, 503)
 })
 
-test('a valid request with accounts unavailable returns an empty series', async () => {
+test('a valid request fails closed until the shared limiter is available', async () => {
   const res = await fetch(`${base}/api/price-history?year=2018&make=Honda&model=Civic&part=Brake+Pads`)
-  assert.equal(res.status, 200)
-  assert.deepEqual(await res.json(), { observations: [] })
+  assert.equal(res.status, 503)
+  assert.deepEqual(await res.json(), { error: 'Rate limiting is temporarily unavailable. Please try again.' })
 })

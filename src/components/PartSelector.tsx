@@ -8,6 +8,7 @@ import { diagnoseProblem, fetchQuote, identifyPartFromImage, type DiagnosisMatch
 import { maintenanceKitsForVehicle } from '../data/maintenanceKits'
 import { MAX_PART_QUERY_LENGTH } from '../lib/searchInput.js'
 import { classifyDtc } from '../lib/dtcValidation.js'
+import { OutboundLink } from './OutboundLink'
 
 // Phone camera photos are routinely 3-8MB raw, but the AI model only needs
 // enough resolution to recognize a part, and the request has to fit under
@@ -183,6 +184,7 @@ export function PartSelector({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoScanning, setPhotoScanning] = useState(false)
   const [photoResult, setPhotoResult] = useState<{ identified: boolean; partName: string | null } | null>(null)
+  const [photoPartName, setPhotoPartName] = useState('')
   const [photoError, setPhotoError] = useState<string | null>(null)
 
   const initChecklist = (match: DiagnosisMatch) => {
@@ -254,6 +256,7 @@ export function PartSelector({
             type="button"
             disabled={diagnosing || !symptomText.trim()}
             onClick={() => applyRefinement(c)}
+            aria-pressed={refineContext?.label === c.label}
             className={`chip text-[11px] disabled:opacity-40 ${
               refineContext?.label === c.label ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400' : ''
             }`}
@@ -266,7 +269,7 @@ export function PartSelector({
         <button
           type="button"
           onClick={clearRefinement}
-          className="mt-2 text-[11px] font-medium text-slate-500 transition hover:text-brand-600"
+          className="mt-2 min-h-11 px-2 text-[11px] font-medium text-slate-500 transition hover:text-brand-600"
         >
           Clear “{refineContext.label}” ✕
         </button>
@@ -311,10 +314,13 @@ export function PartSelector({
 
   const analyzePhoto = async (base64: string) => {
     setPhotoResult(null)
+    setPhotoPartName('')
     setPhotoError(null)
     setPhotoScanning(true)
     try {
-      setPhotoResult(await identifyPartFromImage(base64))
+      const result = await identifyPartFromImage(base64)
+      setPhotoResult(result)
+      setPhotoPartName(result.identified ? result.partName ?? '' : '')
     } catch (err) {
       setPhotoError(err instanceof Error ? err.message : 'Failed to analyze image')
     } finally {
@@ -482,6 +488,7 @@ export function PartSelector({
                         key={m.id}
                         type="button"
                         onClick={() => selectMatch(i)}
+                        aria-pressed={i === activeMatchIdx}
                         className={`chip ${i === activeMatchIdx ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400' : ''}`}
                       >
                         {m.title}
@@ -573,7 +580,7 @@ export function PartSelector({
 
               {quoting && (
                 <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 text-center text-xs font-medium text-slate-400 dark:border-slate-800">
-                  Searching live eBay listings for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} that fit your {car.year} {car.make} {car.model}…
+                  Searching live eBay listings for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} with year, make, and model compatibility evidence for your {car.year} {car.make} {car.model}…
                 </div>
               )}
 
@@ -585,7 +592,7 @@ export function PartSelector({
                       {car.trim ? ` ${car.trim}` : ''}
                     </div>
                     <p className="mt-0.5 text-[11px] text-slate-500">
-                      Lowest delivered price among marketplace compatibility matches. Unknown-fitment listings are excluded.
+                      Lowest item + known shipping, before tax, among marketplace YMM compatibility matches. Listings without compatibility evidence are excluded.
                     </p>
                   </div>
 
@@ -604,7 +611,7 @@ export function PartSelector({
                           {item.listing ? (
                             <p className="truncate text-[11px] text-slate-500">
                               {item.listing.condition} · {item.listing.seller} · {item.listing.source}
-                              {' · marketplace compatibility match'}
+                              {' · marketplace YMM compatibility evidence'}
                             </p>
                           ) : (
                             <p className="text-[11px] text-slate-400">No marketplace compatibility matches found right now</p>
@@ -623,14 +630,12 @@ export function PartSelector({
                             All listings
                           </button>
                           {item.listing && (
-                            <a
+                            <OutboundLink
                               href={item.listing.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               className="btn btn-ghost btn-sm flex-1 justify-center whitespace-nowrap sm:flex-none"
                             >
                               View <ExternalLink size={11} />
-                            </a>
+                            </OutboundLink>
                           )}
                         </div>
                       </li>
@@ -640,10 +645,10 @@ export function PartSelector({
                   <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                     <div className="flex items-baseline justify-between">
                       <div className="text-xs text-slate-500">
-                        Parts ${quote.subtotal.toFixed(2)} + shipping ${quote.shipping.toFixed(2)}
+                        Items ${quote.subtotal.toFixed(2)} + known shipping ${quote.shipping.toFixed(2)}
                       </div>
                       <div className="font-data text-lg font-bold tracking-tight text-slate-950">
-                        ~${quote.total.toFixed(2)}
+                        Item + known shipping, before tax: ~${quote.total.toFixed(2)}
                       </div>
                     </div>
                     <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
@@ -805,14 +810,26 @@ export function PartSelector({
                     <div className="h-10 w-10 shrink-0 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center">
                       <CheckCircle2 size={22} />
                     </div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">Best guess</div>
-                      <div className="text-lg font-bold text-slate-900">{photoResult.partName}</div>
+                    <div className="w-full">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">AI suggestion</div>
+                      <label htmlFor="photo-part-name" className="sr-only">Suggested part name</label>
+                      <input
+                        id="photo-part-name"
+                        type="text"
+                        value={photoPartName}
+                        onChange={(e) => setPhotoPartName(e.target.value)}
+                        aria-describedby="photo-ai-suggestion-help"
+                        className="field h-auto min-h-0 border-0 bg-transparent p-0 text-lg font-bold text-slate-900 focus:ring-0 dark:bg-transparent"
+                      />
+                      <p id="photo-ai-suggestion-help" className="mt-1 text-[11px] leading-relaxed text-emerald-800 dark:text-emerald-200">
+                        AI suggestion only — confirm or edit the part name before searching.
+                      </p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => onSelect(photoResult.partName!)}
+                    onClick={() => onSelect(photoPartName.trim())}
+                    disabled={!photoPartName.trim()}
                     className="btn btn-primary w-full sm:w-auto whitespace-nowrap"
                   >
                     Find this part <ArrowRight size={16} />
@@ -835,9 +852,10 @@ export function PartSelector({
                   onClick={() => {
                     setPhotoPreview(null)
                     setPhotoResult(null)
+                    setPhotoPartName('')
                     setPhotoError(null)
                   }}
-                  className="text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors"
+                  className="min-h-11 px-2 text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors"
                 >
                   Try another photo
                 </button>
@@ -895,7 +913,7 @@ export function PartSelector({
                       key={partName}
                       type="button"
                       onClick={() => onSelect(partName)}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 hover:border-brand-500 hover:bg-brand-50/10 text-xs font-semibold text-slate-700 transition-all text-left"
+                      className="flex min-h-11 items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 hover:border-brand-500 hover:bg-brand-50/10 text-xs font-semibold text-slate-700 transition-all text-left"
                     >
                       <span>Find {partName}</span>
                       <ArrowRight size={13} className="text-slate-400 group-hover:text-brand-500" />

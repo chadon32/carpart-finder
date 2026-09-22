@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Drawer } from 'vaul'
 import { useIsMobile } from '../hooks/useIsMobile'
 
@@ -24,13 +25,24 @@ export function Modal({
   const restoreRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    if (isMobile) return
-    restoreRef.current = document.activeElement as HTMLElement | null
+    // Keep the original opener when resizing swaps the desktop and phone
+    // shells; the active element during that swap may be the old dialog.
+    if (!restoreRef.current) restoreRef.current = document.activeElement as HTMLElement | null
+    // Both shells are portalled outside #root. Radix's aria-hidden handling
+    // can preserve a root containing a live region (our toaster), leaving
+    // background controls exposed. Inert explicitly isolates either shell.
+    const appRoot = document.getElementById('root')
+    const previousInert = appRoot?.inert ?? false
+    if (appRoot) appRoot.inert = true
+    if (isMobile) return () => {
+      if (appRoot) appRoot.inert = previousInert
+    }
     panelRef.current?.focus()
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prevOverflow
+      if (appRoot) appRoot.inert = previousInert
       restoreRef.current?.focus?.()
     }
   }, [isMobile])
@@ -40,7 +52,23 @@ export function Modal({
       <Drawer.Root open onOpenChange={(open) => { if (!open) onClose() }}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-white outline-none dark:bg-slate-900">
+          <Drawer.Content
+            ref={panelRef}
+            tabIndex={-1}
+            aria-describedby={undefined}
+            onOpenAutoFocus={(event) => {
+              // Vaul suppresses autofocus by default. Focus the sheet itself
+              // so keyboard users enter it without opening a mobile keyboard.
+              event.preventDefault()
+              if (!restoreRef.current) restoreRef.current = document.activeElement as HTMLElement | null
+              panelRef.current?.focus()
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              restoreRef.current?.focus()
+            }}
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-white outline-none dark:bg-slate-900"
+          >
             <Drawer.Title className="sr-only">{label}</Drawer.Title>
             <div aria-hidden className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700" />
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-safe">
@@ -74,7 +102,7 @@ export function Modal({
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-slate-950/45 backdrop-blur-[2px] px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={onClose}
@@ -87,10 +115,11 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
-        className={`max-h-[90vh] w-full ${maxWidth} animate-slide-up overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-100 outline-none`}
+        className={`max-h-[90vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-100 outline-none`}
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

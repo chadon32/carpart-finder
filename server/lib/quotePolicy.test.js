@@ -37,3 +37,12 @@ test('automatic quote rejects accessories and broken inventory', () => {
     null
   )
 })
+
+test('automatic quote excludes listings whose shipping cost is unknown', () => {
+  const picked = pickVerifiedListingForPart([
+    listing({ id: 'unknown-shipping', price: 10, shippingCost: null }),
+    listing({ id: 'complete-total', price: 40, shippingCost: 5 }),
+  ], 'Brake Pads')
+
+  assert.equal(picked.id, 'complete-total')
+})

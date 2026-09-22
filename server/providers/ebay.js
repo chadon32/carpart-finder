@@ -3,6 +3,7 @@ import { categoryForPart } from '../partCategories.js'
 import { fetchWithRetry } from '../httpClient.js'
 import { mapWithConcurrency } from '../lib/concurrency.js'
 import { listingDoesNotContradictVehicle } from '../lib/fitmentPolicy.js'
+import { safeRetailerUrl } from '../../shared/outboundUrl.js'
 
 const SEARCH_URL = `${EBAY_API_ROOT}/buy/browse/v1/item_summary/search`
 const ITEM_URL = `${EBAY_API_ROOT}/buy/browse/v1/item`
@@ -109,8 +110,16 @@ async function runSearch(token, { q, categoryId, compatibilityFilter, zip, affil
 
 // A listing has to be actually buyable to be worth showing: real title, a
 // working link, and a plausible price. eBay occasionally returns $0 stubs.
+export function itemDestination(item) {
+  return safeRetailerUrl(item.itemAffiliateWebUrl) || safeRetailerUrl(item.itemWebUrl)
+}
+
 function isValidItem(item) {
-  return Boolean(item.title && item.itemWebUrl && Number(item.price?.value) > 0)
+  return Boolean(
+    item.title
+    && itemDestination(item)
+    && Number(item.price?.value) > 0
+  )
 }
 
 // Browse search can return items that are only POSSIBLE matches, or items with
@@ -175,7 +184,7 @@ export function mapItem(item, { compatibilityFilterUsed = false, vehicle = null 
     sellerFeedbackPercentage: item.seller?.feedbackPercentage ?? null,
     sellerFeedbackScore: item.seller?.feedbackScore ?? null,
     image: item.image?.imageUrl ?? null,
-    link: item.itemAffiliateWebUrl || item.itemWebUrl,
+    link: itemDestination(item) || '',
     source: 'eBay',
     crossBorder: false,
     originalPrice: item.marketingPrice?.originalPrice?.value

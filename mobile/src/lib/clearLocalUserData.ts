@@ -7,7 +7,14 @@ import { usePrefs } from '../stores/prefs'
 
 // Audited persisted stores. Keep this registry next to the deletion flow so a
 // new local user-data store cannot be added without an explicit cleanup entry.
-export const LOCAL_USER_DATA_KEYS = ['cpr-garage', 'cpr-recents', 'cpr-watchlist', 'cpr-prefs'] as const
+export const PENDING_ACCOUNT_DELETION_RECEIPT_KEY = 'cpr-pending-account-deletion'
+export const LOCAL_USER_DATA_KEYS = [
+  'cpr-garage',
+  'cpr-recents',
+  'cpr-watchlist',
+  'cpr-prefs',
+  PENDING_ACCOUNT_DELETION_RECEIPT_KEY,
+] as const
 
 export async function clearLocalUserData() {
   useGarage.getState().clear()

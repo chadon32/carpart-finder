@@ -52,10 +52,10 @@ export default function VehiclePicker() {
     // Lazy imports: these native modules only exist in builds that include
     // them — older installs get a message instead of a crash.
     let ImagePicker: typeof import('expo-image-picker')
-    let TextRecognition: typeof import('@react-native-ml-kit/text-recognition').default
+    let recognizeText: typeof import('@dariyd/react-native-text-recognition').recognizeText
     try {
       ImagePicker = await import('expo-image-picker')
-      TextRecognition = (await import('@react-native-ml-kit/text-recognition')).default
+      recognizeText = (await import('@dariyd/react-native-text-recognition')).recognizeText
     } catch {
       setVinMsg('VIN scanning needs the newest app build — update from the install link.')
       return
@@ -69,8 +69,14 @@ export default function VehiclePicker() {
     if (shot.canceled || !shot.assets[0]?.uri) return
     setVinBusy(true)
     try {
-      const result = await TextRecognition.recognize(shot.assets[0].uri)
-      const found = extractVin(result.text)
+      const result = await recognizeText(shot.assets[0].uri, {
+        languages: ['en'],
+        recognitionLevel: 'line',
+      })
+      if (!result.success) throw new Error(result.errorMessage ?? 'Text recognition failed')
+      const recognizedText =
+        result.fullText ?? result.pages?.map((page) => page.fullText).join('\n') ?? ''
+      const found = extractVin(recognizedText)
       if (!found) {
         setVinMsg('No VIN found in the photo — try closer, straight-on.')
         setVinBusy(false)

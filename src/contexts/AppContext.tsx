@@ -1,6 +1,12 @@
 import { useState, useEffect, type ReactNode } from 'react'
-import { getCurrentUser, logoutUser, ApiError } from '../api/supabase'
+import {
+  getCurrentUser,
+  logoutUser,
+  reconcilePendingAccountDeletion,
+  ApiError,
+} from '../api/supabase'
 import { AppContext, type AccountData, type User } from './AppContextValue'
+import { clearLocalUserData } from '../lib/clearLocalUserData.js'
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -85,11 +91,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
 
-    getCurrentUser()
-      .then(() => {
+    const verifySession = async () => {
+      if (await reconcilePendingAccountDeletion()) {
         if (cancelled) return
-      })
-      .catch(async (err) => {
+        clearLocalUserData()
+        setUser(null)
+        return
+      }
+
+      try {
+        await getCurrentUser()
+      } catch (err) {
         if (cancelled) return
         // Only a definitive answer from the server ends the session. A network
         // failure means we don't know, so keep the cached user rather than
@@ -99,10 +111,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const definitive = err instanceof ApiError && [401, 403, 503].includes(err.status)
         if (!definitive) return
 
-        await logoutUser() // clears the stale cpf_token cookie server-side
-        localStorage.removeItem('carpartsradar-user')
-        setUser(null)
-      })
+        try {
+          await logoutUser() // clears the stale cpf_token cookie server-side
+        } catch {
+          // The preceding /me response already proved the session invalid.
+          // Local sign-out must still finish when the cookie-clear request
+          // encounters a second network failure.
+        } finally {
+          localStorage.removeItem('carpartsradar-user')
+          setUser(null)
+        }
+      }
+    }
+    void verifySession()
     return () => {
       cancelled = true
     }

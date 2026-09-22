@@ -89,6 +89,9 @@ export default function WatchlistScreen() {
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`Buy ${item.title} on ${item.source}`}
+                  accessibilityHint="Opens the seller listing in your browser"
                   onPress={() => openOutboundLink(item.link)}
                   style={{
                     flex: 1,
@@ -102,6 +105,9 @@ export default function WatchlistScreen() {
                   <Text style={{ color: '#fff', fontWeight: '700' }}>Buy on {item.source}</Text>
                 </Pressable>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${item.title} from your watchlist`}
+                  accessibilityHint="Stops tracking this listing"
                   onPress={() => {
                     Haptics.selectionAsync()
                     unwatch(item.id)

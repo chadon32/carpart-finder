@@ -15,6 +15,7 @@ import type { CartItem } from '../hooks/useCart'
 import { fetchPricesChunked, type PriceInfo } from '../api/client'
 import { trackRetailerClick } from '../lib/analytics'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
+import { OutboundLink } from './OutboundLink'
 
 type PriceCheck = Record<string, PriceInfo>
 
@@ -93,7 +94,7 @@ function CompareTable({ items }: { items: CartItem[] }) {
             <td className="p-3" />
             {items.map((item) => (
               <td key={item.cartId} className="p-3">
-                <a
+                <OutboundLink
                   href={item.link}
                   onClick={() => trackRetailerClick({
                     retailer: item.source,
@@ -108,7 +109,7 @@ function CompareTable({ items }: { items: CartItem[] }) {
                   className="btn btn-primary px-3 py-1.5 text-xs"
                 >
                   Buy on {item.source} <ExternalLink size={13} />
-                </a>
+                </OutboundLink>
               </td>
             ))}
           </tr>
@@ -221,7 +222,7 @@ export function CartPanel({
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
                   <span className="font-data text-lg font-bold text-slate-900">${item.price.toFixed(2)}</span>
                   <div className="flex gap-1.5">
-                    <a
+                    <OutboundLink
                       href={item.link}
                       onClick={() => trackRetailerClick({
                         retailer: item.source,
@@ -236,7 +237,7 @@ export function CartPanel({
                       className="btn btn-primary px-3 py-1.5 text-xs"
                     >
                       Buy on {item.source} <ExternalLink size={13} />
-                    </a>
+                    </OutboundLink>
                     <button
                       type="button"
                       onClick={() => onRemove(item.cartId)}

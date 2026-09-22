@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Mail } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { friendlyApiError } from '../lib/apiErrors.js'
@@ -9,23 +9,29 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
   const [subscribed, setSubscribed] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const requestInFlight = useRef(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (requestInFlight.current) return
     const normalizedEmail = email.trim()
     if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setError('Enter a valid email address.')
       return
     }
     if (targetPrice <= 0) return
+    requestInFlight.current = true
     setSubscribing(true)
     setError(null)
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 20_000)
     try {
       let res: Response
       try {
         res = await fetch('/api/supabase/price-alerts/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             email: normalizedEmail,
             year: car.year,
@@ -37,6 +43,7 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
           }),
         })
       } catch {
+        if (controller.signal.aborted) throw new Error('The alert request timed out. Check your connection and try again.')
         throw new Error(friendlyApiError('/api/supabase/price-alerts/subscribe', 0))
       }
       if (!res.ok) {
@@ -55,17 +62,19 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
     } catch (err: any) {
       setError(err.message)
     } finally {
+      window.clearTimeout(timeout)
+      requestInFlight.current = false
       setSubscribing(false)
     }
   }
 
   return (
-    <div className="card p-6">
-      <div className="flex items-center gap-3">
+    <div className="card p-[16px] sm:p-6">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="icon-tile bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">
           <Mail size={17} />
         </div>
-        <div>
+        <div className="min-w-0 flex-1 basis-40">
           <div className="font-semibold tracking-tight text-slate-950">Price drop alerts</div>
           <div className="text-xs text-slate-500">Get notified when this part gets cheaper</div>
         </div>
@@ -78,7 +87,7 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
       ) : (
         <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-3">
           <p className="text-xs text-slate-600 leading-relaxed">
-            Target alert threshold set to the current lowest available price of <strong>${targetPrice.toFixed(2)}</strong>.
+            Target set to the current lowest known total of <strong>${targetPrice.toFixed(2)}</strong> (item + known shipping, before tax).
           </p>
           <label htmlFor="price-alert-email" className="field-label">Email address</label>
           <input

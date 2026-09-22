@@ -51,6 +51,32 @@ export function isAlreadyDeletedAuthError(error) {
   return status === 404 || code === 'user_not_found' || /user.*not found|not found.*user/.test(message)
 }
 
+export async function getAccountDeletionStatus({
+  admin,
+  userId,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}) {
+  if (!admin) throw new Error('Supabase admin client is unavailable')
+  if (!userId) throw new Error('Account deletion receipt is missing a user id')
+
+  try {
+    const result = await withTimeout(
+      admin.auth.admin.getUserById(userId),
+      timeoutMs,
+      'Account deletion status check'
+    )
+    if (result?.error) {
+      if (isAlreadyDeletedAuthError(result.error)) {
+        return { success: true, deleted: true }
+      }
+      return { success: false, deleted: false, error: result.error }
+    }
+    return { success: true, deleted: !result?.data?.user }
+  } catch (error) {
+    return { success: false, deleted: false, error }
+  }
+}
+
 export function deleteAccountPermanently({
   admin,
   userId,

@@ -11,6 +11,8 @@ export default function AccountScreen() {
   const user = useAuth((s) => s.user)
   const status = useAuth((s) => s.status)
   const reauthEmail = useAuth((s) => s.reauthEmail)
+  const deletionRecovered = useAuth((s) => s.deletionRecovered)
+  const deletionCleanupFailed = useAuth((s) => s.deletionCleanupFailed)
   const { outcome, action, cleanup } = useLocalSearchParams<{
     outcome?: string
     action?: string
@@ -22,7 +24,7 @@ export default function AccountScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }}>
         <Text style={{ color: c.text, fontSize: 34, fontFamily: displayFont }}>ACCOUNT</Text>
-        {outcome === 'deleted' ? (
+        {outcome === 'deleted' || deletionRecovered ? (
           <View
             accessibilityRole="alert"
             style={{ borderRadius: 14, borderWidth: 1, borderColor: '#86efac', backgroundColor: '#f0fdf4', padding: 14, gap: 4 }}
@@ -33,7 +35,7 @@ export default function AccountScreen() {
             </Text>
           </View>
         ) : null}
-        {outcome === 'deleted' && cleanup === 'failed' ? (
+        {(outcome === 'deleted' && cleanup === 'failed') || deletionCleanupFailed ? (
           <View
             accessibilityRole="alert"
             style={{ borderRadius: 14, borderWidth: 1, borderColor: '#fbbf24', backgroundColor: '#fffbeb', padding: 14, gap: 4 }}

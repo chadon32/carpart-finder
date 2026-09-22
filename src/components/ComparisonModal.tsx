@@ -1,6 +1,8 @@
 import { X, ExternalLink, Star, Award, Check, AlertTriangle } from 'lucide-react'
 import type { Listing } from '../api/client'
 import { Modal } from './Modal'
+import { OutboundLink } from './OutboundLink'
+import { knownTotalCost } from '../lib/listingHelpers'
 
 const fitmentScopeLabels = {
   'year-make-model': 'Year, make, and model',
@@ -34,7 +36,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
     <Modal label="Compare listings" onClose={onClose} maxWidth="max-w-5xl">
       <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
         <div>
-          <div className="text-xs font-semibold tracking-wider text-brand-500 uppercase">Comparison Matrix</div>
+          <div className="text-xs font-semibold tracking-wider text-brand-600 dark:text-brand-400 uppercase">Comparison Matrix</div>
           <h3 className="text-base font-bold tracking-tight text-slate-900">Side-by-Side Part Comparison</h3>
         </div>
         <button
@@ -51,7 +53,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
         <table className="w-full min-w-[700px] border-collapse text-left text-xs text-slate-600">
           <thead>
             <tr>
-              <th className="w-40 pb-4 pr-4 font-semibold text-slate-400 uppercase tracking-wider">Attribute</th>
+              <th className="w-40 pb-4 pr-4 font-semibold text-slate-500 uppercase tracking-wider">Attribute</th>
               {listings.map((item) => (
                 <th key={item.id} className="pb-4 px-4 align-top w-64 border-l border-slate-100/80">
                   <div className="flex flex-col gap-2">
@@ -79,11 +81,11 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
               {listings.map((item) => (
                 <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
                   {item.shippingCost === 0 ? (
-                    <span className="font-semibold text-emerald-600">Free shipping</span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free shipping</span>
                   ) : item.shippingCost != null ? (
                     `+$${item.shippingCost.toFixed(2)}`
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-slate-500">Shown at checkout</span>
                   )}
                 </td>
               ))}
@@ -91,12 +93,12 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
 
             {/* Total Price */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Total Out-of-Pocket</td>
+              <td className="py-4 pr-4 font-semibold text-slate-900">Item + known shipping (before tax)</td>
               {listings.map((item) => {
-                const total = item.price + (item.shippingCost || 0)
+                const total = knownTotalCost(item)
                 return (
                   <td key={item.id} className="font-data py-4 px-4 font-bold text-base text-slate-950 border-l border-slate-100/80">
-                    ${total.toFixed(2)}
+                    {total == null ? 'Total unavailable' : `$${total.toFixed(2)}`}
                   </td>
                 )
               })}
@@ -112,11 +114,11 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
                 return (
                   <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
                     {item.verifiedFitment !== true ? (
-                      <span className="inline-flex items-center gap-1.5 font-medium text-amber-700">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-300">
                         <AlertTriangle size={13} /> Marketplace compatibility not confirmed
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
                         <Check size={13} strokeWidth={3} /> Marketplace compatibility match
                       </span>
                     )}
@@ -126,7 +128,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
                         {evidence.provider && <div><span className="font-semibold text-slate-600">Provider:</span> {evidence.provider}</div>}
                         {checkedAt && <div><span className="font-semibold text-slate-600">Checked:</span> {checkedAt}</div>}
                         {evidence.note && <p>{evidence.note}</p>}
-                        <p className="text-slate-400">Marketplace data can omit engine, drivetrain, options, and part-number details. Confirm before buying.</p>
+                        <p className="text-slate-500">Marketplace data can omit engine, drivetrain, options, and part-number details. Confirm before buying.</p>
                       </div>
                     )}
                   </td>
@@ -141,7 +143,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
                 <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
                   <div className="font-medium text-slate-800 truncate max-w-[220px]">{item.seller || 'Direct Partner'}</div>
                   {item.sellerFeedbackPercentage && (
-                    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400">
+                    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
                       <Star size={10} className="fill-amber-400 text-amber-400" />
                       <span>{item.sellerFeedbackPercentage}% feedback</span>
                       {item.topRatedSeller && <Award size={10} className="text-brand-500" />}
@@ -176,14 +178,12 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
               <td className="py-4 pr-4" />
               {listings.map((item) => (
                 <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
-                  <a
+                  <OutboundLink
                     href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="btn btn-primary w-full text-center py-2"
                   >
                     View Listing <ExternalLink size={12} />
-                  </a>
+                  </OutboundLink>
                 </td>
               ))}
             </tr>

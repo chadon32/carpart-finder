@@ -4,7 +4,10 @@ const PROOF_VERSION = 1
 const DEFAULT_TTL_MS = 30 * 60 * 1000
 
 function proofSecret() {
-  if (process.env.FITMENT_PROOF_SECRET) return process.env.FITMENT_PROOF_SECRET
+  if (process.env.FITMENT_PROOF_SECRET) {
+    const configured = process.env.FITMENT_PROOF_SECRET
+    return Buffer.byteLength(configured, 'utf8') >= 32 ? configured : null
+  }
   if (!process.env.EBAY_CLIENT_SECRET) return null
 
   // Derive a purpose-specific key instead of using the provider credential

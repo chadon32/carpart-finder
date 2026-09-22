@@ -1,5 +1,11 @@
 # Welcome to your Expo app 👋
 
+## Shared recall contract
+
+The web and native clients validate recall responses using `../shared/recalls.js` and its TypeScript declaration. `metro.config.js` extends Expo's defaults and watches only that dependency-free shared directory, not the whole website or a second React dependency tree. The root `.easignore` includes these two contract files while continuing to exclude the rest of the website/API from native build archives.
+
+After changing shared contracts, run the root contract tests, native Jest/TypeScript checks, and `npx expo export --platform ios`. Jest and TypeScript alone do not verify Metro resolution. This export checks JavaScript/assets, not native compilation, signing, device behavior, or TestFlight.
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started

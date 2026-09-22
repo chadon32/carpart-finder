@@ -47,3 +47,9 @@ test('fitment proof is unavailable when no server secret can be derived', () => 
   assert.equal(issueFitmentProof(claim), null)
   assert.equal(verifyFitmentProof('anything', claim), false)
 })
+
+test('fitment proof refuses a weak configured signing secret', () => {
+  process.env.FITMENT_PROOF_SECRET = 'too-short'
+  assert.equal(issueFitmentProof(claim), null)
+  assert.equal(verifyFitmentProof('anything', claim), false)
+})

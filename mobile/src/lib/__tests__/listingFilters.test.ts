@@ -17,6 +17,16 @@ test('price and total sort ascending', () => {
   expect(applyListingFilters([a, b], { ...defaultFilters, sort: 'total' })[0].id).toBe('a')
 })
 
+test('unknown shipping stays visible but sorts after complete totals and value estimates', () => {
+  const unknown = l({ id: 'unknown', price: 1, shippingCost: null })
+  const complete = l({ id: 'complete', price: 20, shippingCost: 5 })
+
+  expect(applyListingFilters([unknown, complete], { ...defaultFilters, sort: 'total' }).map((x) => x.id))
+    .toEqual(['complete', 'unknown'])
+  expect(applyListingFilters([unknown, complete], defaultFilters).map((x) => x.id))
+    .toEqual(['complete', 'unknown'])
+})
+
 test('rating sorts descending with unrated last', () => {
   const a = l({ id: 'a', sellerFeedbackPercentage: '95.0' })
   const b = l({ id: 'b', sellerFeedbackPercentage: null })

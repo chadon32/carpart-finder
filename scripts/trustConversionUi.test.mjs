@@ -69,3 +69,26 @@ test('generic vehicle health excludes engine-specific timing-belt guidance', asy
   assert.match(healthModal, /Engine-specific services are omitted/)
   assert.match(healthModal, /owner's manual controls/)
 })
+
+test('unknown shipping is never displayed or ranked as a zero-cost delivered total', async () => {
+  const [helpers, listing, results] = await Promise.all([
+    readSource('src/lib/listingHelpers.ts'),
+    readSource('src/components/ListingCard.tsx'),
+    readSource('src/components/ResultsList.tsx'),
+  ])
+
+  assert.match(helpers, /shippingCost == null/)
+  assert.match(helpers, /return null/)
+  assert.match(listing, /Shipping shown by seller at checkout/)
+  assert.match(listing, /knownTotal == null/)
+  assert.match(results, /filter\(\(listing\) => knownTotalCost\(listing\) != null\)/)
+})
+
+test('web AI repair guidance renders only inert allowlisted Markdown', async () => {
+  const guide = await readSource('src/components/RepairGuideModal.tsx')
+
+  assert.match(guide, /SAFE_GUIDE_ELEMENTS/)
+  assert.match(guide, /allowedElements=/)
+  assert.match(guide, /unwrapDisallowed/)
+  assert.match(guide, /skipHtml/)
+})

@@ -6,6 +6,7 @@ import {
   filterExactCompatibility,
   filterVehicleContradictions,
   isExactCompatibility,
+  itemDestination,
   mapItem,
   marketplaceSearchKeyword,
 } from './ebay.js'
@@ -178,4 +179,21 @@ test('mapItem prefers itemAffiliateWebUrl when present', () => {
 test('mapItem falls back to itemWebUrl when no affiliate url exists', () => {
   const mapped = mapItem(baseItem)
   assert.equal(mapped.link, 'https://www.ebay.com/itm/123')
+})
+
+test('mapItem never exposes an unapproved outbound destination', () => {
+  const mapped = mapItem({
+    ...baseItem,
+    itemAffiliateWebUrl: 'javascript:alert(1)',
+    itemWebUrl: 'https://ebay.com.evil.example/itm/123',
+  })
+
+  assert.equal(mapped.link, '')
+})
+
+test('an unsafe affiliate destination falls back to the verified ordinary item URL', () => {
+  assert.equal(
+    itemDestination({ ...baseItem, itemAffiliateWebUrl: 'javascript:alert(1)' }),
+    'https://www.ebay.com/itm/123'
+  )
 })

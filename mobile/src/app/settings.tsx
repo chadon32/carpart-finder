@@ -1,9 +1,9 @@
-import { Linking, ScrollView, Text, View } from 'react-native'
+import { ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { SettingsRow } from '@/components/SettingsRow'
 import { useThemeColors, dataFont, displayFont } from '@/theme'
-import { PRIVACY_POLICY_URL } from '@/lib/legal'
+import { openPrivacyPolicy } from '@/lib/legal'
 
 export default function SettingsScreen() {
   const c = useThemeColors()
@@ -32,7 +32,7 @@ export default function SettingsScreen() {
             <SettingsRow
               title="Privacy Policy"
               detail="How CarPartsRadar collects and deletes data"
-              onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
+              onPress={() => void openPrivacyPolicy()}
             />
           </View>
         </View>

@@ -37,6 +37,11 @@ terminals/
 # Screenshots emitted by drive-mobile.mjs — regenerable verification artifacts
 shots/
 
+# Benchmark JSON reports and optional screenshot evidence — regenerable tooling artifacts
+benchmark-report*.json
+benchmark-shots/
+artifacts/benchmarks/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

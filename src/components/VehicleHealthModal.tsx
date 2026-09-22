@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, ShieldCheck, Gauge, ShoppingCart } from 'lucide-react'
+import { AlertTriangle, Gauge, ShoppingCart } from 'lucide-react'
 import { Modal } from './Modal'
 import { RadarMark } from './RadarMark'
 import { fetchRecalls, type Recall } from '../api/client'
@@ -23,13 +23,15 @@ export function VehicleHealthModal({
     () => readCachedRecalls(vehicle.year, vehicle.make, vehicle.model)
   )
   const [recallsError, setRecallsError] = useState(false)
+  const [recallAttempt, setRecallAttempt] = useState(0)
   const [mileageInput, setMileageInput] = useState(vehicle.mileage != null ? String(vehicle.mileage) : '')
   const [mileageError, setMileageError] = useState<string | null>(null)
 
   useEffect(() => {
     if (recalls !== null) return // session cache hit
     let cancelled = false
-    fetchRecalls(vehicle.year, vehicle.make, vehicle.model)
+    const controller = new AbortController()
+    fetchRecalls(vehicle.year, vehicle.make, vehicle.model, controller.signal)
       .then((res) => {
         if (cancelled) return
         setRecalls(res.recalls)
@@ -41,8 +43,9 @@ export function VehicleHealthModal({
       })
     return () => {
       cancelled = true
+      controller.abort()
     }
-  }, [recalls, vehicle.year, vehicle.make, vehicle.model])
+  }, [recalls, vehicle.year, vehicle.make, vehicle.model, recallAttempt])
 
   const commitMileage = () => {
     const value = mileageInput.trim()
@@ -97,30 +100,35 @@ export function VehicleHealthModal({
           </label>
         </div>
         <p id="vehicle-mileage-help" className="mt-1 text-xs text-slate-500">Optional. Enter a whole number from 0 to 1,000,000.</p>
-        {mileageError && <p id="vehicle-mileage-error" role="alert" className="mt-1 text-xs text-rose-600">{mileageError}</p>}
+        {mileageError && <p id="vehicle-mileage-error" role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">{mileageError}</p>}
         {vehicle.vin && (
-          <p className="font-data mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-400">VIN · {vehicle.vin}</p>
+          <p className="font-data mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-600">VIN · {vehicle.vin}</p>
         )}
       </div>
 
       <div className="space-y-8 p-6">
         <section>
-          <h3 className="section-title text-lg">Open recalls</h3>
-          <p className="mt-0.5 text-xs text-slate-500">Live from the NHTSA recall database</p>
+          <h3 className="section-title text-lg">Model recall notices</h3>
+          <p className="mt-0.5 text-xs text-slate-500">NHTSA notices for this year, make, and model — not your VIN's repair status.</p>
+          <a href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 underline dark:text-sky-300">
+            Check your VIN on NHTSA (opens a new tab)
+          </a>
 
           {recallsError ? (
-            <p className="mt-4 flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
-              <AlertTriangle size={15} className="shrink-0" />
-              Couldn't reach the NHTSA recall database — try again later.
-            </p>
+            <div role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+              <p className="flex items-center gap-2"><AlertTriangle size={15} className="shrink-0" />Couldn't load recall notices. Check your connection and try again.</p>
+              <button type="button" className="btn btn-secondary mt-3" onClick={() => {
+                setRecallsError(false)
+                setRecallAttempt((attempt) => attempt + 1)
+              }}>Retry recall lookup</button>
+            </div>
           ) : recalls === null ? (
             <div className="mt-4 flex items-center gap-2.5 text-sm text-slate-500" role="status">
               <RadarMark className="h-5 w-5 text-brand-600 dark:text-brand-400" /> Checking NHTSA…
             </div>
           ) : recalls.length === 0 ? (
-            <p className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800">
-              <ShieldCheck size={15} className="shrink-0" />
-              No open recalls found in the NHTSA database
+            <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
+              No recall notices were returned for this model. Check your VIN on NHTSA to confirm your vehicle's recall status.
             </p>
           ) : (
             <ul className="mt-4 space-y-3">
@@ -129,11 +137,11 @@ export function VehicleHealthModal({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="badge bg-rose-600 text-white">Recall</span>
                     {r.campaignNumber && (
-                      <span className="font-data text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-700">
+                      <span className="font-data text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-700 dark:text-rose-300">
                         {r.campaignNumber}
                       </span>
                     )}
-                    {r.reportedDate && <span className="text-[11px] text-slate-400">{r.reportedDate}</span>}
+                    {r.reportedDate && <span className="text-[11px] text-slate-600">{r.reportedDate}</span>}
                   </div>
                   {r.component && <p className="mt-2 text-sm font-semibold text-slate-900">{r.component}</p>}
                   {r.summary && <p className="mt-1 text-sm leading-relaxed text-slate-600">{r.summary}</p>}

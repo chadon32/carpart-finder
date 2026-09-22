@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import Markdown from 'react-native-markdown-display'
 import { fetchRepairGuide } from '@/api/client'
+import { SafeRepairGuide } from '@/components/SafeRepairGuide'
 import { useThemeColors, brand } from '@/theme'
 
 export default function RepairGuide() {
@@ -82,22 +82,7 @@ export default function RepairGuide() {
         </View>
       ) : (
         <>
-          <Markdown
-            style={{
-              body: { color: c.text, fontSize: 15, lineHeight: 22 },
-              heading1: { color: c.text, fontWeight: '800', marginTop: 12 },
-              heading2: { color: c.text, fontWeight: '800', marginTop: 12 },
-              heading3: { color: c.text, fontWeight: '700', marginTop: 10 },
-              bullet_list: { marginVertical: 6 },
-              ordered_list: { marginVertical: 6 },
-              code_inline: { backgroundColor: c.border, color: c.text },
-              fence: { backgroundColor: c.card, borderColor: c.border },
-              hr: { backgroundColor: c.border },
-              strong: { color: c.text },
-            }}
-          >
-            {guide}
-          </Markdown>
+          <SafeRepairGuide guide={guide} />
           <Text style={{ color: c.subtext, fontSize: 12, marginTop: 20, fontStyle: 'italic' }}>
             AI-generated guidance — verify torque specs and procedures against your vehicle's
             service manual before starting work.

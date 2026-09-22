@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, Suspense, lazy } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
 import {
   ChevronLeft,
   Wrench,
@@ -11,16 +11,16 @@ import {
   Truck,
   Store,
   Share2,
-  TrendingDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Helmet } from 'react-helmet-async'
 import type { Car } from './CarSelector'
-import { searchParts, fetchPriceHistory, type Listing, type PriceObservation } from '../api/client'
+import type { Listing } from '../api/client'
+import type { PartsSearchState } from '../hooks/usePartsSearch'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { retailerLinks } from '../data/retailerLinks'
-import { Sparkline } from './Sparkline'
+import { PriceHistoryCard } from './PriceHistoryCard'
 import { companionsForPart } from '../data/partTypes'
 import { isElectricVehicle } from '../data/electricVehicles'
 import { trackEvent, trackRetailerClick } from '../lib/analytics'
@@ -31,10 +31,17 @@ const PartDetailModal = lazy(() => import('./PartDetailModal').then((m) => ({ de
 const ComparisonModal = lazy(() => import('./ComparisonModal').then((m) => ({ default: m.ComparisonModal })))
 
 import { PriceAlertCard } from './PriceAlertCard'
-import { FilterSheet } from './FilterSheet'
+const FilterSheet = lazy(() => import('./FilterSheet').then((m) => ({ default: m.FilterSheet })))
 import { ListingCard } from './ListingCard'
+import { OutboundLink } from './OutboundLink'
 import { RadarMark } from './RadarMark'
-import { isNew, isUsed, valueScore } from '../lib/listingHelpers'
+import {
+  compareKnownTotal,
+  compareValueEstimate,
+  isNew,
+  isUsed,
+  knownTotalCost,
+} from '../lib/listingHelpers'
 import { maintenanceKitForSearch } from '../data/maintenanceKits'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
 
@@ -42,30 +49,23 @@ type SortKey = 'value' | 'price' | 'rating'
 type ConditionFilter = 'all' | 'new' | 'used'
 
 function SkeletonCard() {
+  // The single radar/status above the list communicates loading. Animating
+  // every skeleton segment consumed main-thread time during slow searches.
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 min-h-[160px]">
       <div className="flex gap-5">
-        <div className="h-24 w-24 shrink-0 animate-shimmer rounded-xl bg-slate-200" />
+        <div className="h-24 w-24 shrink-0 rounded-xl bg-slate-200" />
         <div className="flex-1 space-y-3 py-1">
-          <div className="h-4 w-3/4 animate-shimmer rounded bg-slate-200" />
-          <div className="h-3 w-1/2 animate-shimmer rounded bg-slate-100" />
-          <div className="mt-4 h-8 w-2/3 animate-shimmer rounded-lg bg-slate-100" />
+          <div className="h-4 w-3/4 rounded bg-slate-200" />
+          <div className="h-3 w-1/2 rounded bg-slate-100" />
+          <div className="mt-4 h-8 w-2/3 rounded-lg bg-slate-100" />
         </div>
       </div>
     </li>
   )
 }
 
-export function ResultsList({
-  car,
-  part,
-  onBackToPart,
-  onBackToCar,
-  onAddToWatchlist,
-  isInWatchlist,
-  onSearchPart,
-  onOpenAccount,
-}: {
+export type ResultsListProps = {
   car: Car
   part: string
   onBackToPart: () => void
@@ -74,20 +74,25 @@ export function ResultsList({
   isInWatchlist: (listingId: string) => boolean
   onSearchPart?: (part: string) => void
   onOpenAccount: () => void
-}) {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [results, setResults] = useState<Listing[]>([])
-  const [fallbackResults, setFallbackResults] = useState<Listing[]>([])
-  const [hiddenIrrelevantFallbacks, setHiddenIrrelevantFallbacks] = useState(0)
-  const [providerErrors, setProviderErrors] = useState<Record<string, string>>({})
-  const [stale, setStale] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
+}
+
+const EMPTY_LISTINGS: Listing[] = []
+const EMPTY_PROVIDER_ERRORS: Record<string, string> = {}
+
+export function ResultsList({
+  car, part, onBackToPart, onBackToCar, onAddToWatchlist, isInWatchlist,
+  onSearchPart, onOpenAccount, search, zip, onZipChange: setZip,
+}: ResultsListProps & { search: PartsSearchState; zip: string; onZipChange: (zip: string) => void }) {
+  const { loading, error, data, key: searchRequestKey, retry } = search
+  const results = data?.results ?? EMPTY_LISTINGS
+  const fallbackResults = data?.fallbackResults ?? EMPTY_LISTINGS
+  const hiddenIrrelevantFallbacks = data?.fitmentSummary?.hiddenIrrelevantFallbacks ?? 0
+  const providerErrors = data?.providerErrors ?? EMPTY_PROVIDER_ERRORS
+  const stale = Boolean(data?.stale)
 
   const [sortBy, setSortBy] = usePersistedState<SortKey>('cpf-sort', 'price')
   const [condition, setCondition] = usePersistedState<ConditionFilter>('cpf-condition', 'all')
   const [hideOverseas, setHideOverseas] = usePersistedState<boolean>('cpf-hide-overseas', false)
-  const [zip, setZip] = usePersistedState<string>('cpf-zip', '')
   const [zipInput, setZipInput] = useState(zip)
 
   // Sync if zip is changed externally (e.g. clear filters)
@@ -107,65 +112,62 @@ export function ResultsList({
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
   const [copied, setCopied] = useState(false)
+  const copyInFlight = useRef(false)
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mounted = useRef(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error' | 'auth'>('idle')
 
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      if (copyTimer.current) clearTimeout(copyTimer.current)
+    }
+  }, [])
+
+  const copyShareLink = async () => {
+    if (copyInFlight.current) return
+    copyInFlight.current = true
+    if (copyTimer.current) clearTimeout(copyTimer.current)
+    setCopied(false)
+    try {
+      // Clipboard access can be unavailable or denied. Confirm success only
+      // after the browser accepts it, and provide a manual recovery path.
+      await navigator.clipboard.writeText(window.location.href)
+      if (!mounted.current) return
+      setCopied(true)
+      toast.success('Link copied')
+      copyTimer.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      if (mounted.current) toast.error('Couldn’t copy the link. Copy the address from your browser’s address bar instead.')
+    } finally {
+      copyInFlight.current = false
+    }
+  }
+
   const bestPrice = useMemo(() => {
-    if (results.length === 0) return 0
-    return Math.min(...results.map((r) => r.price))
+    const completeTotals = results
+      .map(knownTotalCost)
+      .filter((total): total is number => total != null)
+    return completeTotals.length > 0 ? Math.min(...completeTotals) : 0
   }, [results])
 
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    searchParts(car.year, car.make, car.model, part, car.trim, effectiveZip || undefined)
-      .then((res) => {
-        if (cancelled) return
-        setResults(res.results)
-        setFallbackResults(res.fallbackResults || [])
-        setHiddenIrrelevantFallbacks(res.fitmentSummary?.hiddenIrrelevantFallbacks ?? 0)
-        setProviderErrors(res.providerErrors || {})
-        setStale(Boolean(res.stale))
-        trackEvent('Search Results Viewed', {
-          year: car.year,
-          make: car.make,
-          model: car.model,
-          trim: car.trim || undefined,
-          part,
-          verifiedCount: res.results.length,
-          fallbackCount: res.fallbackResults?.length ?? 0,
-          stale: Boolean(res.stale),
-        })
+    if (data) {
+      trackEvent('Search Results Viewed', {
+        year: car.year,
+        make: car.make,
+        model: car.model,
+        trim: car.trim || undefined,
+        part,
+        verifiedCount: data.results.length,
+        fallbackCount: data.fallbackResults?.length ?? 0,
+        stale: Boolean(data.stale),
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.message)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
     }
-  }, [car, part, reloadKey, effectiveZip])
-
-  // Real observed daily lows for this search signature. Absence is normal
-  // (history only accrues once Supabase is configured), so errors just hide it.
-  const [history, setHistory] = useState<PriceObservation[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    setHistory([])
-    fetchPriceHistory(car.year, car.make, car.model, part)
-      .then((res) => {
-        if (!cancelled) setHistory(res.observations)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [car.year, car.make, car.model, part])
+  }, [car.year, car.make, car.model, car.trim, part, data])
 
   // Dynamic JSON-LD Structured Schema Injection for SEO snippets
   useEffect(() => {
@@ -238,7 +240,7 @@ export function ResultsList({
         if (rb !== ra) return rb - ra
         return a.price - b.price
       }
-      return valueScore(a) - valueScore(b)
+      return compareValueEstimate(a, b)
     })
     return list
 
@@ -257,12 +259,13 @@ export function ResultsList({
       list = list.filter((listing) => Number(listing.sellerFeedbackPercentage ?? 0) >= minRating)
     }
     list.sort((a, b) => {
+      if (sortBy === 'price') return a.price - b.price
       if (sortBy === 'rating') {
         const aRating = Number(a.sellerFeedbackPercentage ?? 0)
         const bRating = Number(b.sellerFeedbackPercentage ?? 0)
         if (bRating !== aRating) return bRating - aRating
       }
-      return (a.price + (a.shippingCost || 0)) - (b.price + (b.shippingCost || 0))
+      return compareValueEstimate(a, b)
     })
     return list
   }, [fallbackResults, sortBy, condition, hideOverseas, filterFastDelivery, minRating])
@@ -270,13 +273,15 @@ export function ResultsList({
   const hasComparison = visible.length >= 2
 
   const bestValueId = useMemo(() => {
-    if (visible.length < 2) return null
-    return [...visible].sort((a, b) => valueScore(a) - valueScore(b))[0].id
+    const complete = visible.filter((listing) => knownTotalCost(listing) != null)
+    if (complete.length < 2) return null
+    return [...complete].sort(compareValueEstimate)[0].id
   }, [visible])
 
   const cheapestId = useMemo(() => {
-    if (visible.length < 2) return null
-    return [...visible].sort((a, b) => (a.price + (a.shippingCost || 0)) - (b.price + (b.shippingCost || 0)))[0].id
+    const complete = visible.filter((listing) => knownTotalCost(listing) != null)
+    if (complete.length < 2) return null
+    return [...complete].sort(compareKnownTotal)[0].id
   }, [visible])
 
   const priceRange = useMemo(() => {
@@ -338,11 +343,11 @@ export function ResultsList({
       <meta property="og:description" content={pageDescription} />
     </Helmet>
     
-    <div className="card min-w-0 max-w-full overflow-hidden p-4 sm:p-7">
+    <div className="card break-anywhere max-w-full overflow-hidden p-[16px] sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 max-w-full items-center gap-3">
-          <VehicleThumbnail make={car.make} model={car.model} year={car.year} className="h-11 w-16" iconSize={20} />
-          <div className="min-w-0">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
+          <VehicleThumbnail make={car.make} model={car.model} year={car.year} className="h-[44px] w-[64px]" iconSize={20} />
+          <div className="min-w-0 flex-1 basis-40">
             <h1 aria-label={`${part}${part.toLowerCase().includes('kit') ? ' (kit search)' : ''}`} className="section-title break-anywhere flex min-w-0 flex-wrap items-center gap-2">
               {part}
               {part.toLowerCase().includes('kit') && (
@@ -354,7 +359,7 @@ export function ResultsList({
             </p>
           </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex max-w-full flex-wrap gap-1">
           <button type="button" onClick={onBackToPart} className="btn btn-ghost px-2.5 py-1.5">
             <ChevronLeft size={16} /> Part
           </button>
@@ -407,11 +412,7 @@ export function ResultsList({
           </button>
           <button
             type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            }}
+            onClick={() => void copyShareLink()}
             aria-label="Copy share link"
             className="btn btn-ghost min-h-11 min-w-11 px-3 py-1.5 text-xs flex items-center justify-center gap-1.5"
           >
@@ -453,7 +454,7 @@ export function ResultsList({
           <AlertTriangle className="text-red-500" size={28} />
           <p className="mt-2 font-semibold text-red-800">We couldn't complete this search.</p>
           <p className="break-anywhere mt-1 max-w-full text-xs text-red-500">{error}</p>
-          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-primary mt-4 px-5 py-2">
+          <button type="button" onClick={retry} className="btn btn-primary mt-4 px-5 py-2">
             <RotateCw size={15} /> Try again
           </button>
         </div>
@@ -503,7 +504,7 @@ export function ResultsList({
             <button type="button" onClick={onBackToPart} className="btn btn-primary px-5 py-2">
               Choose another part
             </button>
-            <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="btn btn-secondary px-5 py-2">
+            <button type="button" onClick={retry} className="btn btn-secondary px-5 py-2">
               <RotateCw size={15} /> Retry search
             </button>
           </div>
@@ -529,9 +530,9 @@ export function ResultsList({
               <div className="flex items-start gap-3">
                 <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div>
-                  <h2 id="no-verified-matches" className="font-semibold">No marketplace-confirmed matches found</h2>
+                  <h2 id="no-verified-matches" className="font-semibold">No marketplace YMM compatibility evidence found</h2>
                   <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
-                    We will not call broad keyword results a fit for your {vehicleLabel}. Confirm the original part number,
+                    We will not call broad keyword results a fit for your full vehicle. Confirm the original part number,
                     engine, drivetrain, dimensions, and options before considering the separate marketplace results below.
                   </p>
                   {maintenanceKit && onSearchPart && (
@@ -562,12 +563,13 @@ export function ResultsList({
                 </span>
               )}
             </button>
-            <div className="inline-flex shrink-0 gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <div role="group" aria-label="Condition" className="inline-flex shrink-0 gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
               {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setCondition(c)}
+                  aria-pressed={condition === c}
                   className={`min-h-11 touch-manipulation rounded-full px-4 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}
                 >
                   {c === 'all' ? 'All' : c}
@@ -580,8 +582,8 @@ export function ResultsList({
               aria-label="Sort listings"
               className="field w-auto shrink-0 py-2.5 pr-8 text-xs font-semibold"
             >
-              <option value="price">Cheapest first</option>
-              <option value="value">Best value</option>
+              <option value="price">Lowest item price</option>
+              <option value="value">Best value estimate</option>
               <option value="rating">Seller rating</option>
             </select>
           </div>
@@ -589,12 +591,13 @@ export function ResultsList({
           <div className="mt-6 hidden flex-wrap items-center justify-between gap-3 sm:flex">
             <div className="flex flex-wrap items-center gap-2">
               {/* Condition Filter */}
-              <div className="inline-flex gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+              <div role="group" aria-label="Condition" className="inline-flex gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
                 {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => setCondition(c)}
+                    aria-pressed={condition === c}
                     className={`rounded-full px-3.5 py-1 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}
                   >
                     {c === 'all' ? 'All' : c}
@@ -617,6 +620,7 @@ export function ResultsList({
               <button
                 type="button"
                 onClick={() => setFilterFastDelivery(!filterFastDelivery)}
+                aria-pressed={filterFastDelivery}
                 className={`filter-pill font-semibold ${filterFastDelivery ? 'filter-pill-active' : 'hover:bg-slate-50'}`}
               >
                 Arrives within a week
@@ -672,8 +676,8 @@ export function ResultsList({
                 onChange={(e) => setSortBy(e.target.value as SortKey)}
                 className="field w-auto py-2 pr-8 text-xs font-semibold"
               >
-                <option value="price">Cheapest first</option>
-                <option value="value">Best value</option>
+                <option value="price">Lowest item price</option>
+                <option value="value">Best value estimate</option>
                 <option value="rating">Seller rating</option>
               </select>
             </div>
@@ -682,15 +686,15 @@ export function ResultsList({
           <div className="mt-6 grid min-w-0 gap-8 md:grid-cols-12">
             <div className="min-w-0 md:col-span-7 xl:col-span-8">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
-                <div>
-                  <div className="eyebrow text-brand-600 dark:text-brand-400">Marketplace compatibility matches</div>
+                <div className="min-w-0 max-w-full">
+                  <div className="eyebrow text-brand-600 dark:text-brand-400">Marketplace YMM compatibility evidence</div>
                   <p className="mt-2 max-w-xl text-xs leading-relaxed text-slate-500">
                     We rank listings with marketplace compatibility evidence first. A shared part may be titled for another vehicle, so open Details to review the match before buying.
                   </p>
                   <div className="font-display text-3xl text-slate-950">
                     {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
                     {priceRange && (
-                      <span className="font-data ml-2 inline-block text-base font-normal text-slate-500">
+                      <span className="font-data inline-block max-w-full text-base font-normal text-slate-500 sm:ml-2">
                         {priceRange.min === priceRange.max
                           ? `$${priceRange.min.toFixed(2)}`
                           : `$${priceRange.min.toFixed(2)} – $${priceRange.max.toFixed(2)}`}
@@ -731,7 +735,7 @@ export function ResultsList({
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="py-2 font-semibold text-brand-700 underline hover:text-brand-800 dark:text-sky-300 dark:hover:text-sky-200"
+                    className="min-h-11 py-2 font-semibold text-brand-700 underline hover:text-brand-800 dark:text-sky-300 dark:hover:text-sky-200"
                   >
                     Clear filters
                   </button>
@@ -777,7 +781,8 @@ export function ResultsList({
                     </h2>
                   <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
                     These {visibleFallbacks.length} listings mention the part or vehicle terms, but the marketplace did not
-                    confirm compatibility. They are not ranked as recommendations and are never used for automatic quotes or repair guides.
+                    confirm compatibility. They are not fitment-ranked or automatically recommended, but you can still sort them;
+                    they are never used for automatic quotes or repair guides.
                   </p>
                   {hiddenIrrelevantFallbacks > 0 && (
                     <p className="mt-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
@@ -819,10 +824,10 @@ export function ResultsList({
 
             <aside className="min-w-0 space-y-6 md:col-span-5 xl:col-span-4">
               {companions.length > 0 && onSearchPart && (
-                <div className="card p-6">
-                  <div className="flex items-center gap-3">
+                <div className="card p-[16px] sm:p-6">
+                  <div className="flex flex-wrap items-center gap-3">
                     <div className="icon-tile bg-brand-600 text-white"><Wrench size={17} /></div>
-                    <div>
+                    <div className="min-w-0 flex-1 basis-40">
                       <div className="font-semibold tracking-tight text-slate-950">Complete the job</div>
                       <div className="text-xs text-slate-500">Commonly replaced together — searches your {car.year} {car.make} {car.model}</div>
                     </div>
@@ -842,10 +847,10 @@ export function ResultsList({
                 </div>
               )}
 
-              <div className="card p-6">
-                <div className="flex items-center gap-3">
+              <div className="card p-[16px] sm:p-6">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="icon-tile bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"><Store size={17} /></div>
-                  <div>
+                  <div className="min-w-0 flex-1 basis-40">
                     <div className="font-semibold tracking-tight text-slate-950">Compare at other stores</div>
                     <div className="text-xs text-slate-500">Opens each store's search for this part</div>
                   </div>
@@ -857,7 +862,7 @@ export function ResultsList({
                     // Build a high-quality search query
                     const searchQuery = `${vehicleLabel} ${part}`.trim()
                     return (
-                      <a
+                      <OutboundLink
                         key={idx}
                         href={retailer.buildUrl(searchQuery)}
                         onClick={() => trackRetailerClick({
@@ -866,8 +871,6 @@ export function ResultsList({
                           vehicleLabel,
                           part,
                         })}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className="group flex min-h-11 items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-700"
                       >
                         <span className="flex items-center gap-3">
@@ -875,31 +878,15 @@ export function ResultsList({
                           {retailer.name}
                         </span>
                         <ExternalLink size={14} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-                      </a>
+                      </OutboundLink>
                     )
                   })}
                 </div>
               </div>
 
-              {history.length >= 5 && (
-                <div className="card p-6">
-                  <div className="flex items-center gap-3">
-                    <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"><TrendingDown size={17} /></div>
-                    <div>
-                      <div className="font-semibold tracking-tight text-slate-950">Price radar — observed lows</div>
-                      <div className="text-xs text-slate-500">Lowest daily total we've actually seen for this search</div>
-                    </div>
-                  </div>
-                  <div className="mt-4 text-brand-600 dark:text-brand-400">
-                    <Sparkline points={history} />
-                  </div>
-                  <div className="font-data mt-3 flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500">
-                    <span>Low ${Math.min(...history.map((p) => p.price)).toFixed(2)}</span>
-                    <span>High ${Math.max(...history.map((p) => p.price)).toFixed(2)}</span>
-                    <span>Since {new Date(`${history[0].date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                </div>
-              )}
+              {/* Keyed to the completed search so old history is cancelled
+                  and cleared without re-rendering the entire results screen. */}
+              <PriceHistoryCard key={searchRequestKey} car={car} part={part} />
 
               {bestPrice > 0 && (
                 <PriceAlertCard car={car} part={part} targetPrice={bestPrice} />
@@ -935,6 +922,11 @@ export function ResultsList({
       )}
 
       {showFilters && (
+        <Suspense fallback={(
+          <div role="status" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45">
+            <div className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-xl">Loading filters…</div>
+          </div>
+        )}>
         <FilterSheet
           condition={condition}
           onCondition={setCondition}
@@ -952,6 +944,7 @@ export function ResultsList({
           onClearAll={clearFilters}
           onClose={() => setShowFilters(false)}
         />
+        </Suspense>
       )}
 
       {compareList.length > 0 && (
@@ -968,7 +961,7 @@ export function ResultsList({
             <button
               type="button"
               onClick={() => setCompareList([])}
-              className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900 transition"
+              className="min-h-11 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900 transition"
             >
               Clear
             </button>

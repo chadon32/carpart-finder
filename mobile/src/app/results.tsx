@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, Animated, Modal, Switch, ScrollView } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, TextInput, FlatList, Pressable, Animated, Modal, Switch, ScrollView } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { searchParts, fetchPriceHistory, type PriceObservation } from '@/api/client'
@@ -17,7 +17,9 @@ import { presentListings } from '@/lib/resultsPresentation'
 import {
   activeFilterCount,
   defaultFilters,
-  valueScore,
+  compareKnownTotal,
+  compareValueEstimate,
+  knownTotal,
   type ListingFilters,
 } from '@/lib/listingFilters'
 import { ListingCard } from '@/components/ListingCard'
@@ -55,8 +57,6 @@ function SkeletonCard() {
   )
 }
 
-const totalCost = (l: Listing) => l.price + (l.shippingCost ?? 0)
-
 export default function Results() {
   const c = useThemeColors()
   const { year, make, model, trim, part } = useLocalSearchParams<{
@@ -66,9 +66,8 @@ export default function Results() {
     trim?: string
     part: string
   }>()
-  const [response, setResponse] = useState<SearchResponse | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [failureMessage, setFailureMessage] = useState<string | null>(null)
+  const [searchResult, setSearchResult] = useState<{ key: string; response: SearchResponse } | null>(null)
+  const [searchFailure, setSearchFailure] = useState<{ key: string; message: string } | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const compare = useCompare((s) => s.listings)
   const toggleCompare = useCompare((s) => s.toggle)
@@ -77,6 +76,12 @@ export default function Results() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const zip = usePrefs((s) => s.zip)
   const prefsHydrated = usePrefs((s) => s.hydrated)
+  const searchKey = [year, make, model, trim || '', part, zip || ''].join('\u0000')
+  // Retain results for same-search refreshes, but never present another ZIP's
+  // shipping estimates (or another vehicle's listings) as current results.
+  const response = searchResult?.key === searchKey ? searchResult.response : null
+  const failed = searchFailure?.key === searchKey
+  const failureMessage = failed ? searchFailure.message : null
   // Draft ZIP edited in the sheet; committed to the store (triggering ONE
   // re-search) only when the sheet closes — never per keystroke.
   const [zipDraft, setZipDraft] = useState(zip)
@@ -84,25 +89,36 @@ export default function Results() {
   // Guards against out-of-order responses when searches overlap
   // (pull-to-refresh during a ZIP change): only the newest call may land.
   const runSeq = useRef(0)
+  const searchAbortRef = useRef<AbortController | null>(null)
+  const [completedSearch, setCompletedSearch] = useState<{ key: string; seq: number } | null>(null)
 
   const run = useCallback(async () => {
     const seq = ++runSeq.current
-    setFailed(false)
-    setFailureMessage(null)
+    const activeZip = usePrefs.getState().zip || undefined
+    const requestKey = [year, make, model, trim || '', part, activeZip || ''].join('\u0000')
+    searchAbortRef.current?.abort()
+    const controller = new AbortController()
+    searchAbortRef.current = controller
+    setSearchFailure(null)
+    setCompletedSearch(null)
     try {
       const r = await searchParts(
         year, make, model, part, trim || undefined,
-        usePrefs.getState().zip || undefined
+        activeZip,
+        controller.signal
       )
       if (seq !== runSeq.current) return
-      setResponse(r)
+      setSearchResult({ key: requestKey, response: r })
       if (r.results.length > 0 || (r.fallbackResults?.length ?? 0) > 0) {
         useRecents.getState().record({ year, make, model, trim: trim ?? '' }, part)
       }
+      setCompletedSearch({ key: requestKey, seq })
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       if (seq !== runSeq.current) return
-      setFailureMessage(resultsErrorMessage(error))
-      setFailed(true)
+      setSearchFailure({ key: requestKey, message: resultsErrorMessage(error) })
+    } finally {
+      if (searchAbortRef.current === controller) searchAbortRef.current = null
     }
   }, [year, make, model, part, trim])
 
@@ -114,31 +130,54 @@ export default function Results() {
   }, [run, zip, prefsHydrated])
 
   useEffect(() => {
-    fetchPriceHistory(year, make, model, part)
-      .then((r) => setHistory(r.observations))
-      .catch(() => setHistory([]))
-  }, [year, make, model, part])
+    const currentKey = [year, make, model, trim || '', part, zip || ''].join('\u0000')
+    setHistory([])
+    if (completedSearch?.key !== currentKey) return
 
-  const companions = companionsForPart(part, isElectricVehicle(String(make), String(model)))
+    const controller = new AbortController()
+    // Start history only after the live result response has committed. This
+    // keeps the secondary chart request out of the first-results network path.
+    fetchPriceHistory(year, make, model, part, controller.signal)
+      .then((r) => {
+        if (!controller.signal.aborted) setHistory(r.observations)
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && !(error instanceof Error && error.name === 'AbortError')) setHistory([])
+      })
+    return () => controller.abort()
+  }, [year, make, model, trim, part, zip, completedSearch])
+
+  useEffect(() => () => {
+    runSeq.current += 1
+    searchAbortRef.current?.abort()
+  }, [])
+
+  const companions = useMemo(
+    () => companionsForPart(part, isElectricVehicle(String(make), String(model))),
+    [part, make, model]
+  )
 
   const state = deriveResultsState(response, failed)
-  const results = response?.results ?? []
-  const fallbackResults = response?.fallbackResults ?? []
+  const results = useMemo(() => response?.results ?? [], [response])
+  const fallbackResults = useMemo(() => response?.fallbackResults ?? [], [response])
   const hiddenIrrelevantFallbacks = response?.fitmentSummary?.hiddenIrrelevantFallbacks ?? 0
   // Badges are computed from the complete verified set, then filters/sort can
   // reorder the display without changing which listing earned each badge.
-  const bestValueId =
-    results.length > 0
-      ? results.reduce((best, listing) => (valueScore(listing) < valueScore(best) ? listing : best), results[0]).id
-      : null
-  const cheapestId =
-    results.length > 0
-      ? results.reduce((min, l) => (totalCost(l) < totalCost(min) ? l : min), results[0]).id
-      : null
-  const presentation = presentListings(results, fallbackResults, filters)
+  const { bestValueId, cheapestId, presentation } = useMemo(() => {
+    const completeTotals = results.filter((listing) => knownTotal(listing) != null)
+    return {
+      bestValueId: completeTotals.length >= 2
+        ? [...completeTotals].sort(compareValueEstimate)[0].id
+        : null,
+      cheapestId: completeTotals.length >= 2
+        ? [...completeTotals].sort(compareKnownTotal)[0].id
+        : null,
+      presentation: presentListings(results, fallbackResults, filters),
+    }
+  }, [results, fallbackResults, filters])
   const shown = presentation.verified
   const displayItems = presentation.items
-  const filterCount = activeFilterCount(filters)
+  const filterCount = useMemo(() => activeFilterCount(filters), [filters])
 
   const openListing = (l: Listing) => {
     Haptics.selectionAsync()
@@ -225,7 +264,7 @@ export default function Results() {
           <Pressable
             accessibilityRole="button"
             onPress={() => {
-              setResponse(null)
+              setSearchResult(null)
               run()
             }}
             style={{
@@ -271,7 +310,7 @@ export default function Results() {
             <Pressable
               accessibilityRole="button"
               onPress={() => {
-                setResponse(null)
+                setSearchResult(null)
                 run()
               }}
               style={{
@@ -324,6 +363,11 @@ export default function Results() {
               <AffiliateDisclosure />
             </View>
           ) : null}
+          {results.length > 0 ? (
+            <Text style={{ color: c.subtext, fontSize: 11, lineHeight: 16, paddingHorizontal: 16, paddingTop: 8 }}>
+              Value estimate uses item price + known shipping before tax, seller feedback (92% assumed when missing), and top-rated status. Listings with unknown shipping sort after complete totals.
+            </Text>
+          ) : null}
           {companions.length > 0 && (
             <ScrollView
               horizontal
@@ -374,6 +418,8 @@ export default function Results() {
             </View>
           )}
           <FlatList
+            accessibilityRole="list"
+            accessibilityLabel="Search results"
             data={displayItems}
             keyExtractor={(item) => `${item.tier}-${item.listing.id}`}
             ListEmptyComponent={
@@ -427,16 +473,12 @@ export default function Results() {
                 {!retailersInline && retailerBlock}
               </View>
             }
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={async () => {
-                  setRefreshing(true)
-                  await run()
-                  setRefreshing(false)
-                }}
-              />
-            }
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true)
+              await run()
+              setRefreshing(false)
+            }}
             renderItem={({ item, index }) => (
               <>
                 {item.tier === 'fallback' && index === shown.length ? (
@@ -454,10 +496,10 @@ export default function Results() {
                     }}
                   >
                     <Text style={{ color: '#78350f', fontWeight: '800' }}>
-                      {results.length === 0 ? 'No marketplace-confirmed matches' : 'Other marketplace keyword results'}
+                      {results.length === 0 ? 'No marketplace YMM compatibility evidence' : 'Other marketplace keyword results'}
                     </Text>
                     <Text style={{ color: '#92400e', fontSize: 13, lineHeight: 18 }}>
-                      Fitment was not confirmed for the listings below. Verify the part number, engine, drivetrain, and options before buying.
+                      Fitment was not confirmed for the listings below. They remain sortable, but are not automatically recommended. Verify the part number, engine, drivetrain, and options before buying.
                     </Text>
                     {hiddenIrrelevantFallbacks > 0 ? (
                       <Text style={{ color: '#92400e', fontSize: 12, lineHeight: 17 }}>
@@ -505,7 +547,7 @@ export default function Results() {
 
           {(
             [
-              ['Sort by', 'sort', [['best', 'Best value'], ['price', 'Price'], ['total', 'Price + shipping'], ['rating', 'Seller rating']]],
+              ['Sort by', 'sort', [['best', 'Value estimate'], ['price', 'Item price'], ['total', 'Known total'], ['rating', 'Seller rating']]],
               ['Minimum seller rating', 'minRating', [[0, 'Any'], [90, '90%+'], [95, '95%+'], [98, '98%+']]],
               ['Condition', 'condition', [['all', 'All'], ['new', 'New'], ['used', 'Used']]],
             ] as const
@@ -544,6 +586,7 @@ export default function Results() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ color: c.text, fontWeight: '600' }}>Hide overseas listings</Text>
             <Switch
+              accessibilityLabel="Hide overseas listings"
               value={filters.hideOverseas}
               onValueChange={(v) => setFilters((f) => ({ ...f, hideOverseas: v }))}
               trackColor={{ true: brand }}
@@ -552,9 +595,10 @@ export default function Results() {
 
           <View style={{ gap: 8 }}>
             <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
-              SHIPPING ZIP (EXACT SHIPPING COSTS)
+              SHIPPING ZIP (IMPROVES AVAILABLE ESTIMATES)
             </Text>
             <TextInput
+              accessibilityLabel="Shipping ZIP"
               value={zipDraft}
               onChangeText={(t) => setZipDraft(t.replace(/\D/g, '').slice(0, 5))}
               placeholder="e.g. 90210"

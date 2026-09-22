@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
-import { View, Text, TextInput, Pressable, ActivityIndicator, Linking } from 'react-native'
+import { Alert, View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { useAuth } from '../stores/auth'
 import { getPriceAlerts, deleteSavedSearch, type PriceAlert } from '../api/client'
 import { useThemeColors, brand, dataFont } from '../theme'
-import { PRIVACY_POLICY_URL } from '../lib/legal'
+import { openPrivacyPolicy } from '../lib/legal'
 
 // Sign in / sign up / signed-in summary with the user's price alerts.
 // Accounts are shared with carpartsradar.com — same email works both places.
@@ -96,6 +96,19 @@ export function AccountCard({
     }
   }
 
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      Alert.alert(
+        'Sign out needs attention',
+        error instanceof Error
+          ? error.message
+          : 'Sign out could not be fully completed. Please reopen the app and try again.'
+      )
+    }
+  }
+
   const field = {
     minHeight: 44,
     borderRadius: 12,
@@ -182,7 +195,9 @@ export function AccountCard({
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={logout}
+            accessibilityLabel="Log out"
+            accessibilityHint="Signs you out of this device"
+            onPress={() => void handleLogout()}
             style={{
               minHeight: 44,
               borderRadius: 12,
@@ -286,7 +301,9 @@ export function AccountCard({
       )}
       <Pressable
         accessibilityRole="link"
-        onPress={() => void Linking.openURL(PRIVACY_POLICY_URL).catch(() => undefined)}
+        accessibilityLabel="Privacy Policy"
+        accessibilityHint="Opens the Privacy Policy in your browser"
+        onPress={() => void openPrivacyPolicy()}
         hitSlop={8}
         style={{ alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
       >

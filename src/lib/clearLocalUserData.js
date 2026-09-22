@@ -17,13 +17,15 @@ export function isAppLocalKey(key) {
 // Remove data owned by this app after a permanent account deletion. Storage
 // can be blocked or full, so cleanup is best-effort and never masks a server
 // deletion that already succeeded.
-export function clearLocalUserData() {
+export function clearLocalUserData({ preserveDevicePreferences = false } = {}) {
+  let complete = true
   try {
     for (const key of Object.keys(localStorage)) {
+      if (preserveDevicePreferences && key === 'cpf-dark-mode') continue
       if (isAppLocalKey(key)) localStorage.removeItem(key)
     }
   } catch {
-    // The server-side deletion remains authoritative if browser storage fails.
+    complete = false
   }
 
   try {
@@ -31,6 +33,8 @@ export function clearLocalUserData() {
       if (isAppLocalKey(key)) sessionStorage.removeItem(key)
     }
   } catch {
-    // Session caches are optional and may be unavailable in private browsing.
+    complete = false
   }
+
+  return complete
 }

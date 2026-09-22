@@ -22,7 +22,7 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
   const c = useThemeColors()
   const shipping =
     listing.shippingCost == null
-      ? null
+      ? 'Shipping cost unavailable'
       : listing.shippingCost === 0
         ? 'Free shipping'
         : `+$${listing.shippingCost.toFixed(2)} shipping`
@@ -41,7 +41,7 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open ${listing.title}, $${listing.price.toFixed(2)}. ${listing.verifiedFitment ? 'Marketplace compatibility match.' : 'Fitment not verified.'}`}
+        accessibilityLabel={`${listing.title}, $${listing.price.toFixed(2)}. ${shipping}. ${listing.verifiedFitment ? 'Marketplace compatibility match.' : 'Fitment not verified.'}`}
         onPress={onPress}
       >
         <View style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: c.border }}>
@@ -59,15 +59,15 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
             {listing.title}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {isBestValue && <Pill label="BEST VALUE" bg={brand} fg="#fff" />}
-            {isCheapest && <Pill label="CHEAPEST" bg="#d1fae5" fg="#047857" />}
+            {isBestValue && <Pill label="VALUE ESTIMATE" bg={brand} fg="#fff" />}
+            {isCheapest && <Pill label="LOWEST KNOWN TOTAL" bg="#d1fae5" fg="#047857" />}
             {listing.verifiedFitment ? (
-              <Pill label="MARKETPLACE MATCH" bg="#d1fae5" fg="#047857" />
+              <Pill label="YMM EVIDENCE" bg="#d1fae5" fg="#047857" />
             ) : (
               <Pill label="FITMENT NOT VERIFIED" bg="#fef3c7" fg="#92400e" />
             )}
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 8 }}>
             <Text style={{ color: c.text, fontSize: 21, fontFamily: dataFontBold }}>
               ${listing.price.toFixed(2)}
             </Text>
@@ -76,7 +76,7 @@ export function ListingCard({ listing, isBestValue, isCheapest, isComparing, onP
                 ${listing.originalPrice.toFixed(2)}
               </Text>
             ) : null}
-            {shipping ? <Text style={{ color: c.subtext, fontSize: 13 }}>{shipping}</Text> : null}
+            <Text style={{ color: c.subtext, fontSize: 13 }}>{shipping}</Text>
           </View>
           <Text style={{ color: c.subtext, fontSize: 13 }}>
             {listing.condition} · {listing.seller}

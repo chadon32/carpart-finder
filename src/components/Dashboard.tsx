@@ -5,6 +5,7 @@ import { useAppContext } from '../contexts/useAppContext'
 import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert, ApiError } from '../api/supabase'
 import { DeleteAccountPanel } from './DeleteAccountPanel'
 import { isRequiredAccountDeletionEmail } from '../lib/accountDeletionState.js'
+import { clearLocalUserData } from '../lib/clearLocalUserData.js'
 
 interface DashboardProps {
   onClose: () => void
@@ -78,16 +79,25 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
 
   const handleLogout = async () => {
     setAuthLoading(true)
+    let serverConfirmed = true
+    let localCleanupComplete = true
     try {
       await logoutUser()
-      localStorage.removeItem('carpartsradar-user')
+    } catch {
+      serverConfirmed = false
+    } finally {
+      localCleanupComplete = clearLocalUserData({ preserveDevicePreferences: true })
       setResumeAccountDeletion(false)
       setReauthEmail(null)
+      setAccountData(null)
       setUser(null)
-      toast.success('Logged out successfully')
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to logout')
-    } finally {
+      if (serverConfirmed && localCleanupComplete) {
+        toast.success('Logged out successfully')
+      } else if (!localCleanupComplete) {
+        toast.warning('You were signed out, but this browser could not clear every local cache. Close all app tabs before another person uses this device.')
+      } else {
+        toast.warning('Local data was cleared, but the server could not confirm logout. Reconnect and try again before reloading.')
+      }
       setAuthLoading(false)
     }
   }
@@ -163,13 +173,17 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
     }
   }
 
-  const handleAccountDeleted = () => {
+  const handleAccountDeleted = (localCleanupComplete: boolean) => {
     setResumeAccountDeletion(false)
     setReauthEmail(null)
     setAccountData(null)
     setUser(null)
     onAccountDeleted?.()
-    toast.success('Your account has been permanently deleted.')
+    if (localCleanupComplete) {
+      toast.success('Your account has been permanently deleted.')
+    } else {
+      toast.warning('Your account was deleted, but this browser could not clear every local cache. Close all app tabs before another person uses this device.')
+    }
     onClose()
   }
 
@@ -237,7 +251,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
 
               <div className="relative mb-6 flex items-center py-1">
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                <span className="shrink-0 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Or</span>
+                <span className="shrink-0 px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Or</span>
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
               </div>
             </>
@@ -326,9 +340,9 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                 className="inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium text-slate-500 transition hover:text-brand-600"
               >
                 {isRegisterMode ? (
-                  <>Already have an account? <span className="font-bold text-brand-600">Sign in</span></>
+                  <>Already have an account? <span className="font-bold text-brand-600 dark:text-brand-400">Sign in</span></>
                 ) : (
-                  <>Don't have an account? <span className="font-bold text-brand-600">Create one</span></>
+                  <>Don't have an account? <span className="font-bold text-brand-600 dark:text-brand-400">Create one</span></>
                 )}
               </button>
             </div>

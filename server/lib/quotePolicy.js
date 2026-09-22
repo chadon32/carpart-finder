@@ -7,7 +7,14 @@ const ACCESSORY_WORDS = [
 ]
 
 export function pickVerifiedListingForPart(results, part) {
-  const verifiedResults = results.filter((result) => result.verifiedFitment === true)
+  // Automatic totals must be complete totals. Unknown shipping is not free,
+  // so those listings remain visible in search but cannot silently enter a
+  // generated quote or price alert.
+  const verifiedResults = results.filter(
+    (result) => result.verifiedFitment === true
+      && result.shippingCost != null
+      && Number.isFinite(Number(result.shippingCost))
+  )
   if (verifiedResults.length === 0) return null
 
   const partTokens = part
@@ -35,7 +42,7 @@ export function pickVerifiedListingForPart(results, part) {
 
   if (candidates.length === 0) return null
   return candidates.reduce((best, result) => {
-    const total = result.price + (result.shippingCost || 0)
+    const total = result.price + Number(result.shippingCost)
     return total < best.total ? { total, listing: result } : best
   }, { total: Infinity, listing: null }).listing
 }

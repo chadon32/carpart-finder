@@ -1,8 +1,14 @@
 import type { Listing, SearchResponse, VehicleType, VinDecodeResult } from './types'
+import { isRecallList, type Recall } from '../../../shared/recalls.js'
+export type { Recall } from '../../../shared/recalls.js'
 
 const configuredApiBase = process.env.EXPO_PUBLIC_API_BASE_URL?.trim()
 export const API_BASE = (configuredApiBase || 'https://carpartsradar.com').replace(/\/+$/, '')
 const FITMENT_CONTRACT_VERSION = 2
+const DEFAULT_TIMEOUT_MS = 20_000
+const SEARCH_TIMEOUT_MS = 45_000
+const AI_TIMEOUT_MS = 45_000
+const MAX_GUIDE_LENGTH = 12_000
 
 function assertFitmentContract<T extends { fitmentContractVersion?: number }>(payload: T): T {
   if (payload.fitmentContractVersion !== FITMENT_CONTRACT_VERSION) {
@@ -23,36 +29,44 @@ export class ApiError extends Error {
   }
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'X-App-Platform': 'ios' },
-    credentials: 'include',
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new ApiError(
-      (data as { error?: string }).error || `Request failed (${res.status})`,
-      res.status
-    )
-  }
-  return data as T
+type RequestOptions = {
+  method?: string
+  body?: unknown
+  timeoutMs?: number
+  signal?: AbortSignal
+  timeoutMessage?: string
 }
 
-async function postJson<T>(path: string, body: unknown, method = 'POST', timeoutMs?: number): Promise<T> {
-  const controller = timeoutMs ? new AbortController() : null
-  const timeout = controller
-    ? setTimeout(() => controller.abort(), timeoutMs)
-    : null
+async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const controller = new AbortController()
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const abortFromCaller = () => controller.abort()
+  if (options.signal?.aborted) controller.abort()
+  else options.signal?.addEventListener('abort', abortFromCaller, { once: true })
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
+      method: options.method,
+      headers: {
+        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        'X-App-Platform': 'ios',
+      },
       credentials: 'include',
-      body: JSON.stringify(body),
-      ...(controller ? { signal: controller.signal } : {}),
+      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+      signal: controller.signal,
     })
-    const data = await res.json()
+
+    let data: unknown
+    try {
+      data = await res.json()
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error
+      throw new ApiError('The service returned an unreadable response. Please try again.', res.status)
+    }
     if (!res.ok) {
       throw new ApiError(
         (data as { error?: string }).error || `Request failed (${res.status})`,
@@ -61,13 +75,24 @@ async function postJson<T>(path: string, body: unknown, method = 'POST', timeout
     }
     return data as T
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new TypeError('The account request timed out.')
+    if (error instanceof Error && error.name === 'AbortError' && timedOut) {
+      throw new TypeError(options.timeoutMessage || 'The request timed out. Check your connection and try again.')
     }
-    throw error
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Could not reach CarPartsRadar. Check your connection and try again.', 0)
   } finally {
-    if (timeout) clearTimeout(timeout)
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', abortFromCaller)
   }
+}
+
+async function getJson<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS, signal?: AbortSignal): Promise<T> {
+  return requestJson(path, { timeoutMs, signal })
+}
+
+async function postJson<T>(path: string, body: unknown, method = 'POST', timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  return requestJson(path, { method, body, timeoutMs })
 }
 
 export function fetchMakes(type: VehicleType = 'all'): Promise<{ makes: string[] }> {
@@ -119,12 +144,13 @@ export async function searchParts(
   model: string,
   part: string,
   trim?: string,
-  zip?: string
+  zip?: string,
+  signal?: AbortSignal
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ year, make, model, part })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  const response = await getJson<SearchResponse>(`/api/search?${params}`)
+  const response = await getJson<SearchResponse>(`/api/search?${params}`, SEARCH_TIMEOUT_MS, signal)
   return assertFitmentContract(response)
 }
 
@@ -134,9 +160,10 @@ export function fetchPriceHistory(
   year: string,
   make: string,
   model: string,
-  part: string
+  part: string,
+  signal?: AbortSignal
 ): Promise<{ observations: PriceObservation[] }> {
-  return getJson(`/api/price-history?${new URLSearchParams({ year, make, model, part })}`)
+  return getJson(`/api/price-history?${new URLSearchParams({ year, make, model, part })}`, DEFAULT_TIMEOUT_MS, signal)
 }
 
 export type QuoteItem = {
@@ -146,6 +173,7 @@ export type QuoteItem = {
 }
 
 export type QuoteResponse = {
+  fitmentContractVersion: 2
   items: QuoteItem[]
   subtotal: number
   shipping: number
@@ -153,7 +181,7 @@ export type QuoteResponse = {
   currency: string
 }
 
-export function fetchQuote(
+export async function fetchQuote(
   year: string,
   make: string,
   model: string,
@@ -164,7 +192,8 @@ export function fetchQuote(
   const params = new URLSearchParams({ year, make, model, parts: parts.join(',') })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  return getJson(`/api/quote?${params}`)
+  const response = await getJson<QuoteResponse>(`/api/quote?${params}`, SEARCH_TIMEOUT_MS)
+  return assertFitmentContract(response)
 }
 
 export function decodeVinApi(vin: string): Promise<VinDecodeResult> {
@@ -192,17 +221,10 @@ export function diagnoseProblem(symptom: string): Promise<{ matches: DiagnosisMa
   return getJson(`/api/diagnose?${new URLSearchParams({ symptom })}`)
 }
 
-export type Recall = {
-  campaignNumber: string | null
-  component: string | null
-  summary: string | null
-  consequence: string | null
-  remedy: string | null
-  reportedDate: string | null
-}
-
-export function fetchRecalls(year: string, make: string, model: string): Promise<{ recalls: Recall[] }> {
-  return getJson(`/api/recalls?${new URLSearchParams({ year, make, model })}`)
+export async function fetchRecalls(year: string, make: string, model: string, signal?: AbortSignal): Promise<{ recalls: Recall[] }> {
+  const data = await getJson<{ recalls: unknown }>(`/api/recalls?${new URLSearchParams({ year, make, model })}`, DEFAULT_TIMEOUT_MS, signal)
+  if (!isRecallList(data?.recalls)) throw new ApiError('Recall data was unreadable. Please try again.', 502)
+  return { recalls: data.recalls }
 }
 
 export type RepairGuideRequest = {
@@ -220,18 +242,17 @@ export async function fetchRepairGuide(
   request: RepairGuideRequest,
   signal?: AbortSignal
 ): Promise<{ guide: string }> {
-  const res = await fetch(`${API_BASE}/api/ai/repair-guide`, {
+  const data = await requestJson<{ guide?: unknown }>('/api/ai/repair-guide', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
-    credentials: 'include',
-    body: JSON.stringify(request),
+    body: request,
     signal,
+    timeoutMs: AI_TIMEOUT_MS,
+    timeoutMessage: 'The repair guide timed out. Please try again.',
   })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new ApiError((data as { error?: string }).error || `Request failed (${res.status})`, res.status)
+  if (typeof data.guide !== 'string' || !data.guide.trim() || data.guide.length > MAX_GUIDE_LENGTH) {
+    throw new ApiError('The repair guide response was incomplete. Please try again.', 502)
   }
-  return data as { guide: string }
+  return { guide: data.guide }
 }
 
 // ---- Accounts (shared with the website via the same API + cookie) ----
@@ -258,11 +279,25 @@ export function logout(): Promise<{ success?: boolean }> {
 
 export type AccountDeletionResponse = { success: boolean; alreadyDeleted?: boolean }
 
-export function deleteAccount(confirmation: string): Promise<AccountDeletionResponse> {
+export type AccountDeletionIntentResponse = { receipt: string; expiresInMs: number }
+export type AccountDeletionStatusResponse = { success: boolean; deleted: boolean }
+
+export function prepareAccountDeletion(confirmation: string): Promise<AccountDeletionIntentResponse> {
+  return postJson('/api/supabase/account/deletion-intent', { confirmation })
+}
+
+export function getAccountDeletionStatus(receipt: string): Promise<AccountDeletionStatusResponse> {
+  return postJson('/api/supabase/account/deletion-status', { receipt }, 'POST', 10_000)
+}
+
+export function deleteAccount(
+  confirmation: string,
+  receipt?: string
+): Promise<AccountDeletionResponse> {
   // The server enforces a 20-second deletion timeout. Give it a small network
   // margin, then surface an actionable timeout instead of leaving the screen
   // busy indefinitely on a broken connection.
-  return postJson('/api/supabase/account', { confirmation }, 'DELETE', 25_000)
+  return postJson('/api/supabase/account', { confirmation, ...(receipt ? { receipt } : {}) }, 'DELETE', 25_000)
 }
 
 export function getMe(): Promise<{ user: AuthUser }> {
@@ -299,7 +334,7 @@ export function createSavedSearch(
 }
 
 export function deleteSavedSearch(id: string): Promise<{ success: boolean }> {
-  return postJson(`/api/supabase/saved-searches/${id}`, {}, 'DELETE')
+  return postJson(`/api/supabase/saved-searches/${encodeURIComponent(id)}`, {}, 'DELETE')
 }
 
 export function getPriceAlerts(): Promise<{ alerts: PriceAlert[] }> {
@@ -316,12 +351,20 @@ export function createPriceAlert(
 export async function identifyPartFromImage(
   base64Image: string
 ): Promise<{ identified: boolean; partName: string | null }> {
-  const res = await fetch(`${API_BASE}/api/identify-part`, {
+  const data = await requestJson<{ identified?: unknown; partName?: unknown }>('/api/identify-part', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Platform': 'ios' },
-    body: JSON.stringify({ image: base64Image }),
+    body: { image: base64Image },
+    timeoutMs: AI_TIMEOUT_MS,
+    timeoutMessage: 'Photo identification timed out. Try a smaller, tightly cropped photo.',
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
-  return data as { identified: boolean; partName: string | null }
+  if (typeof data.identified !== 'boolean') {
+    throw new ApiError('The photo identifier returned an unreadable response. Please try again.', 502)
+  }
+  if (data.partName !== null && data.partName !== undefined && typeof data.partName !== 'string') {
+    throw new ApiError('The photo identifier returned an unreadable response. Please try again.', 502)
+  }
+  return {
+    identified: data.identified,
+    partName: data.identified && typeof data.partName === 'string' ? data.partName : null,
+  }
 }

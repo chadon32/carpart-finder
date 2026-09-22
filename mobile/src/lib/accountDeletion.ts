@@ -38,6 +38,9 @@ export function accountDeletionErrorMessage(error: unknown) {
   if (error instanceof ApiError && error.status === 502) {
     return 'Your data was removed, but final account closure did not complete. Please retry; retrying is safe.'
   }
+  if (error instanceof ApiError && error.status === 0) {
+    return 'We could not confirm the deletion with the server. Check your connection and try again; retrying is safe.'
+  }
   if (error instanceof TypeError || (error instanceof Error && /network|fetch|timeout/i.test(error.message))) {
     return 'We could not confirm the deletion with the server. Check your connection and try again; retrying is safe.'
   }

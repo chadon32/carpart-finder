@@ -13,33 +13,10 @@ type Entry =
   | { kind: 'header'; label: string }
   | { kind: 'item'; index: number; value: string; isFree: boolean }
 
-function translateObd2(query: string): string | null {
-  const code = query.trim().toUpperCase()
-  if (!/^[P]\d{4}$/.test(code)) return null
-
-  if (/^P03\d{2}$/.test(code)) {
-    return 'Spark Plugs & Ignition Coils'
-  }
-  if (code === 'P0171' || code === 'P0174') {
-    return 'Oxygen Sensor & Mass Airflow Sensor'
-  }
-  if (code === 'P0420' || code === 'P0430') {
-    return 'Catalytic Converter & O2 Sensors'
-  }
-  if (code === 'P0440' || code === 'P0442' || code === 'P0455' || code === 'P0456') {
-    return 'Gas Cap & Evap Purge Valve'
-  }
-  if (/^P011[5-9]$/.test(code)) {
-    return 'Coolant Temperature Sensor'
-  }
-  if (code === 'P0100' || code === 'P0101' || code === 'P0102') {
-    return 'Mass Airflow Sensor (MAF)'
-  }
-  return null
-}
-
 export function Combobox({
+  id,
   label,
+  ariaLabel,
   placeholder,
   options = [],
   groups,
@@ -51,7 +28,9 @@ export function Combobox({
   maxLength,
   onInvalidFreeTextSubmit,
 }: {
+  id?: string
   label: string
+  ariaLabel?: string
   placeholder: string
   options?: string[]
   groups?: ComboboxGroup[]
@@ -70,6 +49,12 @@ export function Combobox({
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestInputValue = useRef('')
   const listId = useId()
+  const inputId = id ?? `${listId}-input`
+  const accessibleName = ariaLabel || label || placeholder
+
+  useEffect(() => () => {
+    if (blurTimeout.current) clearTimeout(blurTimeout.current)
+  }, [])
 
   const trimmedQuery = query.trim()
 
@@ -82,12 +67,6 @@ export function Combobox({
       const item = { kind: 'item' as const, index: items.length, value: val, isFree }
       items.push(item)
       entries.push(item)
-    }
-
-    const obdMatch = translateObd2(trimmedQuery)
-    if (obdMatch) {
-      entries.push({ kind: 'header', label: `Diagnostic Code ${trimmedQuery.toUpperCase()}` })
-      pushItem(obdMatch)
     }
 
     const allOptions = groups ? groups.flatMap((g) => g.options) : options
@@ -145,7 +124,9 @@ export function Combobox({
       }
       if (items.length === 0) return
       const delta = e.key === 'ArrowDown' ? 1 : -1
-      setActiveIndex((prev) => (prev + delta + items.length) % items.length)
+      setActiveIndex((prev) => prev < 0
+        ? (delta > 0 ? 0 : items.length - 1)
+        : (prev + delta + items.length) % items.length)
       return
     }
     if (e.key === 'Enter') {
@@ -153,6 +134,7 @@ export function Combobox({
         e.preventDefault()
         submit(items[activeIndex].value)
       } else if (allowFreeText) {
+        e.preventDefault()
         // Track input events outside React's render cycle so a rapid clear +
         // Enter cannot submit the value from the previous render.
         const currentValue = latestInputValue.current.trim()
@@ -161,7 +143,6 @@ export function Combobox({
           onInvalidFreeTextSubmit?.()
           return
         }
-        e.preventDefault()
         submit(currentValue)
       }
       return
@@ -179,15 +160,17 @@ export function Combobox({
 
   return (
     <div className="relative">
-      {label && <label className="field-label">{label}</label>}
+      {label && <label htmlFor={inputId} className="field-label">{label}</label>}
       <div className="relative">
         <input
+          id={inputId}
           type="text"
           role="combobox"
-          aria-expanded={open}
-          aria-controls={listId}
+          aria-label={accessibleName}
+          aria-expanded={open && !disabled}
+          aria-controls={open && !disabled ? listId : undefined}
           aria-autocomplete="list"
-          aria-activedescendant={activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined}
+          aria-activedescendant={open && !disabled && items[activeIndex] ? `${listId}-opt-${activeIndex}` : undefined}
           disabled={disabled}
           placeholder={placeholder}
           enterKeyHint={enterKeyHint}
@@ -226,6 +209,7 @@ export function Combobox({
         <ul
           id={listId}
           role="listbox"
+          aria-label={accessibleName}
           className="absolute z-30 mt-1.5 max-h-60 w-full animate-fade-in overflow-auto rounded-xl border border-slate-200/80 bg-white p-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5 sm:max-h-72"
         >
           {items.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">No matches</li>}

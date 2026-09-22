@@ -1,5 +1,22 @@
 export function totalPrice(listing) {
-  return Number(listing.price || 0) + Number(listing.shippingCost || 0)
+  const price = Number(listing?.price)
+  const shipping = listing?.shippingCost
+  if (!Number.isFinite(price) || shipping == null || !Number.isFinite(Number(shipping))) {
+    return Infinity
+  }
+  return price + Number(shipping)
+}
+
+export function compareListingsByKnownTotal(a, b) {
+  const totalDifference = totalPrice(a) - totalPrice(b)
+  if (Number.isFinite(totalDifference) && totalDifference !== 0) return totalDifference
+  if (Number.isFinite(totalPrice(a)) !== Number.isFinite(totalPrice(b))) {
+    return Number.isFinite(totalPrice(a)) ? -1 : 1
+  }
+
+  const priceDifference = Number(a?.price || 0) - Number(b?.price || 0)
+  if (priceDifference !== 0) return priceDifference
+  return String(a?.id || '').localeCompare(String(b?.id || ''))
 }
 
 const VEHICLE_MAKES = [
@@ -84,7 +101,7 @@ export function partitionListingsByFitment(listings, limit) {
   const fallback = []
   const seen = new Set()
 
-  for (const listing of [...listings].sort((a, b) => totalPrice(a) - totalPrice(b))) {
+  for (const listing of [...listings].sort(compareListingsByKnownTotal)) {
     const key = `${listing.source}:${listing.id || listing.seller}`
     if (seen.has(key)) continue
     seen.add(key)

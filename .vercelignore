@@ -1,0 +1,22 @@
+# Native app and local QA artifacts are not part of the web/API deployment.
+mobile/
+docs/audits/
+screenshots/
+shots/
+videos/
+terminals/
+.agents/
+.claude/
+
+# Local creative exports and one-off generation helpers.
+*.mp4
+frame_*.jpg
+generate_audio_*.cjs
+generate_scenes*.cjs
+fix.js
+fix_*.js
+fix_*.cjs
+
+# Local logs and already-built output; Vercel rebuilds dist from source.
+.codex-*.log
+dist/

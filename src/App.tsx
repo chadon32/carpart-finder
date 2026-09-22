@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense, lazy } from 'react'
+import { useEffect, useRef, useState, Suspense, lazy } from 'react'
 import { Toaster, toast } from 'sonner'
 import { Helmet } from 'react-helmet-async'
 import { Car as CarIcon, Bookmark, BookOpen, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
@@ -6,21 +6,22 @@ import { RadarMark } from './components/RadarMark'
 import { ApiReadinessBanner } from './components/ApiReadinessBanner'
 import { BottomNav } from './components/BottomNav'
 import { CarSelector, type Car } from './components/CarSelector'
+import { RecentSearches } from './components/RecentSearches'
+import { ResultsRoute } from './components/ResultsRoute'
 
 const PartSelector = lazy(() => import('./components/PartSelector').then(m => ({ default: m.PartSelector })))
-const ResultsList = lazy(() => import('./components/ResultsList').then(m => ({ default: m.ResultsList })))
 const CartPanel = lazy(() => import('./components/CartPanel').then(m => ({ default: m.CartPanel })))
-const RecentSearches = lazy(() => import('./components/RecentSearches').then(m => ({ default: m.RecentSearches })))
 const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })))
 
 import { StepIndicator } from './components/StepIndicator'
 
 // Shared Suspense fallback for lazily-loaded views: a quiet spinner instead of
 // developer-facing "Loading component..." text. aria-label keeps it announced
-// to screen readers without visible jargon.
+// to screen readers without visible jargon. Reserve the content viewport so
+// the footer doesn't flash above the fold and jump away when a view arrives.
 function ViewLoader() {
   return (
-    <div className="flex justify-center py-24" role="status" aria-label="Loading">
+    <div className="flex min-h-[calc(100svh-8rem)] justify-center py-24" role="status" aria-label="Loading">
       <RadarMark className="h-8 w-8 text-brand-600 dark:text-brand-400" />
     </div>
   )
@@ -32,6 +33,7 @@ import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './li
 import { useAppContext } from './contexts/useAppContext'
 import { trackSearch } from './lib/analytics'
 import { isValidPartQuery, normalizePartQuery } from './lib/searchInput.js'
+import { clearLocalUserData } from './lib/clearLocalUserData.js'
 
 function App() {
   const { user, darkMode, setDarkMode } = useAppContext()
@@ -44,6 +46,30 @@ function App() {
   const watchlist = useCart(user?.email)
   const recent = useRecentSearches()
   const { headroomRef } = useHeadroom()
+  const previousAccount = useRef(user?.email)
+  const mainRef = useRef<HTMLElement>(null)
+
+  // A signed-in user's garage, VINs, watchlist, recent searches, ZIP, and
+  // filters must not survive into the next person's session on a shared
+  // browser. Reset both persisted data and live React state on every
+  // signed-in -> signed-out transition; keep only the device theme.
+  useEffect(() => {
+    const previous = previousAccount.current
+    previousAccount.current = user?.email
+    if (!previous || user?.email) return
+
+    clearLocalUserData({ preserveDevicePreferences: true })
+    watchlist.clear()
+    recent.clear()
+    setCar(null)
+    setPart(null)
+    setShowWatchlist(false)
+    setStep('car')
+    window.history.replaceState(null, '', window.location.pathname)
+    // The cleanup is deliberately keyed only to the account transition. The
+    // hook objects are recreated each render but operate on current state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email])
 
   const applyRoute = (r: AppRoute) => {
     setStep(r.step)
@@ -58,6 +84,11 @@ function App() {
       window.history.pushState(null, '', window.location.pathname + newSearch)
     }
     applyRoute(r)
+    // A client-side step change otherwise keeps the previous form's scroll
+    // offset, landing phone users halfway down their new results. Leave
+    // browser Back/Forward restoration to the separate popstate handler.
+    mainRef.current?.focus({ preventScroll: true })
+    window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
   // Browser back/forward: re-derive the view from the URL. Never push here or
@@ -177,19 +208,12 @@ function App() {
 
       <ApiReadinessBanner />
 
-      <main className="mx-auto min-w-0 w-full max-w-6xl flex-1 overflow-x-clip px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 sm:pb-10">
+      <main ref={mainRef} tabIndex={-1} className="mx-auto min-w-0 w-full max-w-6xl flex-1 overflow-x-clip px-[20px] pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 focus:outline-none sm:px-6 sm:pb-10">
         {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
-        {/* Entrance animation must be removed once done: a transform animation
-            (even filled at identity) makes this div the containing block for
-            position:fixed descendants like the compare bar, pinning them to
-            the document instead of the viewport. */}
-        <div
-          key={viewKey}
-          className="animate-slide-up"
-          onAnimationEnd={(e) => {
-            if (e.target === e.currentTarget) e.currentTarget.classList.remove('animate-slide-up')
-          }}
-        >
+        {/* Keep primary content visible from its first paint. A page-wide
+            opacity/transform animation delayed reading and also trapped fixed
+            descendants (such as the compare bar) until the animation ended. */}
+        <div key={viewKey}>
           {showWatchlist ? (
             <Suspense fallback={<ViewLoader />}>
               <CartPanel
@@ -217,26 +241,26 @@ function App() {
                 <>
                   {/* Hero — the thesis. A radar live badge, a racing-decal
                       headline, and the honest fitment promise underneath.
-                      Elements stagger in once on load; the sweep keeps the
-                      "live scan" idea moving after the entrance settles. */}
+                      The small radar sweep adds motion without hiding the
+                      headline, instructions, or controls behind a stagger. */}
                   <div className="blueprint-grid relative mb-10 pt-4 text-center sm:mb-16 sm:pt-10">
-                    <div className="animate-slide-up font-data mx-auto mb-5 inline-flex max-w-full flex-wrap items-center justify-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400 sm:mb-7">
+                    <div className="font-data mx-auto mb-5 inline-flex max-w-full flex-wrap items-center justify-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400 sm:mb-7">
                       <RadarMark className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                       Live scan — prices pulled per search
                     </div>
 
-                    <h1 className="font-display break-anywhere animate-slide-up mx-auto max-w-4xl text-balance text-4xl text-slate-950 sm:text-7xl md:text-8xl [animation-delay:90ms]">
+                    <h1 className="font-display break-anywhere mx-auto max-w-4xl text-balance text-4xl text-slate-950 sm:text-7xl md:text-8xl">
                       Find the right part.
                       <br />
                       <span className="text-brand-600 dark:text-brand-400">Prices on radar.</span>
                     </h1>
 
-                    <p className="animate-slide-up mx-auto mt-4 max-w-lg text-balance text-base text-slate-600 sm:mt-6 sm:text-lg [animation-delay:180ms]">
+                    <p className="mx-auto mt-4 max-w-lg text-balance text-base text-slate-600 sm:mt-6 sm:text-lg">
                       Pick your year, make, and model. Marketplace compatibility matches stay separate
                       from broader keyword results, so unknown fitment is never presented as confirmed.
                     </p>
 
-                    <div className="animate-slide-up -mx-5 mt-6 flex items-center gap-2.5 overflow-x-auto scrollbar-none px-5 sm:mx-0 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0 [animation-delay:260ms]">
+                    <div tabIndex={0} role="region" aria-label="Search features" className="-mx-5 mt-6 flex items-center gap-2.5 overflow-x-auto scrollbar-none px-5 sm:mx-0 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
                       <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
                         <ShieldCheck size={13} className="text-brand-600" /> Evidence shown for every match
                       </div>
@@ -249,19 +273,17 @@ function App() {
                     </div>
                   </div>
 
-                  <Suspense fallback={<ViewLoader />}>
-                    <CarSelector
-                      onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
-                      onSearchPart={(garageCar, garagePart) => runSearch(garageCar, garagePart)}
-                    />
-                    <RecentSearches
-                      searches={recent.searches}
-                      onPick={(s) => runSearch(s.car, s.part)}
-                      onClear={recent.clear}
-                      onRemove={recent.remove}
-                    />
-                    <TrustBanner />
-                  </Suspense>
+                  <CarSelector
+                    onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
+                    onSearchPart={(garageCar, garagePart) => runSearch(garageCar, garagePart)}
+                  />
+                  <RecentSearches
+                    searches={recent.searches}
+                    onPick={(s) => runSearch(s.car, s.part)}
+                    onClear={recent.clear}
+                    onRemove={recent.remove}
+                  />
+                  <TrustBanner />
                 </>
               )}
 
@@ -276,23 +298,22 @@ function App() {
               )}
 
               {step === 'results' && car && part && (
-                <Suspense fallback={<ViewLoader />}>
-                  <ResultsList
-                    car={car}
-                    part={part}
-                    onBackToPart={() => navigate({ step: 'part', car, part: null })}
-                    onBackToCar={goHome}
-                    onAddToWatchlist={(listing) =>
-                      watchlist.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)
-                    }
-                    isInWatchlist={watchlist.isInCart}
-                    onSearchPart={(p) => runSearch(car, p)}
-                    onOpenAccount={() => {
-                      setStep('dashboard')
-                      setShowWatchlist(false)
-                    }}
-                  />
-                </Suspense>
+                <ResultsRoute
+                  fallback={<ViewLoader />}
+                  car={car}
+                  part={part}
+                  onBackToPart={() => navigate({ step: 'part', car, part: null })}
+                  onBackToCar={goHome}
+                  onAddToWatchlist={(listing) =>
+                    watchlist.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)
+                  }
+                  isInWatchlist={watchlist.isInCart}
+                  onSearchPart={(p) => runSearch(car, p)}
+                  onOpenAccount={() => {
+                    setStep('dashboard')
+                    setShowWatchlist(false)
+                  }}
+                />
               )}
             </>
           )}
@@ -300,14 +321,14 @@ function App() {
       </main>
 
       <footer className="border-t border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/60">
-        <div className="mx-auto max-w-6xl px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-10 sm:pb-10">
-          <div className="grid gap-8 sm:grid-cols-[minmax(0,1.4fr)_auto_auto] sm:gap-10">
-            <div>
-              <div className="flex items-center justify-center gap-2.5 sm:justify-start">
+        <div className="mx-auto max-w-6xl px-[24px] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-10 sm:pb-10">
+          <div className="grid min-w-0 grid-cols-1 gap-8 sm:grid-cols-[minmax(0,1.4fr)_auto_auto] sm:gap-10">
+            <div className="break-anywhere">
+              <div className="flex flex-wrap items-center justify-center gap-2.5 sm:justify-start">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
                   <RadarMark className="h-5 w-5" />
                 </span>
-                <span className="font-display text-lg leading-none text-slate-900 dark:text-slate-100">
+                <span className="font-display max-w-full text-lg leading-none text-slate-900 dark:text-slate-100">
                   CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
                 </span>
               </div>
@@ -393,7 +414,7 @@ function TrustBanner() {
           <div key={s.title} className="card group relative p-6 transition-transform duration-300 hover:-translate-y-1">
             {/* Mono step index — this really is a sequence, so the numbering
                 carries information, not decoration. */}
-            <span className="font-data absolute right-5 top-5 text-sm font-semibold text-slate-300 transition-colors group-hover:text-brand-500 dark:text-slate-700" aria-hidden>
+            <span className="font-data absolute right-5 top-5 text-sm font-semibold text-slate-500 transition-colors group-hover:text-brand-500 dark:text-slate-400" aria-hidden>
               0{i + 1}
             </span>
             <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">

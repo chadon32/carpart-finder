@@ -5,7 +5,6 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import rateLimit from 'express-rate-limit'
 import { searchCheapestListings } from '../server/search.js'
 import { getMakes, getModels, decodeVin } from '../server/nhtsa.js'
 import { getTrims } from '../server/ebayCompatibility.js'
@@ -18,8 +17,10 @@ import { recordPriceObservation, getPriceHistory } from '../server/priceHistory.
 import { diagnoseSymptom } from '../server/symptoms.js'
 import { generateRepairGuide } from '../server/routes/ai.js'
 import { pickVerifiedListingForPart } from '../server/lib/quotePolicy.js'
+import { parseIdentificationImage, sanitizeIdentifiedPartName } from '../server/lib/partIdentification.js'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { API_RELEASE, FITMENT_CONTRACT_VERSION } from '../shared/apiContract.js'
+import { createSharedRateLimiter } from '../server/rateLimit.js'
 
 const app = express()
 const API_BUILD_ID = String(
@@ -44,13 +45,24 @@ app.use(express.json({ limit: '2mb' }))
 // same-origin) — silently breaking login, signup, saved searches, and price
 // alerts in production while looking fine from curl (no Origin) or from
 // localhost (hardcoded below).
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
+const productionOrigins = [
   'https://carpartsradar.com',
   'https://www.carpartsradar.com',
-  process.env.FRONTEND_URL, // extra override, e.g. a staging domain
 ].filter(Boolean)
+
+function configuredFrontendOrigin() {
+  const origin = String(process.env.FRONTEND_URL || '').trim()
+  if (!origin) return null
+  try {
+    const url = new URL(origin)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    if (url.username || url.password || url.pathname !== '/' || url.search || url.hash) return null
+    if (process.env.NODE_ENV === 'production' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return null
+    return url.origin
+  } catch {
+    return null
+  }
+}
 
 // Dev-only convenience: allow LAN origins so a phone on the same network can
 // hit the dev server. Never true in production.
@@ -72,7 +84,7 @@ function isDevLocalOrigin(origin) {
 }
 
 function isAllowedOrigin(origin) {
-  return allowedOrigins.includes(origin) || isDevLocalOrigin(origin) || isDevLanOrigin(origin)
+  return productionOrigins.includes(origin) || configuredFrontendOrigin() === origin || isDevLocalOrigin(origin) || isDevLanOrigin(origin)
 }
 
 app.use(cors({
@@ -112,17 +124,25 @@ app.use((_req, res, next) => {
   next()
 })
 
-// Behind Vercel's proxy, req.ip is the proxy unless we trust the first
-// X-Forwarded-For hop — without this, every visitor shares ONE rate bucket
-// and the whole site 429s under light traffic.
-app.set('trust proxy', 1)
+// The API can also be reached directly during local development or through a
+// non-Vercel ingress. Trusting X-Forwarded-For by default would let a direct
+// caller spoof identities and evade the limiter. Set TRUST_PROXY_HOPS only
+// when the deployment guarantees that exactly that many trusted proxy hops
+// precede the app (Vercel's documented single-edge topology uses 1).
+const configuredProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '', 10)
+const trustedProxyHops = Number.isInteger(configuredProxyHops) && configuredProxyHops >= 0 && configuredProxyHops <= 10
+  ? configuredProxyHops
+  : 0
+app.set('trust proxy', trustedProxyHops)
 
 // Rate-limit only the expensive endpoint (each visitor's search flow makes
 // ~5-7 API calls total, so a whole-app 100/15min cap would starve real use).
-const searchLimiter = rateLimit({
+const searchLimiter = createSharedRateLimiter({
+  name: 'search',
   windowMs: 15 * 60 * 1000,
   max: 300,
-  message: { error: 'Too many requests, please try again later.' },
+  failClosed: true,
+  message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 })
@@ -141,10 +161,12 @@ app.use('/api/price-history', searchLimiter)
 // shared quota for every other user. 20 per 15 min is generous for a genuine
 // user (who identifies a part or reads a guide occasionally) but shuts down
 // automated abuse.
-const aiLimiter = rateLimit({
+const aiLimiter = createSharedRateLimiter({
+  name: 'ai',
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: { error: 'Too many AI requests, please try again in a few minutes.' },
+  failClosed: true,
+  message: 'Too many AI requests, please try again in a few minutes.',
   standardHeaders: true,
   legacyHeaders: false,
 })
@@ -161,27 +183,33 @@ app.use('/api/ai', aiLimiter)
 // Successes are counted alongside failures. That costs a legitimate user
 // nothing (they log in once) and denies an attacker cheap confirmation once
 // they find a valid credential.
-const authLimiter = rateLimit({
+const authLimiter = createSharedRateLimiter({
+  name: 'auth',
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { error: 'Too many attempts. Please try again in a few minutes.' },
+  failClosed: true,
+  message: 'Too many attempts. Please try again in a few minutes.',
   standardHeaders: true,
   legacyHeaders: false,
 })
 
 // Guest alert subscription is public and writes a database row. Tighter still.
-const subscribeLimiter = rateLimit({
+const subscribeLimiter = createSharedRateLimiter({
+  name: 'guest-subscribe',
   windowMs: 60 * 60 * 1000,
   max: 5,
-  message: { error: 'Too many alert subscriptions. Please try again later.' },
+  failClosed: true,
+  message: 'Too many alert subscriptions. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 })
 
-const writeLimiter = rateLimit({
+const writeLimiter = createSharedRateLimiter({
+  name: 'supabase-write',
   windowMs: 15 * 60 * 1000,
   max: 60,
-  message: { error: 'Too many requests, please try again later.' },
+  failClosed: true,
+  message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 })
@@ -189,7 +217,9 @@ const writeLimiter = rateLimit({
 app.use('/api/supabase/login', authLimiter)
 app.use('/api/supabase/signup', authLimiter)
 app.use('/api/supabase/price-alerts/subscribe', subscribeLimiter)
-app.use('/api/supabase', writeLimiter)
+// Logout only clears the client cookie and remains available while the shared
+// limiter is being migrated or temporarily unavailable.
+app.use('/api/supabase', (req, res, next) => req.path === '/logout' ? next() : writeLimiter(req, res, next))
 
 // A model year is 4 digits from 1980 to next year; make/model must be non-empty
 // and sanely short. Rejecting junk up front avoids burning rate-limited eBay
@@ -470,22 +500,24 @@ app.get('/api/quote', async (req, res) => {
 })
 
 app.post('/api/identify-part', async (req, res) => {
-  const { image } = req.body
+  const { image } = req.body || {}
   if (!image) {
     return res.status(400).json({ error: 'image body param is required' })
   }
-  
+
+  let parsedImage
+  try {
+    parsedImage = parseIdentificationImage(image)
+  } catch (error) {
+    return res.status(400).json({ error: error.message })
+  }
+
   try {
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'Gemini API key is not configured' })
+      return res.status(503).json({ error: 'The part identifier is temporarily unavailable. Please try again later.' })
     }
 
-    const match = image.match(/^data:(image\/[a-zA-Z0-9+-]+);base64,(.+)$/)
-    if (!match) {
-      return res.status(400).json({ error: 'Invalid image format. Expected base64 Data URL.' })
-    }
-    const mimeType = match[1]
-    const base64Data = match[2]
+    const { mimeType, base64Data } = parsedImage
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
@@ -497,12 +529,12 @@ app.post('/api/identify-part', async (req, res) => {
       prompt,
       { inlineData: { data: base64Data, mimeType } }
     ])
-    let partName = result.response.text().trim().replace(/['"]/g, '')
+    let partName = sanitizeIdentifiedPartName(result.response.text())
 
     // If Flash is unsure, escalate to the Pro model — but isolate it: a Pro
     // quota/availability error must NOT fail the whole request. We simply fall
     // back to "unidentified" instead of surfacing a 500 to the user.
-    if (partName.toUpperCase() === 'UNKNOWN') {
+    if (!partName) {
       try {
         const proModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
         const proPrompt = "You are an expert automotive mechanic analyzing a difficult, dirty, or obscured image. Identify the car part in this image. Return ONLY the exact, standard name of the part in Title Case. Do not include any other text. If you still cannot identify it, return exactly the word 'UNKNOWN'."
@@ -510,7 +542,7 @@ app.post('/api/identify-part', async (req, res) => {
           proPrompt,
           { inlineData: { data: base64Data, mimeType } }
         ])
-        partName = proResult.response.text().trim().replace(/['"]/g, '')
+        partName = sanitizeIdentifiedPartName(proResult.response.text())
       } catch (proErr) {
         console.warn('[AI] Pro escalation unavailable, falling back to unidentified:', proErr?.message)
       }
@@ -518,7 +550,7 @@ app.post('/api/identify-part', async (req, res) => {
 
     // Honest response: report whether we actually identified anything rather
     // than fabricating a confidence score. Empty/UNKNOWN -> not identified.
-    const identified = Boolean(partName) && partName.toUpperCase() !== 'UNKNOWN'
+    const identified = Boolean(partName)
     res.json({ identified, partName: identified ? partName : null })
   } catch (err) {
     console.error('[AI] identify-part failed:', err?.message)
@@ -551,9 +583,12 @@ app.get('/api/search', async (req, res) => {
     // hits re-observe nothing; stale results are old data). Awaited because
     // Vercel can freeze the function right after res.json; recordPriceObservation
     // never throws, so this cannot fail the search.
-    if (!result.cached && !result.stale && result.results.length > 0) {
-      const cheapestTotal = result.results.reduce(
-        (best, r) => Math.min(best, r.price + (r.shippingCost || 0)),
+    const completeTotals = result.results.filter(
+      (listing) => listing.shippingCost != null && Number.isFinite(Number(listing.shippingCost))
+    )
+    if (!result.cached && !result.stale && completeTotals.length > 0) {
+      const cheapestTotal = completeTotals.reduce(
+        (best, listing) => Math.min(best, listing.price + Number(listing.shippingCost)),
         Infinity
       )
       await recordPriceObservation({ year, make, model, part, total: cheapestTotal })

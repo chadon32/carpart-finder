@@ -9,7 +9,7 @@ import {
 } from '../lib/accountDeletionState.js'
 
 interface DeleteAccountPanelProps {
-  onDeleted: () => void
+  onDeleted: (localCleanupComplete: boolean) => void
   onSessionExpired?: () => void
   startExpanded?: boolean
 }
@@ -42,8 +42,8 @@ export function DeleteAccountPanel({ onDeleted, onSessionExpired, startExpanded 
         // The deleted user's token is no longer valid; local cleanup below
         // removes every client-owned session/cache value we can control.
       }
-      clearLocalUserData()
-      onDeleted()
+      const localCleanupComplete = clearLocalUserData()
+      onDeleted(localCleanupComplete)
     } catch (err) {
       if (accountDeletionRequiresReauthentication(err) && onSessionExpired) {
         onSessionExpired()

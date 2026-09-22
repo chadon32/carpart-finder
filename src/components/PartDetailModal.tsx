@@ -5,6 +5,7 @@ import type { Car } from './CarSelector'
 import { Modal } from './Modal'
 import { trackAddedToWatchlist, trackRetailerClick } from '../lib/analytics'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
+import { OutboundLink } from './OutboundLink'
 
 // RepairGuideModal pulls in react-markdown (heavy) and only renders when the
 // user clicks "Generate AI Guide" — load it (and its markdown deps) on demand.
@@ -66,10 +67,10 @@ export function PartDetailModal({
       {/* Header */}
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
-            <div className="text-xs font-semibold tracking-[1px] text-brand-600">DETAILED VIEW</div>
+            <div className="text-xs font-semibold tracking-[1px] text-brand-600 dark:text-brand-400">DETAILED VIEW</div>
             <div className="font-semibold text-xl tracking-tight text-slate-950">{part}</div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="rounded-full p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
@@ -86,7 +87,7 @@ export function PartDetailModal({
                 className="w-full rounded-2xl border border-slate-100 object-cover shadow-sm"
               />
             ) : (
-              <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-300">
+              <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-500">
                 No image
               </div>
             )}
@@ -98,7 +99,7 @@ export function PartDetailModal({
 
             <div className="mt-4 flex items-baseline gap-3">
               {listing.originalPrice && (
-                <span className="font-data text-lg text-slate-400 line-through">${listing.originalPrice.toFixed(2)}</span>
+                <span className="font-data text-lg text-slate-500 line-through">${listing.originalPrice.toFixed(2)}</span>
               )}
               <span className="font-data text-5xl font-semibold tracking-[-1px] text-slate-950">${listing.price.toFixed(2)}</span>
             </div>
@@ -120,7 +121,7 @@ export function PartDetailModal({
                 <div className="flex items-center gap-2">
                   <Truck size={15} className="text-slate-400" />
                   {listing.shippingCost === 0 ? (
-                    <span className="font-semibold text-emerald-600">Free shipping</span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free shipping</span>
                   ) : (
                     `+$${listing.shippingCost.toFixed(2)} shipping`
                   )}
@@ -135,12 +136,12 @@ export function PartDetailModal({
             )}
 
             {!isFitmentVerified ? (
-              <div className="mt-5 flex items-center gap-2 text-xs text-amber-700">
-                <AlertTriangle size={14} /> Marketplace compatibility not confirmed for {vehicleLabel} — check before buying
+              <div className="mt-5 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
+                <AlertTriangle size={14} /> No marketplace YMM compatibility evidence for {vehicleLabel} — check before buying
               </div>
             ) : (
-              <div className="mt-5 flex items-center gap-2 text-xs text-emerald-700">
-                <ShieldCheck size={14} /> Marketplace compatibility match for {vehicleLabel}
+              <div className="mt-5 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+                <ShieldCheck size={14} /> Marketplace YMM compatibility evidence for {vehicleLabel} — not a full-vehicle fitment guarantee
               </div>
             )}
             
@@ -176,7 +177,7 @@ export function PartDetailModal({
                   <dd>{listing.fitmentEvidence.matchType || 'No structured compatibility match'}</dd>
                   {formatCheckedAt(listing.fitmentEvidence.checkedAt) && (
                     <>
-                      <dt className="font-semibold">Checked</dt>
+                      <dt className="font-semibold">Search checked by CarPartsRadar</dt>
                       <dd>{formatCheckedAt(listing.fitmentEvidence.checkedAt)}</dd>
                     </>
                   )}
@@ -243,7 +244,7 @@ export function PartDetailModal({
               {isInWatchlist ? 'Added to Watchlist' : 'Add to Watchlist'}
             </button>
 
-            <a
+            <OutboundLink
               href={listing.link}
               onClick={() => trackRetailerClick({
                 retailer: listing.source,
@@ -258,7 +259,7 @@ export function PartDetailModal({
               className="btn btn-primary flex-1 py-3 text-base"
             >
               View on {listing.source} <ExternalLink size={16} />
-            </a>
+            </OutboundLink>
 
             <button onClick={onClose} className="btn btn-ghost hidden py-3 text-base sm:inline-flex">
               Close

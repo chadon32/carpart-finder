@@ -19,6 +19,9 @@ export default function CompareScreen() {
           title: 'Compare',
           headerRight: () => (
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear comparison"
+              accessibilityHint="Removes all listings from the comparison and returns to the previous screen"
               onPress={() => {
                 clear()
                 router.back()
@@ -35,11 +38,30 @@ export default function CompareScreen() {
           <AffiliateDisclosure />
         </View>
       ) : null}
+      {listings.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 }}>
+          <Text accessibilityRole="header" style={{ color: c.text, fontSize: 20, fontWeight: '800' }}>
+            Nothing to compare yet
+          </Text>
+          <Text style={{ color: c.subtext, textAlign: 'center', lineHeight: 20 }}>
+            Choose two to four listings from search results to compare price, known shipping, seller details, and compatibility evidence.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to listings"
+            accessibilityHint="Returns to the previous screen"
+            onPress={() => router.back()}
+            style={{ minHeight: 48, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: brand }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Back to listings</Text>
+          </Pressable>
+        </View>
+      ) : (
       <ScrollView horizontal contentContainerStyle={{ padding: 16, gap: 12 }}>
         {listings.map((l) => {
           const shipping =
             l.shippingCost == null
-              ? 'See listing'
+              ? 'Unknown — see listing'
               : l.shippingCost === 0
                 ? 'Free'
                 : `$${l.shippingCost.toFixed(2)}`
@@ -80,11 +102,14 @@ export default function CompareScreen() {
                 ) : null}
                 {l.verifiedFitment ? (
                   <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>
-                    ✓ Verified fitment
+                    ✓ Marketplace year/make/model match
                   </Text>
                 ) : null}
                 <View style={{ flex: 1 }} />
                 <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`Buy ${l.title} on ${l.source}`}
+                  accessibilityHint="Opens the seller listing in your browser"
                   onPress={() => openOutboundLink(l.link)}
                   style={{
                     minHeight: 44,
@@ -101,6 +126,7 @@ export default function CompareScreen() {
           )
         })}
       </ScrollView>
+      )}
     </View>
   )
 }

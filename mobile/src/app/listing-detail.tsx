@@ -2,7 +2,7 @@ import { Alert, View, Text, ScrollView, Pressable, Share } from 'react-native'
 import { Image } from 'expo-image'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as Haptics from 'expo-haptics'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Listing } from '@/api/types'
 import { createSavedSearch, createPriceAlert } from '@/api/client'
 import { fitmentPresentation } from '@/lib/fitmentPresentation'
@@ -33,42 +33,137 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
+type ListingRouteSearchParams = {
+  listing?: string | string[]
+  carLabel?: string | string[]
+  year?: string | string[]
+  make?: string | string[]
+  model?: string | string[]
+  trim?: string | string[]
+  part?: string | string[]
+}
+
+type ListingRouteData = {
+  listing: Listing
+  carLabel: string
+  year: string
+  make: string
+  model: string
+  trim?: string
+  part: string
+}
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0
+
+const isOptionalFiniteNumber = (value: unknown) =>
+  value == null || (typeof value === 'number' && Number.isFinite(value))
+
+function isListing(value: unknown): value is Listing {
+  if (!value || typeof value !== 'object') return false
+
+  const listing = value as Record<string, unknown>
+  return (
+    ['id', 'title', 'currency', 'condition', 'seller', 'link', 'source'].every((key) =>
+      isNonEmptyString(listing[key])
+    ) &&
+    typeof listing.price === 'number' &&
+    Number.isFinite(listing.price) &&
+    listing.price >= 0 &&
+    typeof listing.crossBorder === 'boolean' &&
+    (listing.image === null || typeof listing.image === 'string') &&
+    (listing.sellerFeedbackPercentage === null || typeof listing.sellerFeedbackPercentage === 'string') &&
+    isOptionalFiniteNumber(listing.shippingCost) &&
+    isOptionalFiniteNumber(listing.originalPrice)
+  )
+}
+
+function parseListingRouteData(params: ListingRouteSearchParams): ListingRouteData | null {
+  const carLabel = isNonEmptyString(params.carLabel) ? params.carLabel : null
+  const year = isNonEmptyString(params.year) ? params.year : null
+  const make = isNonEmptyString(params.make) ? params.make : null
+  const model = isNonEmptyString(params.model) ? params.model : null
+  const part = isNonEmptyString(params.part) ? params.part : null
+
+  if (!carLabel || !year || !make || !model || !part || typeof params.listing !== 'string') return null
+
+  try {
+    const listing: unknown = JSON.parse(params.listing)
+    if (!isListing(listing)) return null
+
+    return {
+      listing,
+      carLabel,
+      year,
+      make,
+      model,
+      trim: isNonEmptyString(params.trim) ? params.trim : undefined,
+      part,
+    }
+  } catch {
+    return null
+  }
+}
+
 export default function ListingDetail() {
   const c = useThemeColors()
-  const params = useLocalSearchParams<{
-    listing: string
-    carLabel: string
-    year: string
-    make: string
-    model: string
-    trim?: string
-    part: string
-  }>()
-  const listing = JSON.parse(params.listing) as Listing
-  const fitment = fitmentPresentation(listing)
+  const route = parseListingRouteData(useLocalSearchParams<ListingRouteSearchParams>())
   const watch = useWatchlist((s) => s.watch)
   const unwatch = useWatchlist((s) => s.unwatch)
-  const watched = useWatchlist((s) => s.items.some((i) => i.id === listing.id))
+  const watched = useWatchlist((s) => route != null && s.items.some((i) => i.id === route.listing.id))
   const signedIn = useAuth((s) => s.status === 'signedIn')
   const [alertState, setAlertState] = useState<'idle' | 'busy' | 'set' | 'failed'>('idle')
+  const alertInFlight = useRef(false)
+
+  if (!route) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+        <View accessibilityRole="alert" style={{ alignItems: 'center', gap: 6 }}>
+          <Text style={{ color: c.text, fontWeight: '800', fontSize: 20 }}>Listing unavailable</Text>
+          <Text style={{ color: c.subtext, textAlign: 'center', lineHeight: 20 }}>
+            This listing link is incomplete or no longer available. Go back and choose another listing.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back to listings"
+          accessibilityHint="Returns to the previous screen"
+          onPress={() => router.back()}
+          style={{ backgroundColor: brand, borderRadius: 12, minHeight: 48, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Back</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
+  const { listing, ...params } = route
+  const fitment = fitmentPresentation(listing)
+  const alertTarget = listing.shippingCost == null
+    ? null
+    : Number((listing.price + listing.shippingCost).toFixed(2))
 
   const createAlert = async () => {
+    if (alertTarget == null || alertInFlight.current) return
+    alertInFlight.current = true
     setAlertState('busy')
     try {
       const { search } = await createSavedSearch(
         params.year, params.make, params.model, params.trim ?? '', params.part
       )
-      await createPriceAlert(search.id, listing.price)
+      await createPriceAlert(search.id, alertTarget)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       setAlertState('set')
     } catch {
       setAlertState('failed')
+    } finally {
+      alertInFlight.current = false
     }
   }
 
   const shipping =
     listing.shippingCost == null
-      ? 'See listing'
+      ? 'Unknown — see listing'
       : listing.shippingCost === 0
         ? 'Free'
         : `$${listing.shippingCost.toFixed(2)}`
@@ -170,7 +265,7 @@ export default function ListingDetail() {
                 <Text style={{ color: c.subtext, fontSize: 12 }}>Matched fields: {fitment.matchedVehicle}</Text>
               ) : null}
               {fitment.checkedAt ? (
-                <Text style={{ color: c.subtext, fontSize: 12 }}>Provider checked: {fitment.checkedAt}</Text>
+                <Text style={{ color: c.subtext, fontSize: 12 }}>Search checked by CarPartsRadar: {fitment.checkedAt}</Text>
               ) : null}
             </View>
             <View style={{ gap: 3 }}>
@@ -211,6 +306,8 @@ export default function ListingDetail() {
           {listing.verifiedFitment && listing.fitmentProof ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Open repair guide"
+              accessibilityHint="Shows compatibility and installation guidance for this listing"
               onPress={() =>
                 router.push({
                   pathname: '/repair-guide',
@@ -243,8 +340,13 @@ export default function ListingDetail() {
           {signedIn && (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={alertTarget == null
+                ? 'Price alert unavailable because shipping cost is unknown'
+                : `Email me if the known total for ${params.part} drops below $${alertTarget.toFixed(2)}`}
+              accessibilityHint={alertState === 'failed' ? 'Tries to create the price alert again' : 'Creates a price alert using item price plus known shipping before tax'}
+              accessibilityState={{ busy: alertState === 'busy', disabled: alertState === 'busy' || alertState === 'set' || alertTarget == null }}
               onPress={createAlert}
-              disabled={alertState === 'busy' || alertState === 'set'}
+              disabled={alertState === 'busy' || alertState === 'set' || alertTarget == null}
               style={{
                 minHeight: 48,
                 borderRadius: 12,
@@ -256,13 +358,15 @@ export default function ListingDetail() {
               }}
             >
               <Text style={{ color: alertState === 'set' ? '#047857' : c.text, fontWeight: '700' }}>
-                {alertState === 'set'
-                  ? `✓ Alert set — emails you below $${listing.price.toFixed(2)}`
+                {alertTarget == null
+                  ? 'Shipping cost unknown — alert unavailable'
+                  : alertState === 'set'
+                  ? `✓ Alert set — emails you below $${alertTarget.toFixed(2)} known total`
                   : alertState === 'busy'
                     ? 'Setting alert…'
                     : alertState === 'failed'
                       ? 'Alert failed — tap to retry'
-                      : `🔔 Email me if ${params.part} drops below $${listing.price.toFixed(2)}`}
+                      : `🔔 Email me below $${alertTarget.toFixed(2)} known total`}
               </Text>
             </Pressable>
           )}
@@ -292,6 +396,8 @@ export default function ListingDetail() {
         ) : null}
         <Pressable
           accessibilityRole="link"
+          accessibilityLabel={`Buy ${listing.title} on ${listing.source}`}
+          accessibilityHint="Opens the seller listing in your browser"
           onPress={() => openOutboundLink(listing.link)}
           style={{
             flex: 2,
@@ -308,6 +414,9 @@ export default function ListingDetail() {
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={watched ? `Remove ${listing.title} from your watchlist` : `Add ${listing.title} to your watchlist`}
+          accessibilityHint="Tracks this listing in your watchlist"
+          accessibilityState={{ selected: watched }}
           onPress={toggleWatch}
           style={{
             flex: 1,
@@ -328,6 +437,7 @@ export default function ListingDetail() {
           accessibilityRole="button"
           onPress={share}
           accessibilityLabel="Share listing"
+          accessibilityHint="Opens sharing options for this listing"
           style={{
             width: 50,
             borderRadius: 14,
