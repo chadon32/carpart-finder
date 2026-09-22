@@ -43,7 +43,7 @@ a {
 }
 
 :focus-visible {
-  outline: 3px solid rgb(32 80 200 / 0.35);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 
@@ -408,6 +408,9 @@ a {
   text-transform: uppercase;
 }
 
+.article-header { padding: 2.5rem 0 1.5rem; }
+.article-header h1 { font-size: clamp(2.4rem, 4.5vw, 4.2rem); line-height: 1.04; }
+
 .article-dek {
   max-width: 780px;
   margin: 1.5rem 0 0;
@@ -427,7 +430,55 @@ a {
 }
 
 .article-photo img {
+  height: auto;
   max-height: 570px;
+}
+
+.article-body section[id] {
+  scroll-margin-top: 100px;
+}
+
+.article-toc {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.article-toc ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.article-toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--brand-dark);
+  line-height: 1.5;
+  text-underline-offset: 3px;
+}
+
+.compare-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 10px;
+  background: #16388b;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.compare-cta:hover { background: #102c6d; }
+.article-body .guide-disclosure { margin-top: 1rem; font-size: 0.875rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; }
 }
 
 .article-layout {
@@ -436,7 +487,7 @@ a {
   justify-content: center;
   align-items: start;
   gap: clamp(2rem, 7vw, 6rem);
-  padding-top: 4.5rem;
+  padding-top: 2.5rem;
 }
 
 .takeaway-box {
@@ -686,7 +737,7 @@ a {
   }
 
   .article-layout {
-    padding-top: 3rem;
+    padding-top: 1.5rem;
   }
 
   .takeaway-box {
@@ -744,10 +795,11 @@ a {
     font-size: 0.74rem;
   }
 
-  .guide-hero-copy h1,
-  .article-header h1 {
+  .guide-hero-copy h1 {
     font-size: clamp(3rem, 15vw, 4.6rem);
   }
+
+  .article-header h1 { font-size: clamp(2.2rem, 9vw, 3rem); }
 
   .standard-page > header h1 {
     font-size: clamp(2.15rem, 9vw, 3.5rem);

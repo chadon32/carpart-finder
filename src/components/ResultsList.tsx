@@ -13,7 +13,6 @@ import {
   Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Helmet } from 'react-helmet-async'
 import type { Car } from './CarSelector'
 import type { Listing } from '../api/client'
 import type { PartsSearchState } from '../hooks/usePartsSearch'
@@ -169,55 +168,8 @@ export function ResultsList({
     }
   }, [car.year, car.make, car.model, car.trim, part, data])
 
-  // Dynamic JSON-LD Structured Schema Injection for SEO snippets
-  useEffect(() => {
-    if (results.length === 0) return
-
-    const prices = results.map((r) => r.price)
-    const minPrice = Math.min(...prices)
-    const maxPrice = Math.max(...prices)
-
-    const schema = {
-      '@context': 'https://schema.org',
-      '@type': 'Product',
-      'name': `${car.year} ${car.make} ${car.model} ${part}`,
-      'description': `Compare real-time price offers for ${part} on ${car.year} ${car.make} ${car.model} across multiple auto parts stores.`,
-      'offers': {
-        '@type': 'AggregateOffer',
-        'priceCurrency': 'USD',
-        'lowPrice': minPrice.toFixed(2),
-        'highPrice': maxPrice.toFixed(2),
-        'offerCount': results.length,
-        'offers': results.map((r) => ({
-          '@type': 'Offer',
-          'price': r.price.toFixed(2),
-          'priceCurrency': 'USD',
-          'url': r.link,
-          'itemCondition': r.condition === 'new' ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition',
-          'seller': {
-            '@type': 'Organization',
-            'name': r.seller || r.source
-          }
-        }))
-      }
-    }
-
-    const script = document.createElement('script')
-    script.id = 'jsonld-schema'
-    script.type = 'application/ld+json'
-    // Use textContent (not innerHTML) and escape `<` so a seller-controlled
-    // listing title containing `</script>` can't break out of this tag and
-    // execute — JSON.stringify does not escape forward slashes on its own.
-    script.textContent = JSON.stringify(schema).replace(/</g, '\\u003c')
-    document.head.appendChild(script)
-
-    return () => {
-      const existing = document.getElementById('jsonld-schema')
-      if (existing) {
-        document.head.removeChild(existing)
-      }
-    }
-  }, [results, car, part])
+  // Results contain different products, not offers for a single product.
+  // Do not present this internal search as Product/AggregateOffer rich-result data.
 
   const visible = useMemo(() => {
     let list = results.slice()
@@ -331,18 +283,8 @@ export function ResultsList({
     setSelectedListing(null)
     onSearchPart(to)
   }
-  const pageTitle = `${vehicleLabel} ${part} — Compare Prices on CarPartsRadar`
-  const pageDescription = `Review marketplace compatibility matches and broader ${part} search results for a ${vehicleLabel}.`
-
   return (
     <>
-    <Helmet>
-      <title>{pageTitle}</title>
-      <meta name="description" content={pageDescription} />
-      <meta property="og:title" content={pageTitle} />
-      <meta property="og:description" content={pageDescription} />
-    </Helmet>
-    
     <div className="card break-anywhere max-w-full overflow-hidden p-[16px] sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">

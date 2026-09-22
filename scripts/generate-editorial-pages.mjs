@@ -26,12 +26,20 @@ function textWithContactLink(value) {
   return escaped.replaceAll(escapedEmail, `<a href="mailto:${escapedEmail}">${escapedEmail}</a>`)
 }
 
-function structuredData({ title, description, path, type }) {
+function formattedDate(isoDate) {
+  return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${isoDate}T12:00:00Z`))
+}
+
+function sectionId(section) {
+  return section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+function structuredData({ title, description, path, type, modified, crumbs }) {
   const pageUrl = canonical(path)
   const organizationId = `${site.origin}/#organization`
   const websiteId = `${site.origin}/#website`
   const pageSchema = {
-    '@type': type === 'article' ? 'Article' : 'WebPage',
+    '@type': type === 'article' ? 'Article' : path === '/guides.html' ? 'CollectionPage' : 'WebPage',
     '@id': `${pageUrl}#${type === 'article' ? 'article' : 'webpage'}`,
     url: pageUrl,
     name: title,
@@ -40,8 +48,10 @@ function structuredData({ title, description, path, type }) {
     publisher: { '@id': organizationId },
     ...(type === 'article'
       ? {
-          author: { '@id': organizationId },
-          dateModified: site.isoDate,
+          headline: title,
+          author: { '@type': 'Organization', name: 'CarPartsRadar Editorial', url: canonical('/methodology.html') },
+          ...(modified ? { dateModified: modified } : {}),
+          image: canonical('/editorial/parts-workbench.webp'),
           mainEntityOfPage: pageUrl,
         }
       : {}),
@@ -66,6 +76,14 @@ function structuredData({ title, description, path, type }) {
         publisher: { '@id': organizationId },
       },
       pageSchema,
+      ...(crumbs ? [{
+        '@type': 'BreadcrumbList',
+        '@id': `${pageUrl}#breadcrumb`,
+        itemListElement: crumbs.map((item, index) => ({
+          '@type': 'ListItem', position: index + 1, name: item.label,
+          item: canonical(item.href || path),
+        })),
+      }] : []),
     ],
   }
 
@@ -121,7 +139,7 @@ function footer() {
     </footer>`
 }
 
-function pageShell({ title, description, path, body, type = 'website' }) {
+function pageShell({ title, description, path, body, type = 'website', modified, crumbs }) {
   const pageTitle = title === site.name ? title : `${title} | ${site.name}`
   const pageUrl = canonical(path)
   return `<!doctype html>
@@ -142,8 +160,12 @@ function pageShell({ title, description, path, body, type = 'website' }) {
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:url" content="${pageUrl}" />
   <meta property="og:image" content="${site.origin}/editorial/parts-workbench.webp" />
+  <meta property="og:image:alt" content="Replacement car parts arranged on a workbench" />
   <meta name="twitter:card" content="summary_large_image" />
-  ${structuredData({ title: pageTitle, description, path, type })}
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${site.origin}/editorial/parts-workbench.webp" />
+  ${structuredData({ title, description, path, type, modified, crumbs })}
 </head>
 <body>
   ${header()}
@@ -189,7 +211,7 @@ function guideIndex() {
 
       <section class="shell guide-library" aria-labelledby="guide-library-title">
         <div class="section-heading">
-          <p class="eyebrow">Reviewed ${site.updated}</p>
+          <p class="eyebrow">${guides.length} practical buying guides</p>
           <h2 id="guide-library-title">Automotive buying guides</h2>
           <p>Each guide separates diagnosis, fitment evidence, product comparison, and the costs that appear after the headline price.</p>
         </div>
@@ -217,39 +239,37 @@ function guideIndex() {
 }
 
 function sectionMarkup(section) {
-  return `<section>
+  return `<section id="${sectionId(section)}" tabindex="-1">
     <h2>${escapeHtml(section.heading)}</h2>
     ${section.paragraphs.map((paragraph) => `<p>${textWithContactLink(paragraph)}</p>`).join('')}
   </section>`
 }
 
 function guidePage(guide) {
-  const guideIndexValue = guides.findIndex((item) => item.slug === guide.slug)
-  const related = [1, 2, 3]
-    .map((offset) => guides[(guideIndexValue + offset) % guides.length])
-    .filter((item) => item.slug !== guide.slug)
+  const related = guide.related.map((slug) => {
+    const match = guides.find((item) => item.slug === slug)
+    if (!match || slug === guide.slug) throw new Error(`Invalid related guide: ${slug}`)
+    return match
+  })
+  const crumbs = [
+    { label: 'Home', href: '/' },
+    { label: 'Guides', href: '/guides.html' },
+    { label: guide.title },
+  ]
 
   const body = `
     <main id="main-content">
       <article class="article shell">
-        ${breadcrumb([
-          { label: 'Home', href: '/' },
-          { label: 'Guides', href: '/guides.html' },
-          { label: guide.title },
-        ])}
+        ${breadcrumb(crumbs)}
         <header class="article-header">
           <p class="eyebrow">${escapeHtml(guide.category)}</p>
           <h1>${escapeHtml(guide.title)}</h1>
           <p class="article-dek">${escapeHtml(guide.description)}</p>
           <div class="article-meta">
-            <span>Written by CarPartsRadar Editorial</span>
-            <span>Reviewed ${site.updated}</span>
+            <span>Written by <a href="/methodology.html">CarPartsRadar Editorial</a></span>
+            <span>Updated <time datetime="${guide.modified}">${formattedDate(guide.modified)}</time></span>
           </div>
         </header>
-
-        <figure class="article-photo">
-          <img src="/editorial/parts-workbench.webp" width="1440" height="960" alt="Selection of unbranded replacement car parts on a mechanic's workbench" />
-        </figure>
 
         <div class="article-layout">
           <aside class="takeaway-box" aria-labelledby="takeaway-title">
@@ -257,11 +277,24 @@ function guidePage(guide) {
             <ul>${guide.takeaways.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
           </aside>
           <div class="article-body">
+            <nav class="article-toc" aria-label="In this guide">
+              <h2>In this guide</h2>
+              <ul>${guide.sections.map((section) => `<li><a href="#${sectionId(section)}">${escapeHtml(section.heading)}</a></li>`).join('')}<li><a href="#before-you-order">Before you order</a></li></ul>
+            </nav>
             ${guide.intro.map((paragraph) => `<p class="intro">${escapeHtml(paragraph)}</p>`).join('')}
+            <figure class="article-photo">
+              <img src="/editorial/parts-workbench.webp" width="1440" height="960" loading="lazy" decoding="async" alt="Selection of unbranded replacement car parts on a mechanic's workbench" />
+            </figure>
             ${guide.sections.map(sectionMarkup).join('')}
-            <section class="checklist">
+            <section class="checklist" id="before-you-order" tabindex="-1">
               <h2>Before you order</h2>
               <ol>${guide.checklist.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>
+            </section>
+            <section class="guide-next-step" aria-labelledby="compare-heading">
+              <h2 id="compare-heading">Ready to compare listings?</h2>
+              <p>Choose your vehicle, then search for the part. Review marketplace compatibility matches separately from broader results, and confirm final fitment, shipping, and price with the seller. No account is required to search.</p>
+              <a class="compare-cta" href="/?guide=${guide.slug}">Choose your vehicle and compare parts <span aria-hidden="true">→</span></a>
+              <p class="guide-disclosure">Some retailer links may earn us a commission. <a href="/affiliate-disclosure.html">How affiliate links work</a>.</p>
             </section>
             <section class="sources">
               <h2>Primary references</h2>
@@ -290,18 +323,18 @@ function guidePage(guide) {
     description: guide.description,
     path: `/guides/${guide.slug}.html`,
     type: 'article',
+    modified: guide.modified,
+    crumbs,
     body,
   })
 }
 
 function standardPage(page, path) {
+  const crumbs = [{ label: 'Home', href: '/' }, { label: page.title }]
   const body = `
     <main id="main-content">
       <article class="standard-page shell">
-        ${breadcrumb([
-          { label: 'Home', href: '/' },
-          { label: page.title },
-        ])}
+        ${breadcrumb(crumbs)}
         <header>
           <p class="eyebrow">${escapeHtml(page.eyebrow)}</p>
           <h1>${escapeHtml(page.title)}</h1>
@@ -316,6 +349,7 @@ function standardPage(page, path) {
     title: page.title,
     description: page.description,
     path,
+    crumbs,
     body,
   })
 }
@@ -335,7 +369,11 @@ function sitemap() {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${paths.map((path) => `  <url><loc>${canonical(path)}</loc><lastmod>${site.isoDate}</lastmod></url>`).join('\n')}
+${paths.map((path) => {
+    // Never substitute a global build date for an unknown page modification date.
+    const modified = guides.find((guide) => path === `/guides/${guide.slug}.html`)?.modified
+    return `  <url><loc>${canonical(path)}</loc>${modified ? `<lastmod>${modified}</lastmod>` : ''}</url>`
+  }).join('\n')}
 </urlset>\n`
 }
 
@@ -347,13 +385,11 @@ function feed() {
     <link>${site.origin}/guides.html</link>
     <description>Independent automotive fitment and parts-buying guidance.</description>
     <language>en-us</language>
-    <lastBuildDate>${new Date(`${site.isoDate}T12:00:00Z`).toUTCString()}</lastBuildDate>
 ${guides.map((guide) => `    <item>
       <title>${escapeHtml(guide.title)}</title>
       <link>${canonical(`/guides/${guide.slug}.html`)}</link>
       <guid isPermaLink="true">${canonical(`/guides/${guide.slug}.html`)}</guid>
       <description>${escapeHtml(guide.description)}</description>
-      <pubDate>${new Date(`${site.isoDate}T12:00:00Z`).toUTCString()}</pubDate>
     </item>`).join('\n')}
   </channel>
 </rss>\n`

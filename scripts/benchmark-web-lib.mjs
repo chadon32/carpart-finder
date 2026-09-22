@@ -269,7 +269,8 @@ function sendJson(response, status, body) {
 function strippedHtml(html) {
   return html
     .replace(/<script\b[^>]*\bsrc=["']https?:[^"']+["'][^>]*>\s*<\/script>/gi, '')
-    .replace(/<link\b[^>]*\bhref=["']https?:[^"']+["'][^>]*>/gi, '')
+    .replace(/<link\b[^>]*\bhref=["']https?:[^"']+["'][^>]*>/gi, (tag) =>
+      /\brel=["'](?:stylesheet|preconnect|dns-prefetch|preload|modulepreload)["']/i.test(tag) ? '' : tag)
 }
 
 export async function startFixtureServer(distDir, { images = false, slowSearchMs = 0 } = {}) {

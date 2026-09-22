@@ -15,6 +15,8 @@ Car-parts comparison website (React, TypeScript, Vite), shared API, and Expo mob
 
 See [performance methodology and commands](docs/PERFORMANCE.md), the [September 5 improvement report](docs/audits/2026-09-05-app-benchmark-improvements.md), and the [September 6 follow-up](docs/audits/2026-09-06-remaining-work.md). Browser checks and benchmarks use local fixtures, not production accounts or marketplace APIs.
 
+The [September 22 SEO audit and release](docs/audits/2026-09-22-seo-release.md) documents the keyword map, crawl policy, guide templates, tests and measurement plan. After deployment, run `node scripts/check-seo.mjs` for read-only production checks. Edit editorial content in `scripts/editorial-content.mjs`, then run `npm run generate:editorial`; update each guide's `modified` date only for a meaningful content/link/schema change, not each build.
+
 The [search-loading continuation](docs/audits/2026-09-06-search-loading-followup.md) documents the subsequent request/module overlap improvement and its separate validation.
 
 The [reliability and validation continuation](docs/audits/2026-09-06-reliability-closure.md) records the latest recall, dialog, AI-guide and optional-history fixes, current benchmark results, and release checks that still require an authorized environment or physical device.

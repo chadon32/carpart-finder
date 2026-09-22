@@ -34,6 +34,8 @@ const ftcRepair = {
 export const guides = [
   {
     slug: 'how-to-confirm-car-part-fitment',
+    modified: '2026-09-22',
+    related: ['oem-vs-aftermarket-car-parts', 'compare-total-car-part-cost', 'brake-pad-buying-guide'],
     category: 'Fitment basics',
     title: 'How to Confirm a Car Part Fits Before You Buy',
     description: 'A practical fitment checklist using the VIN, trim, engine, drivetrain, production date, and manufacturer part numbers.',
@@ -96,6 +98,8 @@ export const guides = [
   },
   {
     slug: 'oem-vs-aftermarket-car-parts',
+    modified: '2026-09-22',
+    related: ['how-to-confirm-car-part-fitment', 'compare-total-car-part-cost', 'alternator-buying-guide'],
     category: 'Buying strategy',
     title: 'OEM vs. Aftermarket Car Parts: How to Choose',
     description: 'Compare original equipment, aftermarket, remanufactured, and used parts by fit, warranty, cost, and repair risk.',
@@ -157,6 +161,8 @@ export const guides = [
   },
   {
     slug: 'brake-pad-buying-guide',
+    modified: '2026-09-22',
+    related: ['how-to-confirm-car-part-fitment', 'oem-vs-aftermarket-car-parts', 'compare-total-car-part-cost'],
     category: 'Brake system',
     title: 'Brake Pad Buying Guide: Fit, Material, and Total Cost',
     description: 'Choose replacement brake pads by axle, caliper package, friction material, hardware, driving conditions, and rotor condition.',
@@ -218,6 +224,8 @@ export const guides = [
   },
   {
     slug: 'alternator-buying-guide',
+    modified: '2026-09-22',
+    related: ['starter-motor-buying-guide', 'compare-total-car-part-cost', 'how-to-confirm-car-part-fitment'],
     category: 'Starting and charging',
     title: 'Alternator Buying Guide: Output, Fitment, and Core Charges',
     description: 'Compare alternators by rated output, connector, pulley, mounting, remanufacturing quality, warranty, and core-return cost.',
@@ -279,6 +287,8 @@ export const guides = [
   },
   {
     slug: 'starter-motor-buying-guide',
+    modified: '2026-09-22',
+    related: ['alternator-buying-guide', 'compare-total-car-part-cost', 'how-to-confirm-car-part-fitment'],
     category: 'Starting and charging',
     title: 'Starter Motor Buying Guide: Diagnose First, Then Match',
     description: 'Select a starter by engine, transmission, tooth count, rotation, mounting, electrical terminals, warranty, and core policy.',
@@ -340,6 +350,8 @@ export const guides = [
   },
   {
     slug: 'oxygen-sensor-buying-guide',
+    modified: '2026-09-22',
+    related: ['how-to-confirm-car-part-fitment', 'oem-vs-aftermarket-car-parts', 'compare-total-car-part-cost'],
     category: 'Engine management',
     title: 'Oxygen Sensor Buying Guide: Bank, Position, and Connector',
     description: 'Identify the correct upstream or downstream oxygen sensor by bank, sensor number, emissions package, connector, and original part number.',
@@ -401,6 +413,8 @@ export const guides = [
   },
   {
     slug: 'shocks-vs-struts-buying-guide',
+    modified: '2026-09-22',
+    related: ['how-to-confirm-car-part-fitment', 'compare-total-car-part-cost', 'oem-vs-aftermarket-car-parts'],
     category: 'Suspension',
     title: 'Shocks vs. Struts: What to Check Before Ordering',
     description: 'Understand shock and strut applications, complete assemblies, electronic suspension options, axle pairing, and alignment costs.',
@@ -462,6 +476,8 @@ export const guides = [
   },
   {
     slug: 'compare-total-car-part-cost',
+    modified: '2026-09-22',
+    related: ['how-to-confirm-car-part-fitment', 'alternator-buying-guide', 'starter-motor-buying-guide'],
     category: 'Buying strategy',
     title: 'How to Compare the Real Cost of an Online Car Part',
     description: 'Calculate delivered price, shipping, tax, core deposits, hardware, programming, returns, downtime, and warranty risk.',
@@ -488,6 +504,13 @@ export const guides = [
         paragraphs: [
           'A core charge is usually refundable if the correct old part is returned on time and in acceptable condition. It still increases the amount paid at checkout and may remain outstanding for weeks. Record the deposit, return deadline, label cost, packaging requirement, and refund method.',
           'The real core cost is the nonrefundable portion: return shipping, packing materials, travel to a store, or a rejected core. Keep the old part intact until the replacement is confirmed, but follow any fluid-draining and hazardous-material instructions from the carrier and seller.',
+        ],
+      },
+      {
+        heading: 'Worked example: cheaper listing, higher final cost',
+        paragraphs: [
+          'Illustrative example, not live prices: Part A costs $90, plus $15 shipping, $8 estimated tax, and a $40 refundable core deposit. You pay $153 at checkout. If returning the old part costs $12 and the full deposit is refunded, the net cost is $125: $153 + $12 - $40.',
+          'Part B costs $115, with shipping included, $9 estimated tax, and no core deposit. Its checkout and net cost are both $124. In this example, B is $1 cheaper overall and needs less money upfront. Compare equivalent fitment, condition, quantity, included hardware, and warranty before using this arithmetic to choose; actual taxes, fees, and core terms come from the seller.',
         ],
       },
       {

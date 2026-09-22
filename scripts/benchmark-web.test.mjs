@@ -68,6 +68,19 @@ test('fixture server exposes a loopback URL and async close', async () => {
   await assert.rejects(fetch(server.url))
 })
 
+test('fixture strips external fetches but preserves canonical metadata for SEO tests', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'benchmark-web-'))
+  const metadata = '<link rel="canonical" href="https://carpartsradar.com/"><link rel="alternate" href="https://carpartsradar.com/feed.xml">'
+  writeFileSync(path.join(dir, 'index.html'), `${metadata}<link rel="stylesheet" href="https://example.invalid/font.css"><link rel="preconnect" href="https://example.invalid">`)
+  const server = await startFixtureServer(dir)
+  try {
+    assert.equal(await (await fetch(server.url)).text(), metadata)
+  } finally {
+    await server.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('initial modulepreloads are deduplicated and lazy chunks are counted separately', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'benchmark-web-'))
   try {

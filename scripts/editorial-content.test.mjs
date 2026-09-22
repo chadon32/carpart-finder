@@ -117,3 +117,47 @@ test('sitemap and robots file advertise every public editorial page', async () =
   }
   assert.match(robots, /Sitemap: https:\/\/carpartsradar\.com\/sitemap\.xml/)
 })
+
+test('guide schema, dates, jump links and contextual recommendations match visible content', async () => {
+  const sitemap = await readFile(resolve(publicDir, 'sitemap.xml'), 'utf8')
+  const feed = await readFile(resolve(publicDir, 'feed.xml'), 'utf8')
+  assert.doesNotMatch(feed, /<pubDate>|<lastBuildDate>/, 'Do not invent publication timestamps')
+  assert.equal((sitemap.match(/<lastmod>/g) || []).length, guides.length)
+  for (const guide of guides) {
+    const html = await readFile(resolve(publicDir, `guides/${guide.slug}.html`), 'utf8')
+    const schema = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1])
+    const article = schema['@graph'].find((item) => item['@type'] === 'Article')
+    const breadcrumbs = schema['@graph'].find((item) => item['@type'] === 'BreadcrumbList')
+    assert.equal(article.headline, guide.title)
+    assert.equal(article.dateModified, guide.modified)
+    assert.equal(article.author.name, 'CarPartsRadar Editorial')
+    assert.match(html, new RegExp(`<time datetime="${guide.modified}">`))
+    assert.equal(breadcrumbs.itemListElement.length, 3)
+    assert.equal(breadcrumbs.itemListElement[2].item, `${site.origin}/guides/${guide.slug}.html`)
+    assert.equal(new Set(guide.related).size, 3)
+    for (const slug of guide.related) {
+      assert.notEqual(slug, guide.slug)
+      assert.ok(guides.some((item) => item.slug === slug))
+      assert.ok(html.includes(`href="/guides/${slug}.html"`))
+    }
+    const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1])
+    assert.equal(new Set(ids).size, ids.length, 'Anchor IDs must be unique')
+    for (const match of html.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.includes(match[1]), `Missing ${match[1]}`)
+    assert.ok(html.includes(`href="/?guide=${guide.slug}"`))
+    assert.doesNotMatch(html, /utm_source|utm_medium/, 'Internal links must not overwrite campaign attribution')
+    assert.match(html, /loading="lazy" decoding="async"/)
+  }
+})
+
+test('indexing rules exclude search/API URLs without blocking canonical pages', async () => {
+  const config = JSON.parse(await readFile(resolve(root, 'vercel.json'), 'utf8'))
+  assert.ok(config.redirects.some((rule) => rule.source === '/index.html' && rule.destination === '/' && rule.permanent))
+  for (const key of ['year', 'make', 'model', 'trim', 'part']) {
+    assert.ok(config.headers.some((rule) => rule.source === '/' && rule.has?.some((condition) => condition.type === 'query' && condition.key === key) && rule.headers.some((header) => header.key === 'X-Robots-Tag' && header.value === 'noindex, follow')))
+  }
+  assert.ok(config.headers.some((rule) => rule.source === '/api/:path*' && rule.headers.some((header) => header.key === 'X-Robots-Tag')))
+  assert.ok(!config.headers.some((rule) => !rule.has && rule.source !== '/api/:path*' && rule.headers.some((header) => header.key === 'X-Robots-Tag')))
+  const html = await readFile(resolve(root, 'index.html'), 'utf8')
+  assert.match(html, /<link data-rh="true" rel="canonical"/)
+  assert.match(html, /<script defer src="https:\/\/www.anrdoezrs.net/)
+})

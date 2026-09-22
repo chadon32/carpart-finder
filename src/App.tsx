@@ -134,14 +134,30 @@ function App() {
   }
 
   const viewKey = showWatchlist ? 'watchlist' : step
+  // Internal searches and private views are useful to people, not search landing pages.
+  // Vercel also sends noindex for search URLs before JavaScript runs.
+  const query = new URLSearchParams(window.location.search)
+  const noIndex = showWatchlist || step === 'dashboard' ||
+    ['year', 'make', 'model', 'trim', 'part'].some((key) => query.has(key))
+  const vehicleLabel = car ? `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}` : ''
+  const showingResults = step === 'results' && !showWatchlist && car && part
+  const pageTitle = showingResults
+    ? `${vehicleLabel} ${part} — Compare Prices on CarPartsRadar`
+    : 'CarPartsRadar | Compare Car Part Prices and Fitment'
+  const pageDescription = showingResults
+    ? `Review marketplace compatibility matches and broader ${part} search results for a ${vehicleLabel}.`
+    : 'Compare live car-part listings, review fitment evidence, and use independent buying guides before ordering for your vehicle.'
 
   return (
     <div className="app-bg flex min-h-screen min-w-0 max-w-full flex-col overflow-x-clip text-slate-900 dark:text-slate-100">
       <Helmet>
-        <title>CarPartsRadar | Compare Car Part Prices and Fitment</title>
-        <meta name="description" content="Compare live car-part prices. Marketplace compatibility matches stay separate from broader keyword results so you can verify fitment before buying." />
-        <meta property="og:title" content="CarPartsRadar | Compare Car Part Prices and Fitment" />
-        <meta property="og:description" content="Compare live auto-part listings with marketplace compatibility evidence and clearly separated broader keyword results." />
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta name="robots" content={noIndex ? 'noindex, follow' : 'index, follow'} />
+        {!noIndex && <link rel="canonical" href="https://carpartsradar.com/" />}
+        {!noIndex && <meta property="og:url" content="https://carpartsradar.com/" />}
       </Helmet>
       
       <Toaster position="top-center" richColors />
@@ -284,6 +300,15 @@ function App() {
                     onRemove={recent.remove}
                   />
                   <TrustBanner />
+                  <nav aria-label="Before you buy" className="mt-8 rounded-2xl border border-slate-200 p-5 dark:border-slate-700">
+                    <h2 className="text-lg font-semibold">Not sure what to buy?</h2>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Check compatibility and the full cost before choosing a listing.</p>
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-brand-700 dark:text-brand-400">
+                      <a className="inline-flex min-h-11 items-center underline underline-offset-4" href="/guides/how-to-confirm-car-part-fitment.html">Will this part fit?</a>
+                      <a className="inline-flex min-h-11 items-center underline underline-offset-4" href="/guides/oem-vs-aftermarket-car-parts.html">OEM or aftermarket?</a>
+                      <a className="inline-flex min-h-11 items-center underline underline-offset-4" href="/guides/compare-total-car-part-cost.html">Compare the total cost</a>
+                    </div>
+                  </nav>
                 </>
               )}
 
