@@ -1,3 +1,6 @@
+import { guideSearchStart } from '../data/guideSearch'
+import { sanitizeAnalyticsEvent } from '../../shared/analyticsPrivacy.mjs'
+
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || ''
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
 
@@ -22,8 +25,29 @@ export function initAnalytics() {
     posthog.init(POSTHOG_KEY, {
       api_host: POSTHOG_HOST,
       person_profiles: 'identified_only',
-      autocapture: true,
+      // Product events are explicitly emitted below. DOM autocapture could
+      // collect free-text search, VIN, email, or retailer-link content.
+      autocapture: false,
       capture_pageview: false,
+      capture_pageleave: false,
+      capture_performance: false,
+      disable_session_recording: true,
+      disable_persistence: true,
+      cookieless_mode: 'always',
+      property_denylist: [
+        '$current_url',
+        '$host',
+        '$pathname',
+        '$referrer',
+        '$referring_domain',
+        '$initial_referrer',
+        '$initial_referring_domain',
+      ],
+      before_send: (event) => {
+        if (!event) return null
+        const sanitized = sanitizeAnalyticsEvent(event.event, event.properties)
+        return sanitized ? { ...event, properties: sanitized.properties } : null
+      },
     })
   }).catch(() => {
     // Analytics is optional; a blocked or failed chunk must never become a
@@ -33,9 +57,11 @@ export function initAnalytics() {
 }
 
 export function trackEvent(eventName: string, properties?: Record<string, unknown>) {
+  const sanitized = sanitizeAnalyticsEvent(eventName, properties)
+  if (!sanitized) return
   const pending = loadPosthog()
   if (!pending) return
-  void pending.then((posthog) => posthog.capture(eventName, properties)).catch(() => {
+  void pending.then((posthog) => posthog.capture(sanitized.name, sanitized.properties)).catch(() => {
     // Keep tracking failures isolated from search, watchlist, and checkout UI.
   })
 }
@@ -83,5 +109,43 @@ export function trackRetailerClick({
     part,
     ...(listingId ? { listingId } : {}),
     ...(fitmentStatus ? { fitmentStatus } : {}),
+  })
+}
+
+export function trackComparisonChecklistShared({
+  listingCount,
+  structuredEvidenceCount,
+  keywordMatchCount,
+  knownTotalCount,
+  retailerLinkCount,
+}: {
+  listingCount: number
+  structuredEvidenceCount: number
+  keywordMatchCount: number
+  knownTotalCount: number
+  retailerLinkCount: number
+}) {
+  trackEvent('comparison_checklist_shared', {
+    listingCount,
+    structuredEvidenceCount,
+    keywordMatchCount,
+    knownTotalCount,
+    retailerLinkCount,
+  })
+}
+
+export function trackGuideSearchStarted(guideId: string) {
+  const start = guideSearchStart(guideId)
+  if (!start) return
+  trackEvent('guide_search_started', {
+    guideId: start.id,
+    partCategoryId: start.part,
+  })
+}
+
+export function trackPartIdentificationDemo(action: 'viewed' | 'open_tool') {
+  trackEvent('part_identification_demo', {
+    demoId: 'parts-workbench-v1',
+    action,
   })
 }

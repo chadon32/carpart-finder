@@ -1,8 +1,11 @@
 import { X, ExternalLink, Star, Award, Check, AlertTriangle } from 'lucide-react'
 import type { Listing } from '../api/client'
+import type { Car } from './CarSelector'
 import { Modal } from './Modal'
 import { OutboundLink } from './OutboundLink'
 import { knownTotalCost } from '../lib/listingHelpers'
+import { ComparisonShareCard } from './ComparisonShareCard'
+import { comparisonListingFreshnessLabel } from '../lib/comparisonShare'
 
 const fitmentScopeLabels = {
   'year-make-model': 'Year, make, and model',
@@ -15,7 +18,7 @@ function formatCheckedAt(checkedAt: string) {
   return Number.isNaN(date.getTime()) ? null : date.toLocaleString()
 }
 
-export function ComparisonModal({ listings, onClose }: { listings: Listing[]; onClose: () => void }) {
+export function ComparisonModal({ listings, vehicle, part, onClose }: { listings: Listing[]; vehicle: Car; part: string; onClose: () => void }) {
   const getDeliveryText = (item: Listing) => {
     if (!item.deliveryMin && !item.deliveryMax) return '—'
     const min = item.deliveryMin ? new Date(item.deliveryMin) : null
@@ -49,6 +52,7 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
       </div>
 
       <p className="px-6 pt-4 text-xs text-slate-500 sm:hidden">Swipe sideways to compare every selected listing.</p>
+      <ComparisonShareCard listings={listings} vehicle={vehicle} part={part} />
       <div className="overflow-x-auto p-6" tabIndex={0} aria-label="Scrollable listing comparison table">
         <table className="w-full min-w-[700px] border-collapse text-left text-xs text-slate-600">
           <thead>
@@ -126,7 +130,8 @@ export function ComparisonModal({ listings, onClose }: { listings: Listing[]; on
                       <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-slate-500">
                         <div><span className="font-semibold text-slate-600">Scope:</span> {fitmentScopeLabels[evidence.scope]}</div>
                         {evidence.provider && <div><span className="font-semibold text-slate-600">Provider:</span> {evidence.provider}</div>}
-                        {checkedAt && <div><span className="font-semibold text-slate-600">Checked:</span> {checkedAt}</div>}
+                        <div><span className="font-semibold text-slate-600">Fitment evidence checked:</span> {checkedAt || 'Unavailable'}</div>
+                        <div><span className="font-semibold text-slate-600">Listing freshness:</span> {comparisonListingFreshnessLabel(item)}</div>
                         {evidence.note && <p>{evidence.note}</p>}
                         <p className="text-slate-500">Marketplace data can omit engine, drivetrain, options, and part-number details. Confirm before buying.</p>
                       </div>

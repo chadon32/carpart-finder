@@ -25,8 +25,12 @@ export type Listing = {
   bestOfferAccepted?: boolean
   shortDescription?: string | null
   shippingCost?: number | null
+  coreCharge?: number | null
   deliveryMin?: string | null
   deliveryMax?: string | null
+  // Provider listing freshness is optional; absent data must remain visible
+  // as unavailable rather than being inferred from fitment evidence time.
+  listedAt?: string | null
   // True only when the provider returned explicit exact compatibility evidence.
   // Missing/false is always unverified and must never render as a guarantee.
   verifiedFitment?: boolean

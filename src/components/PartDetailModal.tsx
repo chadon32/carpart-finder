@@ -6,6 +6,7 @@ import { Modal } from './Modal'
 import { trackAddedToWatchlist, trackRetailerClick } from '../lib/analytics'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
 import { OutboundLink } from './OutboundLink'
+import { comparisonFitmentCheckedTimestamp, comparisonListingFreshnessLabel } from '../lib/comparisonShare'
 
 // RepairGuideModal pulls in react-markdown (heavy) and only renders when the
 // user clicks "Generate AI Guide" — load it (and its markdown deps) on demand.
@@ -16,11 +17,6 @@ const fitmentScopeLabels = {
   'year-make-model-trim': 'Year, make, model, and trim',
   'keyword-only': 'Keyword-only',
 } as const
-
-function formatCheckedAt(checkedAt: string) {
-  const date = new Date(checkedAt)
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString()
-}
 
 interface PartDetailModalProps {
   listing: Listing
@@ -175,12 +171,10 @@ export function PartDetailModal({
                   )}
                   <dt className="font-semibold">Evidence</dt>
                   <dd>{listing.fitmentEvidence.matchType || 'No structured compatibility match'}</dd>
-                  {formatCheckedAt(listing.fitmentEvidence.checkedAt) && (
-                    <>
-                      <dt className="font-semibold">Search checked by CarPartsRadar</dt>
-                      <dd>{formatCheckedAt(listing.fitmentEvidence.checkedAt)}</dd>
-                    </>
-                  )}
+                  <dt className="font-semibold">Fitment evidence checked</dt>
+                  <dd>{comparisonFitmentCheckedTimestamp(listing)}</dd>
+                  <dt className="font-semibold">Listing freshness</dt>
+                  <dd>{comparisonListingFreshnessLabel(listing)}</dd>
                 </dl>
                 <p className="mt-2 text-slate-500">
                   This marketplace compatibility match is not a fitment guarantee. Confirm engine, drivetrain, options, dimensions, and original part number on the retailer page before buying.

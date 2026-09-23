@@ -31,9 +31,10 @@ import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
 import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
 import { useAppContext } from './contexts/useAppContext'
-import { trackSearch } from './lib/analytics'
+import { trackGuideSearchStarted, trackSearch } from './lib/analytics'
 import { isValidPartQuery, normalizePartQuery } from './lib/searchInput.js'
 import { clearLocalUserData } from './lib/clearLocalUserData.js'
+import { guideSearchStart } from './data/guideSearch'
 
 function App() {
   const { user, darkMode, setDarkMode } = useAppContext()
@@ -41,6 +42,7 @@ function App() {
   const [step, setStep] = useState<Step | 'dashboard'>(initial.step)
   const [car, setCar] = useState<Car | null>(initial.car)
   const [part, setPart] = useState<string | null>(initial.part)
+  const [guide, setGuide] = useState<string | null>(initial.guide ?? null)
   const [showWatchlist, setShowWatchlist] = useState(false)
 
   const watchlist = useCart(user?.email)
@@ -63,6 +65,7 @@ function App() {
     recent.clear()
     setCar(null)
     setPart(null)
+    setGuide(null)
     setShowWatchlist(false)
     setStep('car')
     window.history.replaceState(null, '', window.location.pathname)
@@ -75,6 +78,7 @@ function App() {
     setStep(r.step)
     setCar(r.car)
     setPart(r.part)
+    setGuide(r.guide ?? null)
     setShowWatchlist(false)
   }
   // search shareable, bookmarkable, and refresh-safe.
@@ -108,7 +112,8 @@ function App() {
     const fullCar: Car = { ...selectedCar, trim: selectedCar.trim || '' }
     recent.record(fullCar, normalizedPart)
     trackSearch(fullCar.year, fullCar.make, fullCar.model, normalizedPart)
-    navigate({ step: 'results', car: fullCar, part: normalizedPart })
+    if (guide) trackGuideSearchStarted(guide)
+    navigate({ step: 'results', car: fullCar, part: normalizedPart, guide })
   }
 
   const goHome = () => {
@@ -125,8 +130,8 @@ function App() {
       if (step !== 'dashboard') return
     }
     if (step === 'dashboard') {
-      if (car && part) navigate({ step: 'results', car, part })
-      else if (car) navigate({ step: 'part', car, part: null })
+      if (car && part) navigate({ step: 'results', car, part, guide })
+      else if (car) navigate({ step: 'part', car, part: null, guide })
       else navigate({ step: 'car', car: null, part: null })
       return
     }
@@ -138,7 +143,8 @@ function App() {
   // Vercel also sends noindex for search URLs before JavaScript runs.
   const query = new URLSearchParams(window.location.search)
   const noIndex = showWatchlist || step === 'dashboard' ||
-    ['year', 'make', 'model', 'trim', 'part'].some((key) => query.has(key))
+    ['year', 'make', 'model', 'trim', 'part', 'guide'].some((key) => query.has(key))
+  const guideStart = guideSearchStart(guide)
   const vehicleLabel = car ? `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}` : ''
   const showingResults = step === 'results' && !showWatchlist && car && part
   const pageTitle = showingResults
@@ -289,8 +295,18 @@ function App() {
                     </div>
                   </div>
 
+                  {guideStart && (
+                    <section aria-labelledby="guide-search-start-heading" className="mb-6 rounded-2xl border border-brand-200/80 bg-brand-50/60 p-4 dark:border-brand-900/50 dark:bg-brand-950/20 sm:p-5">
+                      <p className="eyebrow text-brand-700 dark:text-brand-300">Starting from a buying guide</p>
+                      <h2 id="guide-search-start-heading" className="mt-1 text-base font-bold text-slate-950 dark:text-slate-50">{guideStart.title}</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                        After you confirm the vehicle, we will suggest <strong>{guideStart.part}</strong> for review. You can edit the part category before any listings are searched. This suggestion does not diagnose your vehicle.
+                      </p>
+                    </section>
+                  )}
+
                   <CarSelector
-                    onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null })}
+                    onConfirm={(selectedCar) => navigate({ step: 'part', car: selectedCar, part: null, guide })}
                     onSearchPart={(garageCar, garagePart) => runSearch(garageCar, garagePart)}
                   />
                   <RecentSearches
@@ -316,6 +332,8 @@ function App() {
                 <Suspense fallback={<ViewLoader />}>
                   <PartSelector
                     car={car}
+                    startingPart={guideStart?.part}
+                    startingGuideTitle={guideStart?.title}
                     onBack={goHome}
                     onSelect={(selectedPart) => runSearch(car, selectedPart)}
                   />
@@ -327,7 +345,7 @@ function App() {
                   fallback={<ViewLoader />}
                   car={car}
                   part={part}
-                  onBackToPart={() => navigate({ step: 'part', car, part: null })}
+                  onBackToPart={() => navigate({ step: 'part', car, part: null, guide })}
                   onBackToCar={goHome}
                   onAddToWatchlist={(listing) =>
                     watchlist.addItem(listing, `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`, part)

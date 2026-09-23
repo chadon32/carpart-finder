@@ -22,6 +22,7 @@ export function Combobox({
   groups,
   value,
   onChange,
+  onInputChange,
   disabled,
   allowFreeText,
   enterKeyHint,
@@ -36,6 +37,7 @@ export function Combobox({
   groups?: ComboboxGroup[]
   value: string
   onChange: (value: string) => void
+  onInputChange?: (value: string) => void
   disabled?: boolean
   allowFreeText?: boolean
   enterKeyHint?: 'search' | 'go' | 'done' | 'next'
@@ -187,6 +189,7 @@ export function Combobox({
             latestInputValue.current = e.target.value
             setEmptySubmit(false)
             setQuery(e.target.value)
+            onInputChange?.(e.target.value)
             if (!open) setOpen(true)
           }}
           onKeyDown={handleKeyDown}

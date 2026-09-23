@@ -18,6 +18,85 @@ function request(ip = '203.0.113.10') {
   return { ip, socket: { remoteAddress: ip } }
 }
 
+function tableFallbackAdmin({ tableError = null } = {}) {
+  const rows = new Map()
+  const operations = []
+  const admin = {
+    rows,
+    operations,
+    rpc: () => {
+      const result = Promise.resolve({ data: null, error: { code: 'PGRST202', message: 'function is missing' } })
+      result.abortSignal = () => result
+      return result
+    },
+    from(table) {
+      assert.equal(table, 'api_rate_limits')
+      const operation = { type: null, payload: null, filters: {} }
+      operations.push(operation)
+      const query = {
+        select() {
+          if (!operation.type) operation.type = 'select'
+          return query
+        },
+        insert(payload) {
+          operation.type = 'insert'
+          operation.payload = payload
+          return query
+        },
+        update(payload) {
+          operation.type = 'update'
+          operation.payload = payload
+          return query
+        },
+        eq(column, value) {
+          operation.filters[column] = value
+          return query
+        },
+        abortSignal() {
+          return query
+        },
+        maybeSingle() {
+          return cancellable(execute(false))
+        },
+        single() {
+          return cancellable(execute(true))
+        },
+      }
+      return query
+
+      function cancellable(result) {
+        const promise = Promise.resolve(result)
+        promise.abortSignal = () => promise
+        return promise
+      }
+
+      function execute(requireRow) {
+        if (tableError) return { data: null, error: tableError }
+        const key = operation.filters.key_hash || operation.payload?.key_hash
+        const existing = key ? rows.get(key) : null
+        if (operation.type === 'select') return { data: existing ? { ...existing } : null, error: null }
+        if (operation.type === 'insert') {
+          if (existing) return { data: null, error: { code: '23505' } }
+          rows.set(key, { ...operation.payload })
+          return { data: { ...operation.payload }, error: null }
+        }
+        if (operation.type === 'update') {
+          const matches = existing
+            && String(existing.window_start) === String(operation.filters.window_start)
+            && Number(existing.request_count) === Number(operation.filters.request_count)
+          if (!matches) return { data: null, error: null }
+          rows.set(key, { ...existing, ...operation.payload })
+          return { data: { ...rows.get(key) }, error: null }
+        }
+        return requireRow
+          ? { data: null, error: { code: 'test-unhandled-operation' } }
+          : { data: null, error: null }
+      }
+    },
+  }
+  return admin
+}
+
 test('two limiter instances share one atomic backend counter', async () => {
   const rows = new Map()
   const calls = []
@@ -63,6 +142,55 @@ test('two limiter instances share one atomic backend counter', async () => {
   assert.equal(calls[0].args.p_key_hash, calls[1].args.p_key_hash)
   assert.match(calls[0].args.p_key_hash, /^[a-f0-9]{64}$/)
   assert.notEqual(calls[0].args.p_key_hash, req.ip)
+})
+
+test('a missing RPC can use the shared table without falling back to local state', async () => {
+  const admin = tableFallbackAdmin()
+  const limiter = createSharedRateLimiter({
+    name: 'table-fallback',
+    windowMs: 60_000,
+    max: 1,
+    message: 'Too many attempts.',
+    failClosed: true,
+    admin,
+    production: () => true,
+  })
+
+  const first = response()
+  let firstNext = 0
+  await limiter(request(), first, () => { firstNext += 1 })
+  assert.equal(firstNext, 1)
+  assert.equal(first.result.statusCode, 200)
+
+  const second = response()
+  let secondNext = 0
+  await limiter(request(), second, () => { secondNext += 1 })
+  assert.equal(secondNext, 0)
+  assert.equal(second.result.statusCode, 429)
+  assert.equal(admin.rows.size, 1)
+  const [keyHash, row] = [...admin.rows.entries()][0]
+  assert.match(keyHash, /^[a-f0-9]{64}$/)
+  assert.equal(row.request_count, 2)
+  assert.equal(row.key_hash, keyHash)
+  assert.ok(!JSON.stringify(row).includes('203.0.113.10'))
+})
+
+test('a missing RPC and missing table still fail closed', async () => {
+  const limiter = createSharedRateLimiter({
+    name: 'missing-table',
+    windowMs: 60_000,
+    max: 1,
+    message: 'Too many attempts.',
+    failClosed: true,
+    admin: tableFallbackAdmin({ tableError: { code: 'PGRST205' } }),
+    production: () => true,
+  })
+  const result = response()
+  let nextCalls = 0
+  await limiter(request(), result, () => { nextCalls += 1 })
+  assert.equal(nextCalls, 0)
+  assert.equal(result.result.statusCode, 503)
+  assert.deepEqual(result.result.body, { error: 'Rate limiting is temporarily unavailable. Please try again.' })
 })
 
 test('production fails closed when the shared limiter is unavailable', async () => {

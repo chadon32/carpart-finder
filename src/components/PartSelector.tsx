@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Zap, AlertTriangle, Search, ArrowRight, Wrench, ExternalLink, Camera, Image as ImageIcon, CheckCircle2 } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { Combobox } from './Combobox'
@@ -9,6 +9,8 @@ import { maintenanceKitsForVehicle } from '../data/maintenanceKits'
 import { MAX_PART_QUERY_LENGTH } from '../lib/searchInput.js'
 import { classifyDtc } from '../lib/dtcValidation.js'
 import { OutboundLink } from './OutboundLink'
+import { PartIdentificationDemo } from './PartIdentificationDemo'
+import { trackPartIdentificationDemo } from '../lib/analytics'
 
 // Phone camera photos are routinely 3-8MB raw, but the AI model only needs
 // enough resolution to recognize a part, and the request has to fit under
@@ -156,14 +158,21 @@ const COMMON_DTCs: Record<string, { definition: string; parts: string[]; descrip
 
 export function PartSelector({
   car,
+  startingPart,
+  startingGuideTitle,
   onSelect,
   onBack,
 }: {
   car: Car
+  startingPart?: string
+  startingGuideTitle?: string
   onSelect: (part: string) => void
   onBack: () => void
 }) {
   const [searchMethod, setSearchMethod] = useState<SearchMethod>('name')
+  const [partName, setPartName] = useState(startingPart ?? '')
+  const [reviewingGuideStart, setReviewingGuideStart] = useState(Boolean(startingPart))
+  const photoDemoViewed = useRef(false)
   const [dtcInput, setDtcInput] = useState('')
 
   // "Describe a problem" tab state
@@ -186,6 +195,24 @@ export function PartSelector({
   const [photoResult, setPhotoResult] = useState<{ identified: boolean; partName: string | null } | null>(null)
   const [photoPartName, setPhotoPartName] = useState('')
   const [photoError, setPhotoError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (searchMethod !== 'photo' || photoDemoViewed.current) return
+    photoDemoViewed.current = true
+    trackPartIdentificationDemo('viewed')
+  }, [searchMethod])
+
+  const handlePartNameChange = (value: string) => {
+    setPartName(value)
+    if (!reviewingGuideStart) onSelect(value)
+  }
+
+  const confirmGuidePart = () => {
+    const value = partName.trim()
+    if (!value) return
+    setReviewingGuideStart(false)
+    onSelect(value)
+  }
 
   const initChecklist = (match: DiagnosisMatch) => {
     const next: Record<string, boolean> = {}
@@ -666,13 +693,26 @@ export function PartSelector({
         </div>
       ) : searchMethod === 'name' ? (
         <>
+          {reviewingGuideStart && startingPart && (
+            <section aria-labelledby="guide-part-review-heading" className="mb-5 rounded-xl border border-brand-200/80 bg-brand-50/50 p-4 dark:border-brand-900/50 dark:bg-brand-950/20">
+              <p className="eyebrow text-brand-700 dark:text-brand-300">Review before searching</p>
+              <h3 id="guide-part-review-heading" className="mt-1 text-sm font-bold text-slate-950 dark:text-slate-50">Suggested from {startingGuideTitle || 'this guide'}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                The part category is editable. Confirm it below to begin the normal marketplace search. A guide does not establish diagnosis or fitment.
+              </p>
+              <button type="button" onClick={confirmGuidePart} disabled={!partName.trim()} className="btn btn-primary mt-3 w-full text-xs sm:w-auto">
+                Search {partName || startingPart} <ArrowRight size={14} />
+              </button>
+            </section>
+          )}
           <div>
             <Combobox
               label="Part search"
               placeholder="Search by part name or OEM number (e.g. Brake Rotors, 04465-0K010)"
               options={partTypes.map((p) => p.name)}
-              value=""
-              onChange={(part) => onSelect(part)}
+              value={partName}
+              onChange={handlePartNameChange}
+              onInputChange={setPartName}
               allowFreeText
               enterKeyHint="search"
               maxLength={MAX_PART_QUERY_LENGTH}
@@ -735,6 +775,13 @@ export function PartSelector({
             <h3 className="section-title">Don't know the part name?</h3>
             <p className="text-sm text-slate-500 mt-1">Take a clear photo and our AI will try to identify the part.</p>
           </div>
+
+          <PartIdentificationDemo
+            onTryPhoto={() => {
+              trackPartIdentificationDemo('open_tool')
+              document.getElementById('part-photo-input')?.click()
+            }}
+          />
           
           {!photoPreview ? (
             <div className="space-y-3">

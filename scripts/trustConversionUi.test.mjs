@@ -14,11 +14,13 @@ test('comparison and detail views keep marketplace fitment language cautious and
   assert.match(comparison, /Marketplace compatibility match/)
   assert.match(comparison, /Scope:/)
   assert.match(comparison, /Provider:/)
-  assert.match(comparison, /Checked:/)
+  assert.match(comparison, /Fitment evidence checked/)
+  assert.match(comparison, /Listing freshness/)
   assert.match(comparison, /Marketplace data can omit engine/)
   assert.match(detail, /Scope/)
   assert.match(detail, /Provider/)
-  assert.match(detail, /Checked/)
+  assert.match(detail, /Fitment evidence checked/)
+  assert.match(detail, /Listing freshness/)
   assert.match(detail, /not a fitment guarantee/)
 })
 
@@ -91,4 +93,19 @@ test('web AI repair guidance renders only inert allowlisted Markdown', async () 
   assert.match(guide, /allowedElements=/)
   assert.match(guide, /unwrapDisallowed/)
   assert.match(guide, /skipHtml/)
+})
+
+test('part-identification demo uses a local authored vector with adjacent provenance', async () => {
+  const [demo, provenance] = await Promise.all([
+    readSource('src/components/PartIdentificationDemo.tsx'),
+    readSource('public/editorial/parts-workbench-demo.provenance.txt'),
+  ])
+
+  assert.match(demo, /parts-workbench-demo\.svg/)
+  assert.doesNotMatch(demo, /parts-workbench\.webp/)
+  assert.match(provenance, /Owner\/source:/)
+  assert.match(provenance, /License:/)
+  assert.match(provenance, /Authored\/reviewed:/)
+  assert.match(provenance, /Privacy review:/)
+  assert.match(provenance, /EXIF\/embedding review:/)
 })

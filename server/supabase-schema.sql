@@ -291,6 +291,7 @@ create table if not exists public.api_rate_limits (
 
 alter table public.api_rate_limits enable row level security;
 revoke all on table public.api_rate_limits from public, anon, authenticated;
+grant select, insert, update, delete on table public.api_rate_limits to service_role;
 create index if not exists idx_api_rate_limits_updated_at on public.api_rate_limits(updated_at);
 
 create or replace function public.consume_api_rate_limit(

@@ -43,6 +43,7 @@ import {
 } from '../lib/listingHelpers'
 import { maintenanceKitForSearch } from '../data/maintenanceKits'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
+import { guideForPart } from '../data/guideSearch'
 
 type SortKey = 'value' | 'price' | 'rating'
 type ConditionFilter = 'all' | 'new' | 'used'
@@ -150,6 +151,8 @@ export function ResultsList({
       .filter((total): total is number => total != null)
     return completeTotals.length > 0 ? Math.min(...completeTotals) : 0
   }, [results])
+
+  const matchingGuide = guideForPart(part)
 
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
 
@@ -633,6 +636,14 @@ export function ResultsList({
                   <p className="mt-2 max-w-xl text-xs leading-relaxed text-slate-500">
                     We rank listings with marketplace compatibility evidence first. A shared part may be titled for another vehicle, so open Details to review the match before buying.
                   </p>
+                  {matchingGuide && (
+                    <a
+                      href={`/guides/${matchingGuide.id}.html`}
+                      className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-brand-700 underline decoration-brand-300 underline-offset-4 hover:text-brand-800 dark:text-brand-300 dark:decoration-brand-700 dark:hover:text-brand-200"
+                    >
+                      Read the matching guide: {matchingGuide.title}
+                    </a>
+                  )}
                   <div className="font-display text-3xl text-slate-950">
                     {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
                     {priceRange && (
@@ -859,7 +870,7 @@ export function ResultsList({
 
       {showCompareModal && compareList.length > 1 && (
         <Suspense fallback={null}>
-          <ComparisonModal listings={compareList} onClose={() => setShowCompareModal(false)} />
+          <ComparisonModal listings={compareList} vehicle={car} part={part} onClose={() => setShowCompareModal(false)} />
         </Suspense>
       )}
 
