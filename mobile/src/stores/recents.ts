@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Car } from '../api/types'
+import { skipServerWebHydration } from '../lib/persistence'
 
 export type RecentSearch = { car: Car; part: string; at: number }
 
@@ -31,6 +32,10 @@ export const useRecents = create<RecentsState>()(
         })),
       clear: () => set({ searches: [] }),
     }),
-    { name: 'cpr-recents', storage: createJSONStorage(() => AsyncStorage) }
+    {
+      name: 'cpr-recents',
+      storage: createJSONStorage(() => AsyncStorage),
+      skipHydration: skipServerWebHydration,
+    }
   )
 )

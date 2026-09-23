@@ -1,0 +1,45 @@
+# Native app and local QA artifacts are not part of the web/API deployment.
+mobile/
+docs/audits/
+screenshots/
+shots/
+videos/
+terminals/
+.agents/
+.claude/
+
+# Environment files and secret material never belong in the deployment input.
+.env
+.env.*
+server/.env
+server/.env.*
+secrets/
+**/secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Local creative exports and one-off generation helpers.
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.avi
+*.wav
+*.mp3
+frame_*.jpg
+generate_audio_*.cjs
+generate_scenes*.cjs
+fix.js
+fix_*.js
+fix_*.cjs
+
+# Local logs and already-built output; Vercel rebuilds dist from source.
+.codex-*.log
+dist/
+
+# Benchmark captures, traces, and other local evidence are not runtime assets.
+artifacts/
+benchmark-shots/

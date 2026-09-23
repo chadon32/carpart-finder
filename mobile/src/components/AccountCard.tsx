@@ -1,21 +1,37 @@
-import { useCallback, useState } from 'react'
-import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { useCallback, useRef, useState } from 'react'
+import { Alert, View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
 import { useAuth } from '../stores/auth'
 import { getPriceAlerts, deleteSavedSearch, type PriceAlert } from '../api/client'
 import { useThemeColors, brand, dataFont } from '../theme'
+import { openPrivacyPolicy } from '../lib/legal'
 
 // Sign in / sign up / signed-in summary with the user's price alerts.
 // Accounts are shared with carpartsradar.com — same email works both places.
-export function AccountCard() {
+type AccountCardProps = {
+  signedOutMessage?: string
+  onAuthenticated?: () => void
+  initialEmail?: string
+  requiredEmail?: string
+  allowSignup?: boolean
+}
+
+export function AccountCard({
+  signedOutMessage,
+  onAuthenticated,
+  initialEmail = '',
+  requiredEmail,
+  allowSignup = true,
+}: AccountCardProps = {}) {
   const c = useThemeColors()
   const { user, status, login, signup, logout } = useAuth()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ text: string; kind: 'info' | 'error' } | null>(null)
   const [alerts, setAlerts] = useState<PriceAlert[] | null>(null)
+  const passwordInput = useRef<TextInput>(null)
 
   // Refetch on every focus of the Garage tab so alerts created from a
   // listing (while this card stayed mounted) show up immediately.
@@ -38,6 +54,10 @@ export function AccountCard() {
       setMsg({ text: 'Enter your email address.', kind: 'error' })
       return
     }
+    if (requiredEmail && email.trim().toLowerCase() !== requiredEmail.trim().toLowerCase()) {
+      setMsg({ text: `Sign in with ${requiredEmail} to continue account deletion.`, kind: 'error' })
+      return
+    }
     if (password.length < 8) {
       setMsg({ text: 'Password must be at least 8 characters.', kind: 'error' })
       return
@@ -53,6 +73,8 @@ export function AccountCard() {
         })
         setMode('login')
         setPassword('')
+      } else {
+        onAuthenticated?.()
       }
     } catch (e) {
       setMsg({
@@ -71,6 +93,19 @@ export function AccountCard() {
       setAlerts((cur) => cur?.filter((x) => x.id !== a.id) ?? null)
     } catch {
       // Leave the row; the next refresh reflects reality.
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      Alert.alert(
+        'Sign out needs attention',
+        error instanceof Error
+          ? error.message
+          : 'Sign out could not be fully completed. Please reopen the app and try again.'
+      )
     }
   }
 
@@ -131,7 +166,13 @@ export function AccountCard() {
                       Alert below ${Number(a.target_price).toFixed(2)}
                     </Text>
                   </View>
-                  <Pressable onPress={() => removeAlert(a)} hitSlop={10}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove price alert for ${a.saved_searches?.part ?? 'saved search'}`}
+                    onPress={() => removeAlert(a)}
+                    hitSlop={6}
+                    style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+                  >
                     <Text style={{ color: '#be123c', fontWeight: '700' }}>Remove</Text>
                   </Pressable>
                 </View>
@@ -139,7 +180,24 @@ export function AccountCard() {
             </View>
           )}
           <Pressable
-            onPress={logout}
+            accessibilityRole="button"
+            onPress={() => router.push('/profile')}
+            style={{
+              minHeight: 44,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: c.border,
+            }}
+          >
+            <Text style={{ color: c.text, fontWeight: '700' }}>Profile & Settings</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+            accessibilityHint="Signs you out of this device"
+            onPress={() => void handleLogout()}
             style={{
               minHeight: 44,
               borderRadius: 12,
@@ -154,30 +212,54 @@ export function AccountCard() {
         </>
       ) : (
         <>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor={c.subtext}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            style={field}
-          />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password (8+ characters)"
-            placeholderTextColor={c.subtext}
-            secureTextEntry
-            style={field}
-          />
+          {signedOutMessage ? (
+            <Text accessibilityRole="alert" style={{ color: c.text, fontSize: 14, lineHeight: 20 }}>
+              {signedOutMessage}
+            </Text>
+          ) : null}
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>Email address</Text>
+            <TextInput
+              accessibilityLabel="Email address"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={c.subtext}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              keyboardType="email-address"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInput.current?.focus()}
+              style={field}
+            />
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>Password</Text>
+            <TextInput
+              ref={passwordInput}
+              accessibilityLabel="Password"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="8 or more characters"
+              placeholderTextColor={c.subtext}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              textContentType={mode === 'login' ? 'password' : 'newPassword'}
+              secureTextEntry
+              returnKeyType="go"
+              onSubmitEditing={() => void submit()}
+              style={field}
+            />
+          </View>
           {msg ? (
-            <Text style={{ color: msg.kind === 'error' ? '#be123c' : '#047857', fontSize: 13, fontWeight: '600' }}>
+            <Text accessibilityRole="alert" style={{ color: msg.kind === 'error' ? '#be123c' : '#047857', fontSize: 13, fontWeight: '600' }}>
               {msg.text}
             </Text>
           ) : null}
           <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ busy, disabled: busy }}
             onPress={submit}
             disabled={busy}
             style={{
@@ -196,23 +278,37 @@ export function AccountCard() {
               </Text>
             )}
           </Pressable>
-          <Pressable
-            onPress={() => {
-              setMode((m) => (m === 'login' ? 'signup' : 'login'))
-              setMsg(null)
-            }}
-            hitSlop={8}
-            style={{ alignItems: 'center', minHeight: 32, justifyContent: 'center' }}
-          >
-            <Text style={{ color: brand, fontWeight: '600' }}>
-              {mode === 'login' ? 'New here? Create an account' : 'Have an account? Log in'}
-            </Text>
-          </Pressable>
+          {allowSignup ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setMode((m) => (m === 'login' ? 'signup' : 'login'))
+                setMsg(null)
+                setPassword('')
+              }}
+              hitSlop={8}
+              style={{ alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+            >
+              <Text style={{ color: brand, fontWeight: '600' }}>
+                {mode === 'login' ? 'New here? Create an account' : 'Have an account? Log in'}
+              </Text>
+            </Pressable>
+          ) : null}
           <Text style={{ color: c.subtext, fontSize: 12 }}>
             One account for the app and carpartsradar.com.
           </Text>
         </>
       )}
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel="Privacy Policy"
+        accessibilityHint="Opens the Privacy Policy in your browser"
+        onPress={() => void openPrivacyPolicy()}
+        hitSlop={8}
+        style={{ alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+      >
+        <Text style={{ color: brand, fontWeight: '600' }}>Privacy Policy</Text>
+      </Pressable>
     </View>
   )
 }

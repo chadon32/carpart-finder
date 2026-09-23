@@ -1,0 +1,9 @@
+CarPartsRadar part-identification demo asset provenance
+
+Asset: public/editorial/parts-workbench-demo.svg
+Owner/source: New code-authored SVG created in the CarPartsRadar repository for this feature. It is an original project illustration; it is not copied from a photograph, vendor catalog, retailer listing, model response, or user upload.
+License: No third-party license is claimed or required. Treat this file as an original project asset governed by the repository's applicable project terms, and obtain project-owner approval before reuse outside this repository.
+Authored/reviewed: 2026-09-23
+Privacy review: Passed source review. The illustration contains only geometric vector shapes; no person, license plate, VIN, vehicle identifier, account identifier, email address, customer detail, or user content is present.
+EXIF/embedding review: Passed source review. SVG has no raster EXIF metadata, embedded bitmap, external URL, font dependency, or remote resource.
+Usage boundary: This is an illustrative visual category demo. It is not a photograph, vehicle diagnosis, personal test, purchase result, or fitment confirmation.

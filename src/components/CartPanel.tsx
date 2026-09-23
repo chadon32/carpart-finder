@@ -13,6 +13,9 @@ import {
 } from 'lucide-react'
 import type { CartItem } from '../hooks/useCart'
 import { fetchPricesChunked, type PriceInfo } from '../api/client'
+import { trackRetailerClick } from '../lib/analytics'
+import { AffiliateDisclosure } from './AffiliateDisclosure'
+import { OutboundLink } from './OutboundLink'
 
 type PriceCheck = Record<string, PriceInfo>
 
@@ -91,14 +94,22 @@ function CompareTable({ items }: { items: CartItem[] }) {
             <td className="p-3" />
             {items.map((item) => (
               <td key={item.cartId} className="p-3">
-                <a
+                <OutboundLink
                   href={item.link}
+                  onClick={() => trackRetailerClick({
+                    retailer: item.source,
+                    placement: 'watchlist-compare',
+                    vehicleLabel: item.carLabel,
+                    part: item.part,
+                    listingId: item.id,
+                    fitmentStatus: item.verifiedFitment === true ? 'verified' : 'unverified',
+                  })}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-primary px-3 py-1.5 text-xs"
                 >
                   Buy on {item.source} <ExternalLink size={13} />
-                </a>
+                </OutboundLink>
               </td>
             ))}
           </tr>
@@ -164,6 +175,8 @@ export function CartPanel({
         </div>
       </div>
 
+      {items.length > 0 && <AffiliateDisclosure className="mt-4" />}
+
       {checkError && <p className="mt-3 text-sm text-red-600">Couldn't check prices: {checkError}</p>}
       {prices && !checkError && (
         <p className="mt-3 text-xs text-slate-400">Re-checked against live listings just now.</p>
@@ -209,14 +222,22 @@ export function CartPanel({
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
                   <span className="font-data text-lg font-bold text-slate-900">${item.price.toFixed(2)}</span>
                   <div className="flex gap-1.5">
-                    <a
+                    <OutboundLink
                       href={item.link}
+                      onClick={() => trackRetailerClick({
+                        retailer: item.source,
+                        placement: 'watchlist',
+                        vehicleLabel: item.carLabel,
+                        part: item.part,
+                        listingId: item.id,
+                        fitmentStatus: item.verifiedFitment === true ? 'verified' : 'unverified',
+                      })}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-primary px-3 py-1.5 text-xs"
                     >
                       Buy on {item.source} <ExternalLink size={13} />
-                    </a>
+                    </OutboundLink>
                     <button
                       type="button"
                       onClick={() => onRemove(item.cartId)}

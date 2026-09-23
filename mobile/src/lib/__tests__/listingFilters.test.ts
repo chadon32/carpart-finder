@@ -4,10 +4,10 @@ import type { Listing } from '../../api/types'
 const l = (over: Partial<Listing>): Listing =>
   ({ id: Math.random().toString(), price: 10, condition: 'New', crossBorder: false, sellerFeedbackPercentage: '99.0', ...over }) as Listing
 
-test('best preserves server order', () => {
+test('best ranks by total cost and seller trust instead of assuming server order', () => {
   const a = l({ id: 'a', price: 30 })
   const b = l({ id: 'b', price: 10 })
-  expect(applyListingFilters([a, b], defaultFilters).map((x) => x.id)).toEqual(['a', 'b'])
+  expect(applyListingFilters([a, b], defaultFilters).map((x) => x.id)).toEqual(['b', 'a'])
 })
 
 test('price and total sort ascending', () => {
@@ -15,6 +15,16 @@ test('price and total sort ascending', () => {
   const b = l({ id: 'b', price: 10, shippingCost: 25 })
   expect(applyListingFilters([a, b], { ...defaultFilters, sort: 'price' })[0].id).toBe('b')
   expect(applyListingFilters([a, b], { ...defaultFilters, sort: 'total' })[0].id).toBe('a')
+})
+
+test('unknown shipping stays visible but sorts after complete totals and value estimates', () => {
+  const unknown = l({ id: 'unknown', price: 1, shippingCost: null })
+  const complete = l({ id: 'complete', price: 20, shippingCost: 5 })
+
+  expect(applyListingFilters([unknown, complete], { ...defaultFilters, sort: 'total' }).map((x) => x.id))
+    .toEqual(['complete', 'unknown'])
+  expect(applyListingFilters([unknown, complete], defaultFilters).map((x) => x.id))
+    .toEqual(['complete', 'unknown'])
 })
 
 test('rating sorts descending with unrated last', () => {

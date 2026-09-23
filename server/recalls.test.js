@@ -85,6 +85,29 @@ test('an upstream failure returns 502', async () => {
   assert.equal(res.status, 502)
 })
 
+test('malformed upstream data fails honestly instead of becoming an empty or corrupted recall result', async () => {
+  const invalid = [null, {}, { results: null }, { results: 'invalid' }, { results: [null] }, { results: [{ Component: {} }] }]
+  for (const [index, payload] of invalid.entries()) {
+    stubRecalls(() => new Response(JSON.stringify(payload), { status: 200 }))
+    const res = await fetch(`${base}/api/recalls?year=${2000 + index}&make=Ford&model=Escape`)
+    assert.equal(res.status, 502, JSON.stringify(payload))
+  }
+})
+
+test('malformed recall responses are not cached and the next request can recover', async () => {
+  let calls = 0
+  stubRecalls(() => {
+    calls += 1
+    return new Response(JSON.stringify(calls === 1 ? {} : { results: [] }), { status: 200 })
+  })
+  const url = `${base}/api/recalls?year=2017&make=Mazda&model=CX-5`
+  assert.equal((await fetch(url)).status, 502)
+  const recovered = await fetch(url)
+  assert.equal(recovered.status, 200)
+  assert.deepEqual((await recovered.json()).recalls, [])
+  assert.equal(calls, 2)
+})
+
 test('results are cached per vehicle (second call skips upstream)', async () => {
   let calls = 0
   stubRecalls(() => {

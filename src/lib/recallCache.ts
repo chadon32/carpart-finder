@@ -1,4 +1,5 @@
 import type { Recall } from '../api/client'
+import { isRecallList } from '../../shared/recalls.js'
 
 // Session-scoped recall cache: the garage badge only shows a count that was
 // actually fetched this session — never a placeholder or a guess.
@@ -8,7 +9,8 @@ const cacheKey = (year: string, make: string, model: string) =>
 export function readCachedRecalls(year: string, make: string, model: string): Recall[] | null {
   try {
     const raw = sessionStorage.getItem(cacheKey(year, make, model))
-    return raw ? (JSON.parse(raw) as Recall[]) : null
+    const parsed: unknown = raw ? JSON.parse(raw) : null
+    return isRecallList(parsed) ? parsed : null
   } catch {
     return null
   }

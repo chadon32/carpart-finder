@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking, Alert } from 'react-native'
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { fetchRecalls, type Recall } from '@/api/client'
 import { maintenanceForVehicle } from '@/data/maintenanceSchedule'
@@ -20,10 +20,18 @@ export default function VehicleHealth() {
 
   useFocusEffect(
     useCallback(() => {
+      const controller = new AbortController()
+      let cancelled = false
       setFailed(false)
-      fetchRecalls(year, make, model)
-        .then((r) => setRecalls(r.recalls))
-        .catch(() => setFailed(true))
+      setRecalls(null)
+      fetchRecalls(year, make, model, controller.signal)
+        .then((r) => { if (!cancelled) setRecalls(r.recalls) })
+        .catch(() => { if (!cancelled) setFailed(true) })
+      return () => {
+        cancelled = true
+        controller.abort()
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- attempt is an explicit retry revision for the same vehicle.
     }, [year, make, model, attempt])
   )
 
@@ -36,16 +44,34 @@ export default function VehicleHealth() {
       </Text>
 
       <Text style={{ color: c.text, fontSize: 20, fontWeight: '800' }}>
-        Safety recalls
+        Model recall notices
         {recalls ? ` (${recalls.length})` : ''}
       </Text>
 
+      <Text style={{ color: c.subtext, fontSize: 13 }}>
+        NHTSA notices for this year, make, and model — not your VIN's repair status.
+      </Text>
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel="Check your VIN on NHTSA"
+        accessibilityHint="Opens the NHTSA recall website in your browser"
+        onPress={() => {
+          void Linking.openURL('https://www.nhtsa.gov/recalls').catch(() => {
+            Alert.alert('Could not open NHTSA', 'Open https://www.nhtsa.gov/recalls in your browser to check your VIN.')
+          })
+        }}
+        style={{ minHeight: 44, justifyContent: 'center' }}
+      >
+        <Text style={{ color: c.brand, fontWeight: '700', textDecorationLine: 'underline' }}>Check your VIN on NHTSA</Text>
+      </Pressable>
+
       {failed ? (
-        <View style={{ gap: 10 }}>
+        <View accessibilityRole="alert" style={{ gap: 10 }}>
           <Text style={{ color: c.subtext }}>
             Couldn't load recall data — this does NOT mean there are no recalls.
           </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={() => setAttempt((a) => a + 1)}
             style={{
               alignSelf: 'flex-start',
@@ -61,10 +87,10 @@ export default function VehicleHealth() {
           </Pressable>
         </View>
       ) : recalls == null ? (
-        <ActivityIndicator style={{ marginVertical: 12 }} />
+        <ActivityIndicator accessibilityLabel="Loading model recall notices" style={{ marginVertical: 12 }} />
       ) : recalls.length === 0 ? (
-        <Text style={{ color: '#047857', fontWeight: '600' }}>
-          ✓ No open recalls found for this vehicle (NHTSA)
+        <Text style={{ color: c.subtext }}>
+          No recall notices were returned for this model. Check your VIN on NHTSA to confirm your vehicle's recall status.
         </Text>
       ) : (
         recalls.map((r, i) => (
@@ -82,7 +108,7 @@ export default function VehicleHealth() {
             <Text style={{ color: c.text, fontWeight: '800' }}>{r.component ?? 'Recall'}</Text>
             {r.summary ? <Text style={{ color: c.subtext, fontSize: 14, lineHeight: 20 }}>{r.summary}</Text> : null}
             {r.consequence ? (
-              <Text style={{ color: '#be123c', fontSize: 13 }}>Risk: {r.consequence}</Text>
+              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>Risk: {r.consequence}</Text>
             ) : null}
             {r.remedy ? <Text style={{ color: c.subtext, fontSize: 13 }}>Remedy: {r.remedy}</Text> : null}
             {r.campaignNumber ? (
@@ -99,6 +125,9 @@ export default function VehicleHealth() {
         Broad industry rules of thumb — not a vehicle-specific schedule. Your owner's manual is
         the source of truth.
       </Text>
+      <Text style={{ color: c.subtext, fontSize: 13 }}>
+        Engine-specific services are omitted because this vehicle's engine is not confirmed.
+      </Text>
       <View
         style={{
           backgroundColor: c.card,
@@ -111,6 +140,9 @@ export default function VehicleHealth() {
         {maintenance.map((m, i) => (
           <Pressable
             key={m.part}
+            accessibilityRole="button"
+            accessibilityLabel={`Shop ${m.part}`}
+            accessibilityHint="Opens marketplace results for this general maintenance item"
             onPress={() =>
               router.push({ pathname: '/results', params: { year, make, model, trim: trim ?? '', part: m.part } })
             }

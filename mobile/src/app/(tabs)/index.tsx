@@ -24,11 +24,12 @@ export default function SearchScreen() {
             </Text>
           </View>
           <Text style={{ color: c.subtext, marginTop: 4 }}>
-            Live part prices, checked against your exact vehicle.
+            Live part prices with marketplace fitment evidence kept separate from unverified results.
           </Text>
         </View>
 
         <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/vehicle-picker')}
           style={{
             backgroundColor: c.brand,
@@ -62,12 +63,20 @@ export default function SearchScreen() {
               <Text style={{ color: c.subtext, fontSize: 12, letterSpacing: 1, fontFamily: dataFont }}>
                 RECENT SEARCHES
               </Text>
-              <Pressable onPress={clearRecents} hitSlop={8}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear recent searches"
+                onPress={clearRecents}
+                hitSlop={8}
+                style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
                 <Text style={{ color: c.subtext, fontSize: 12, fontWeight: '700' }}>Clear</Text>
               </Pressable>
             </View>
             {recents.slice(0, 4).map((r) => (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Search ${r.part} for ${r.car.year} ${r.car.make} ${r.car.model}`}
                 key={`${r.car.year}-${r.car.make}-${r.car.model}-${r.part}`}
                 onPress={() =>
                   router.push({

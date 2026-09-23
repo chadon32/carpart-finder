@@ -1,45 +1,12 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { getCurrentUser, logoutUser, ApiError } from '../api/supabase'
-
-interface User {
-  name: string
-  email: string
-}
-
-export interface SavedSearch {
-  id: string
-  year: string
-  make: string
-  model: string
-  trim?: string | null
-  part: string
-  created_at?: string
-}
-
-export interface PriceAlert {
-  id: string
-  saved_search_id?: string
-  target_price: number
-  triggered_at?: string | null
-  last_price?: number | null
-  saved_searches?: Pick<SavedSearch, 'part' | 'year' | 'make' | 'model'> | null
-}
-
-interface AccountData {
-  searches: SavedSearch[]
-  alerts: PriceAlert[]
-}
-
-interface AppContextType {
-  user: User | null
-  setUser: (user: User | null) => void
-  accountData: AccountData | null
-  setAccountData: React.Dispatch<React.SetStateAction<AccountData | null>>
-  darkMode: boolean
-  setDarkMode: (mode: boolean) => void
-}
-
-const AppContext = createContext<AppContextType | undefined>(undefined)
+import { useState, useEffect, type ReactNode } from 'react'
+import {
+  getCurrentUser,
+  logoutUser,
+  reconcilePendingAccountDeletion,
+  ApiError,
+} from '../api/supabase'
+import { AppContext, type AccountData, type User } from './AppContextValue'
+import { clearLocalUserData } from '../lib/clearLocalUserData.js'
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -124,11 +91,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
 
-    getCurrentUser()
-      .then(() => {
+    const verifySession = async () => {
+      if (await reconcilePendingAccountDeletion()) {
         if (cancelled) return
-      })
-      .catch(async (err) => {
+        clearLocalUserData()
+        setUser(null)
+        return
+      }
+
+      try {
+        await getCurrentUser()
+      } catch (err) {
         if (cancelled) return
         // Only a definitive answer from the server ends the session. A network
         // failure means we don't know, so keep the cached user rather than
@@ -138,10 +111,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const definitive = err instanceof ApiError && [401, 403, 503].includes(err.status)
         if (!definitive) return
 
-        await logoutUser() // clears the stale cpf_token cookie server-side
-        localStorage.removeItem('carpartsradar-user')
-        setUser(null)
-      })
+        try {
+          await logoutUser() // clears the stale cpf_token cookie server-side
+        } catch {
+          // The preceding /me response already proved the session invalid.
+          // Local sign-out must still finish when the cookie-clear request
+          // encounters a second network failure.
+        } finally {
+          localStorage.removeItem('carpartsradar-user')
+          setUser(null)
+        }
+      }
+    }
+    void verifySession()
     return () => {
       cancelled = true
     }
@@ -153,12 +135,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
       {children}
     </AppContext.Provider>
   )
-}
-
-export function useAppContext() {
-  const context = useContext(AppContext)
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider')
-  }
-  return context
 }

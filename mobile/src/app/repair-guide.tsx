@@ -1,37 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import Markdown from 'react-native-markdown-display'
 import { fetchRepairGuide } from '@/api/client'
+import { SafeRepairGuide } from '@/components/SafeRepairGuide'
 import { useThemeColors, brand } from '@/theme'
 
 export default function RepairGuide() {
   const c = useThemeColors()
-  const { year, make, model, part } = useLocalSearchParams<{
+  const { year, make, model, trim, part, listingId, source, fitmentProof } = useLocalSearchParams<{
     year: string
     make: string
     model: string
+    trim?: string
     part: string
+    listingId: string
+    source: string
+    fitmentProof: string
   }>()
   const [guide, setGuide] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const run = useCallback(async () => {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
-    setFailed(false)
+    setError(null)
     setGuide(null)
     try {
-      const r = await fetchRepairGuide(year, make, model, part, controller.signal)
+      const r = await fetchRepairGuide(
+        { year, make, model, trim: trim ?? '', part, listingId, source, fitmentProof },
+        controller.signal
+      )
       setGuide(r.guide)
     } catch (e) {
       // A deliberate dismissal is not a failure.
       if ((e as Error)?.name === 'AbortError') return
-      setFailed(true)
+      setError(e instanceof Error ? e.message : 'The repair guide is unavailable. Try again.')
     }
-  }, [year, make, model, part])
+  }, [year, make, model, trim, part, listingId, source, fitmentProof])
 
   useEffect(() => {
     run()
@@ -45,10 +52,14 @@ export default function RepairGuide() {
         {part} · {year} {String(make).toUpperCase()} {String(model).toUpperCase()}
       </Text>
 
-      {failed ? (
+      {error ? (
         <View style={{ alignItems: 'center', paddingTop: 40, gap: 12 }}>
           <Text style={{ color: c.text, fontWeight: '700' }}>Couldn't generate the guide</Text>
+          <Text accessibilityRole="alert" style={{ color: c.subtext, textAlign: 'center' }}>
+            {error}
+          </Text>
           <Pressable
+            accessibilityRole="button"
             onPress={run}
             style={{
               backgroundColor: brand,
@@ -71,22 +82,7 @@ export default function RepairGuide() {
         </View>
       ) : (
         <>
-          <Markdown
-            style={{
-              body: { color: c.text, fontSize: 15, lineHeight: 22 },
-              heading1: { color: c.text, fontWeight: '800', marginTop: 12 },
-              heading2: { color: c.text, fontWeight: '800', marginTop: 12 },
-              heading3: { color: c.text, fontWeight: '700', marginTop: 10 },
-              bullet_list: { marginVertical: 6 },
-              ordered_list: { marginVertical: 6 },
-              code_inline: { backgroundColor: c.border, color: c.text },
-              fence: { backgroundColor: c.card, borderColor: c.border },
-              hr: { backgroundColor: c.border },
-              strong: { color: c.text },
-            }}
-          >
-            {guide}
-          </Markdown>
+          <SafeRepairGuide guide={guide} />
           <Text style={{ color: c.subtext, fontSize: 12, marginTop: 20, fontStyle: 'italic' }}>
             AI-generated guidance — verify torque specs and procedures against your vehicle's
             service manual before starting work.

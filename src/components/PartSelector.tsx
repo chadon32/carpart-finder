@@ -1,10 +1,16 @@
-import { useState } from 'react'
-import { Zap, AlertTriangle, Search, ArrowRight, Wrench, ExternalLink, Disc, Cog, Thermometer, Box, Camera, Image as ImageIcon, CheckCircle2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Zap, AlertTriangle, Search, ArrowRight, Wrench, ExternalLink, Camera, Image as ImageIcon, CheckCircle2 } from 'lucide-react'
 import type { Car } from './CarSelector'
 import { Combobox } from './Combobox'
 import { partTypesForVehicle, popularPartTypesForVehicle } from '../data/partTypes'
 import { isElectricVehicle } from '../data/electricVehicles'
 import { diagnoseProblem, fetchQuote, identifyPartFromImage, type DiagnosisMatch, type QuoteResponse } from '../api/client'
+import { maintenanceKitsForVehicle } from '../data/maintenanceKits'
+import { MAX_PART_QUERY_LENGTH } from '../lib/searchInput.js'
+import { classifyDtc } from '../lib/dtcValidation.js'
+import { OutboundLink } from './OutboundLink'
+import { PartIdentificationDemo } from './PartIdentificationDemo'
+import { trackPartIdentificationDemo } from '../lib/analytics'
 
 // Phone camera photos are routinely 3-8MB raw, but the AI model only needs
 // enough resolution to recognize a part, and the request has to fit under
@@ -72,82 +78,41 @@ const SYMPTOM_EXAMPLES = [
   'Clunking over bumps and potholes',
 ]
 
-const MAINTENANCE_KITS = [
-  {
-    title: 'Complete Brake Job',
-    search: 'Brake Pad and Rotor Kit',
-    desc: 'Includes front & rear brake pads and rotors.',
-    icon: Disc,
-    color: 'text-blue-600',
-    bg: 'bg-blue-50 dark:bg-blue-900/20'
-  },
-  {
-    title: 'Engine Tune-Up',
-    search: 'Ignition Coil Spark Plug Kit',
-    desc: 'Includes spark plugs, ignition coils, and boots.',
-    icon: Zap,
-    color: 'text-amber-600',
-    bg: 'bg-amber-50 dark:bg-amber-900/20'
-  },
-  {
-    title: 'Timing Service',
-    search: 'Timing Belt Water Pump Kit',
-    desc: 'Includes timing belt, water pump, pulleys, and tensioners.',
-    icon: Cog,
-    color: 'text-brand-600',
-    bg: 'bg-brand-50 dark:bg-brand-900/20'
-  },
-  {
-    title: 'Front Suspension Rebuild',
-    search: 'Control Arm Suspension Kit',
-    desc: 'Includes control arms, ball joints, and tie rods.',
-    icon: Wrench,
-    color: 'text-purple-600',
-    bg: 'bg-purple-50 dark:bg-purple-900/20'
-  },
-  {
-    title: 'Cooling System Refresh',
-    search: 'Radiator Hose Thermostat Kit',
-    desc: 'Includes radiator, main hoses, and thermostat.',
-    icon: Thermometer,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50 dark:bg-emerald-900/20'
-  },
-  {
-    title: 'Full Filter Service',
-    search: 'Air Cabin Filter Kit',
-    desc: 'Includes engine air filter and cabin air filter.',
-    icon: Box,
-    color: 'text-slate-600',
-    bg: 'bg-slate-50 dark:bg-slate-800'
-  }
+type SearchMethod = 'name' | 'kits' | 'code' | 'photo' | 'symptom'
+
+const SEARCH_METHODS: { id: SearchMethod; label: string }[] = [
+  { id: 'name', label: 'Part Name' },
+  { id: 'kits', label: 'Maintenance Kits' },
+  { id: 'code', label: 'Error Code (OBD-II)' },
+  { id: 'photo', label: 'Photo Search' },
+  { id: 'symptom', label: 'Describe a Problem' },
 ]
 
 const COMMON_DTCs: Record<string, { definition: string; parts: string[]; description: string }> = {
   'P0300': {
     definition: 'Random/Multiple Cylinder Misfire Detected',
     parts: ['Spark Plugs', 'Ignition Coils', 'Ignition Wires'],
-    description: 'The engine control module has detected misfires across multiple cylinders. Often resolved by changing spark plugs or coils.'
+    description: 'The engine control module detected misfires across multiple cylinders. Ignition, fuel, air, compression, and wiring checks may be required before replacing parts.'
   },
   'P0301': {
     definition: 'Cylinder 1 Misfire Detected',
     parts: ['Spark Plugs', 'Ignition Coils', 'Fuel Injector'],
-    description: 'Misfire isolated to Cylinder 1. Try replacing spark plugs or swapping coils.'
+    description: 'Misfire detected on Cylinder 1. Inspect ignition, fuel delivery, wiring, and compression before replacing parts.'
   },
   'P0302': {
     definition: 'Cylinder 2 Misfire Detected',
     parts: ['Spark Plugs', 'Ignition Coils', 'Fuel Injector'],
-    description: 'Misfire isolated to Cylinder 2. Try replacing spark plugs or swapping coils.'
+    description: 'Misfire detected on Cylinder 2. Inspect ignition, fuel delivery, wiring, and compression before replacing parts.'
   },
   'P0303': {
     definition: 'Cylinder 3 Misfire Detected',
     parts: ['Spark Plugs', 'Ignition Coils', 'Fuel Injector'],
-    description: 'Misfire isolated to Cylinder 3. Try replacing spark plugs or swapping coils.'
+    description: 'Misfire detected on Cylinder 3. Inspect ignition, fuel delivery, wiring, and compression before replacing parts.'
   },
   'P0304': {
     definition: 'Cylinder 4 Misfire Detected',
     parts: ['Spark Plugs', 'Ignition Coils', 'Fuel Injector'],
-    description: 'Misfire isolated to Cylinder 4. Try replacing spark plugs or swapping coils.'
+    description: 'Misfire detected on Cylinder 4. Inspect ignition, fuel delivery, wiring, and compression before replacing parts.'
   },
   'P0171': {
     definition: 'System Too Lean (Bank 1)',
@@ -172,7 +137,7 @@ const COMMON_DTCs: Record<string, { definition: string; parts: string[]; descrip
   'P0442': {
     definition: 'EVAP System Leak Detected (Small Leak)',
     parts: ['Gas Cap', 'Vapor Canister Purge Valve', 'EVAP Vent Solenoid'],
-    description: 'Small fuel vapor leak. Most commonly resolved by tightening or replacing a worn gas cap.'
+    description: 'A small fuel-vapor leak was detected. Inspect the cap, hoses, valves, and related seals before replacing parts.'
   },
   'P0455': {
     definition: 'EVAP System Leak Detected (Large Leak)',
@@ -187,20 +152,27 @@ const COMMON_DTCs: Record<string, { definition: string; parts: string[]; descrip
   'P0102': {
     definition: 'Mass Air Flow (MAF) Sensor Circuit Low Input',
     parts: ['Mass Airflow Sensor', 'Air Filter'],
-    description: 'MAF sensor signal frequency or voltage is lower than normal limits. Try cleaning or replacing the sensor.'
+    description: 'MAF sensor signal frequency or voltage is lower than expected. Inspect the intake path, connector, wiring, and sensor before replacement.'
   }
 }
 
 export function PartSelector({
   car,
+  startingPart,
+  startingGuideTitle,
   onSelect,
   onBack,
 }: {
   car: Car
+  startingPart?: string
+  startingGuideTitle?: string
   onSelect: (part: string) => void
   onBack: () => void
 }) {
-  const [searchMethod, setSearchMethod] = useState<'name' | 'kits' | 'code' | 'symptom' | 'photo'>('name')
+  const [searchMethod, setSearchMethod] = useState<SearchMethod>('name')
+  const [partName, setPartName] = useState(startingPart ?? '')
+  const [reviewingGuideStart, setReviewingGuideStart] = useState(Boolean(startingPart))
+  const photoDemoViewed = useRef(false)
   const [dtcInput, setDtcInput] = useState('')
 
   // "Describe a problem" tab state
@@ -221,7 +193,26 @@ export function PartSelector({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoScanning, setPhotoScanning] = useState(false)
   const [photoResult, setPhotoResult] = useState<{ identified: boolean; partName: string | null } | null>(null)
+  const [photoPartName, setPhotoPartName] = useState('')
   const [photoError, setPhotoError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (searchMethod !== 'photo' || photoDemoViewed.current) return
+    photoDemoViewed.current = true
+    trackPartIdentificationDemo('viewed')
+  }, [searchMethod])
+
+  const handlePartNameChange = (value: string) => {
+    setPartName(value)
+    if (!reviewingGuideStart) onSelect(value)
+  }
+
+  const confirmGuidePart = () => {
+    const value = partName.trim()
+    if (!value) return
+    setReviewingGuideStart(false)
+    onSelect(value)
+  }
 
   const initChecklist = (match: DiagnosisMatch) => {
     const next: Record<string, boolean> = {}
@@ -292,6 +283,7 @@ export function PartSelector({
             type="button"
             disabled={diagnosing || !symptomText.trim()}
             onClick={() => applyRefinement(c)}
+            aria-pressed={refineContext?.label === c.label}
             className={`chip text-[11px] disabled:opacity-40 ${
               refineContext?.label === c.label ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400' : ''
             }`}
@@ -304,7 +296,7 @@ export function PartSelector({
         <button
           type="button"
           onClick={clearRefinement}
-          className="mt-2 text-[11px] font-medium text-slate-500 transition hover:text-brand-600"
+          className="mt-2 min-h-11 px-2 text-[11px] font-medium text-slate-500 transition hover:text-brand-600"
         >
           Clear “{refineContext.label}” ✕
         </button>
@@ -330,24 +322,32 @@ export function PartSelector({
   const electric = isElectricVehicle(car.make, car.model)
   const partTypes = partTypesForVehicle(electric)
   const popularPartTypes = popularPartTypesForVehicle(electric)
+  const availableMaintenanceKits = maintenanceKitsForVehicle(electric)
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleSearchMethodKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = SEARCH_METHODS.findIndex((method) => method.id === searchMethod)
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % SEARCH_METHODS.length
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + SEARCH_METHODS.length) % SEARCH_METHODS.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = SEARCH_METHODS.length - 1
+    else return
 
-    // Reset state
+    event.preventDefault()
+    const nextMethod = SEARCH_METHODS[nextIndex]
+    setSearchMethod(nextMethod.id)
+    window.requestAnimationFrame(() => document.getElementById(`part-tab-${nextMethod.id}`)?.focus())
+  }
+
+  const analyzePhoto = async (base64: string) => {
     setPhotoResult(null)
+    setPhotoPartName('')
     setPhotoError(null)
     setPhotoScanning(true)
-
     try {
-      // Downscale/re-encode first: phone photos are routinely several MB,
-      // which both exceeds sane request sizes and slows the AI call for no
-      // benefit — the model doesn't need full resolution to name a part.
-      const base64 = await downscaleImage(file)
-      setPhotoPreview(base64)
       const result = await identifyPartFromImage(base64)
       setPhotoResult(result)
+      setPhotoPartName(result.identified ? result.partName ?? '' : '')
     } catch (err) {
       setPhotoError(err instanceof Error ? err.message : 'Failed to analyze image')
     } finally {
@@ -355,18 +355,35 @@ export function PartSelector({
     }
   }
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Reset state
+    try {
+      // Downscale/re-encode first: phone photos are routinely several MB,
+      // which both exceeds sane request sizes and slows the AI call for no
+      // benefit — the model doesn't need full resolution to name a part.
+      const base64 = await downscaleImage(file)
+      setPhotoPreview(base64)
+      await analyzePhoto(base64)
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Failed to analyze image')
+    }
+  }
+
   // Find dynamic lookup code match
-  const codeKey = dtcInput.trim().toUpperCase()
-  const matchedDtc = COMMON_DTCs[codeKey] || (codeKey.length >= 4 && /^[P]\d{4}$/.test(codeKey) ? {
-    definition: `OBD-II Diagnostic Code ${codeKey}`,
-    parts: ['Spark Plugs', 'Ignition Coils', 'Oxygen Sensor', 'Mass Airflow Sensor'],
-    description: `Trouble code ${codeKey} entered. Select from the matched replacement components below.`
-  } : null)
+  const dtcState = classifyDtc(dtcInput, COMMON_DTCs)
+  const codeKey = dtcState.code
+  const matchedDtc = dtcState.status === 'recognized' ? COMMON_DTCs[codeKey] : null
+  const dtcInvalid = dtcState.status === 'invalid'
+  const dtcUnknown = dtcState.status === 'unknown'
+  const dtcHasProblem = dtcInvalid || dtcUnknown
 
   return (
-    <div className="card p-7">
-      <div className="flex items-start justify-between">
-        <div>
+    <div className="card min-w-0 max-w-full overflow-hidden p-5 sm:p-7">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="section-title">What part do you need?</h2>
           <p className="mt-1 text-sm text-slate-600">
             Showing parts for{' '}
@@ -376,7 +393,7 @@ export function PartSelector({
             </span>
           </p>
         </div>
-        <button type="button" onClick={onBack} className="btn btn-ghost px-3 py-1.5 text-sm">
+        <button type="button" onClick={onBack} className="btn btn-ghost shrink-0 px-3 py-1.5 text-sm">
           Change vehicle
         </button>
       </div>
@@ -388,44 +405,42 @@ export function PartSelector({
       )}
 
       {/* Switcher Tab — horizontally scrollable on phones so all five fit */}
-      <div className="-mx-7 mb-5 mt-6 flex snap-x overflow-x-auto scrollbar-none border-b border-slate-100 px-7 dark:border-slate-800/60 sm:mx-0 sm:px-0">
-        <button
-          type="button"
-          onClick={() => setSearchMethod('name')}
-          className={`tab snap-start ${searchMethod === 'name' ? 'tab-active' : ''}`}
+      <div className="relative -mx-7 mb-5 mt-6 sm:mx-0">
+        <div
+          className="flex snap-x overflow-x-auto scrollbar-none border-b border-slate-100 px-7 pr-12 dark:border-slate-800/60 sm:mx-0 sm:px-0 sm:pr-0"
+          role="tablist"
+          aria-label="Part search method"
+          aria-orientation="horizontal"
         >
-          Part Name
-        </button>
-        <button
-          type="button"
-          onClick={() => setSearchMethod('kits')}
-          className={`tab snap-start ${searchMethod === 'kits' ? 'tab-active' : ''}`}
-        >
-          Maintenance Kits
-        </button>
-        <button
-          type="button"
-          onClick={() => setSearchMethod('code')}
-          className={`tab snap-start ${searchMethod === 'code' ? 'tab-active' : ''}`}
-        >
-          Error Code (OBD-II)
-        </button>
-        <button
-          type="button"
-          onClick={() => setSearchMethod('photo')}
-          className={`tab snap-start ${searchMethod === 'photo' ? 'tab-active' : ''}`}
-        >
-          Photo Search
-        </button>
-        <button
-          type="button"
-          onClick={() => setSearchMethod('symptom')}
-          className={`tab snap-start ${searchMethod === 'symptom' ? 'tab-active' : ''}`}
-        >
-          Describe a Problem
-        </button>
+        {SEARCH_METHODS.map((method) => (
+          <button
+            key={method.id}
+            id={`part-tab-${method.id}`}
+            type="button"
+            onClick={() => setSearchMethod(method.id)}
+            onKeyDown={handleSearchMethodKeyDown}
+            className={`tab snap-start ${searchMethod === method.id ? 'tab-active' : ''}`}
+            role="tab"
+            aria-selected={searchMethod === method.id}
+            aria-controls={`part-panel-${method.id}`}
+            tabIndex={searchMethod === method.id ? 0 : -1}
+          >
+            {method.label}
+          </button>
+        ))}
+        </div>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 flex w-12 items-center justify-end bg-gradient-to-l from-white via-white/95 to-transparent pr-1 dark:from-slate-900 dark:via-slate-900/95">
+          <ArrowRight size={14} className="text-slate-400 sm:hidden" />
+        </div>
       </div>
+      <p className="-mt-3 mb-4 text-[11px] text-slate-500 sm:hidden">Swipe the tabs to see every search method.</p>
 
+      <div
+        id={`part-panel-${searchMethod}`}
+        role="tabpanel"
+        aria-labelledby={`part-tab-${searchMethod}`}
+        tabIndex={0}
+      >
       {searchMethod === 'symptom' ? (
         <div className="space-y-5">
           <form
@@ -470,9 +485,12 @@ export function PartSelector({
           </form>
 
           {diagnosisError && (
-            <p className="rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700">
-              {diagnosisError}
-            </p>
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700">
+              <span>{diagnosisError}</span>
+              <button type="button" onClick={() => submitDiagnosis(symptomText)} className="btn btn-secondary btn-sm">
+                Retry
+              </button>
+            </div>
           )}
 
           {matches !== null && matches.length === 0 && (
@@ -497,6 +515,7 @@ export function PartSelector({
                         key={m.id}
                         type="button"
                         onClick={() => selectMatch(i)}
+                        aria-pressed={i === activeMatchIdx}
                         className={`chip ${i === activeMatchIdx ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400' : ''}`}
                       >
                         {m.title}
@@ -578,14 +597,17 @@ export function PartSelector({
               </div>
 
               {quoteError && (
-                <p className="rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700">
-                  Couldn't fetch prices: {quoteError}
-                </p>
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700">
+                  <span>Couldn't fetch prices: {quoteError}</span>
+                  <button type="button" onClick={runQuote} className="btn btn-secondary btn-sm">
+                    Retry
+                  </button>
+                </div>
               )}
 
               {quoting && (
                 <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 text-center text-xs font-medium text-slate-400 dark:border-slate-800">
-                  Searching live eBay listings for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} that fit your {car.year} {car.make} {car.model}…
+                  Searching live eBay listings for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} with year, make, and model compatibility evidence for your {car.year} {car.make} {car.model}…
                 </div>
               )}
 
@@ -596,7 +618,9 @@ export function PartSelector({
                       Your quote — {car.year} {car.make} {car.model}
                       {car.trim ? ` ${car.trim}` : ''}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-slate-500">Cheapest fitting listing per part, live from eBay right now.</p>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Lowest item + known shipping, before tax, among marketplace YMM compatibility matches. Listings without compatibility evidence are excluded.
+                    </p>
                   </div>
 
                   <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -614,10 +638,10 @@ export function PartSelector({
                           {item.listing ? (
                             <p className="truncate text-[11px] text-slate-500">
                               {item.listing.condition} · {item.listing.seller} · {item.listing.source}
-                              {item.listing.verifiedFitment === false && ' · fitment not verified'}
+                              {' · marketplace YMM compatibility evidence'}
                             </p>
                           ) : (
-                            <p className="text-[11px] text-slate-400">No fitting listings found right now</p>
+                            <p className="text-[11px] text-slate-400">No marketplace compatibility matches found right now</p>
                           )}
                         </div>
                         {item.listing && (
@@ -633,14 +657,12 @@ export function PartSelector({
                             All listings
                           </button>
                           {item.listing && (
-                            <a
+                            <OutboundLink
                               href={item.listing.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               className="btn btn-ghost btn-sm flex-1 justify-center whitespace-nowrap sm:flex-none"
                             >
                               View <ExternalLink size={11} />
-                            </a>
+                            </OutboundLink>
                           )}
                         </div>
                       </li>
@@ -650,14 +672,14 @@ export function PartSelector({
                   <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                     <div className="flex items-baseline justify-between">
                       <div className="text-xs text-slate-500">
-                        Parts ${quote.subtotal.toFixed(2)} + shipping ${quote.shipping.toFixed(2)}
+                        Items ${quote.subtotal.toFixed(2)} + known shipping ${quote.shipping.toFixed(2)}
                       </div>
                       <div className="font-data text-lg font-bold tracking-tight text-slate-950">
-                        ~${quote.total.toFixed(2)}
+                        Item + known shipping, before tax: ~${quote.total.toFixed(2)}
                       </div>
                     </div>
                     <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
-                      Estimate only — parts, not labor. Prices are live and change with listings; based on the cheapest option per part.
+                      Estimate only — parts, not labor. Confirm engine, drivetrain, options, and original part number before purchase.
                     </p>
                   </div>
                 </div>
@@ -671,15 +693,29 @@ export function PartSelector({
         </div>
       ) : searchMethod === 'name' ? (
         <>
+          {reviewingGuideStart && startingPart && (
+            <section aria-labelledby="guide-part-review-heading" className="mb-5 rounded-xl border border-brand-200/80 bg-brand-50/50 p-4 dark:border-brand-900/50 dark:bg-brand-950/20">
+              <p className="eyebrow text-brand-700 dark:text-brand-300">Review before searching</p>
+              <h3 id="guide-part-review-heading" className="mt-1 text-sm font-bold text-slate-950 dark:text-slate-50">Suggested from {startingGuideTitle || 'this guide'}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                The part category is editable. Confirm it below to begin the normal marketplace search. A guide does not establish diagnosis or fitment.
+              </p>
+              <button type="button" onClick={confirmGuidePart} disabled={!partName.trim()} className="btn btn-primary mt-3 w-full text-xs sm:w-auto">
+                Search {partName || startingPart} <ArrowRight size={14} />
+              </button>
+            </section>
+          )}
           <div>
             <Combobox
               label="Part search"
               placeholder="Search by part name or OEM number (e.g. Brake Rotors, 04465-0K010)"
               options={partTypes.map((p) => p.name)}
-              value=""
-              onChange={(part) => onSelect(part)}
+              value={partName}
+              onChange={handlePartNameChange}
+              onInputChange={setPartName}
               allowFreeText
               enterKeyHint="search"
+              maxLength={MAX_PART_QUERY_LENGTH}
             />
             <p className="mt-1.5 text-xs text-slate-500">Pick from the autocomplete list, or enter any custom part name or number and press Enter.</p>
           </div>
@@ -698,11 +734,16 @@ export function PartSelector({
       ) : searchMethod === 'kits' ? (
         <div className="animate-fade-in space-y-5">
           <div>
-            <label className="field-label">Pre-bundled Maintenance Kits</label>
-            <p className="text-xs text-slate-500 mb-4">Save time and money by purchasing all required components for a repair job in a single bundled kit.</p>
+            <label className="field-label">Maintenance kit searches</label>
+            <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+              Services that require confirmed engine details, such as timing-belt work, are intentionally not suggested here.
+            </p>
+            <p className="mb-4 text-xs text-slate-500">
+              Search for components sold together. If no combined kit is available, we’ll help you search each component separately.
+            </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {MAINTENANCE_KITS.map((kit) => {
+            {availableMaintenanceKits.map((kit) => {
               const Icon = kit.icon
               return (
                 <button
@@ -712,12 +753,12 @@ export function PartSelector({
                   className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 text-left transition-all hover:border-brand-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50"
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${kit.bg} ${kit.color}`}>
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${kit.background} ${kit.color}`}>
                       <Icon size={22} strokeWidth={2} />
                     </div>
                     <div>
                       <h3 className="font-bold tracking-tight text-slate-900 group-hover:text-brand-700">{kit.title}</h3>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500">{kit.desc}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">{kit.description}</p>
                     </div>
                   </div>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-0 -translate-x-2">
@@ -732,21 +773,45 @@ export function PartSelector({
         <div className="animate-fade-in space-y-5">
           <div className="text-center mb-6">
             <h3 className="section-title">Don't know the part name?</h3>
-            <p className="text-sm text-slate-500 mt-1">Take a photo of the broken part and our AI will identify it.</p>
+            <p className="text-sm text-slate-500 mt-1">Take a clear photo and our AI will try to identify the part.</p>
           </div>
+
+          <PartIdentificationDemo
+            onTryPhoto={() => {
+              trackPartIdentificationDemo('open_tool')
+              document.getElementById('part-photo-input')?.click()
+            }}
+          />
           
           {!photoPreview ? (
-            <label className="relative flex flex-col items-center justify-center w-full h-48 sm:h-64 border-2 border-slate-200 border-dashed rounded-2xl cursor-pointer bg-slate-50/50 hover:bg-slate-50 hover:border-brand-300 transition-all group dark:border-slate-800 dark:bg-slate-900/30">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <div className="h-12 w-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <Camera size={24} />
+            <div className="space-y-3">
+              <label
+                htmlFor="part-photo-input"
+                className="group relative flex h-48 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 transition-all hover:border-brand-300 hover:bg-slate-50 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-800 dark:bg-slate-900/30 sm:h-64"
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <div className="h-12 w-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <Camera size={24} />
+                  </div>
+                  <p className="mb-1 text-sm font-semibold text-slate-700">Tap to take a photo</p>
+                  <p className="text-xs text-slate-400">or upload an existing image</p>
                 </div>
-                <p className="mb-1 text-sm font-semibold text-slate-700">Tap to take a photo</p>
-                <p className="text-xs text-slate-400">or upload an existing image</p>
-              </div>
-              {/* capture="environment" prefers the rear camera on mobile */}
-              <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handlePhotoUpload} />
-            </label>
+                {/* capture="environment" prefers the rear camera on mobile */}
+                <input
+                  id="part-photo-input"
+                  type="file"
+                  className="sr-only"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                  capture="environment"
+                  aria-label="Take or upload a photo of the car part"
+                  aria-describedby="part-photo-help"
+                  onChange={handlePhotoUpload}
+                />
+              </label>
+              <p id="part-photo-help" className="text-center text-[11px] leading-relaxed text-slate-500">
+                Use a clear, well-lit photo of the part only. The image is compressed before it is sent for AI identification.
+              </p>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-black/5 dark:border-slate-800 h-64 sm:h-80 w-full flex items-center justify-center">
@@ -765,11 +830,23 @@ export function PartSelector({
               </div>
               
               {photoError && (
-                <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-sm text-rose-700">
+                <div role="alert" className="p-4 rounded-xl bg-rose-50 border border-rose-100 flex items-start gap-3 text-sm text-rose-700">
                   <AlertTriangle className="shrink-0 mt-0.5" size={16} />
-                  <div>
+                  <div className="flex-1">
                     <div className="font-semibold">Identification Failed</div>
                     <div>{photoError}</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => photoPreview && void analyzePhoto(photoPreview)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Retry analysis
+                      </button>
+                      <button type="button" onClick={() => setSearchMethod('name')} className="btn btn-ghost btn-sm">
+                        Search by name
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -780,14 +857,26 @@ export function PartSelector({
                     <div className="h-10 w-10 shrink-0 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400 flex items-center justify-center">
                       <CheckCircle2 size={22} />
                     </div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">Best guess</div>
-                      <div className="text-lg font-bold text-slate-900">{photoResult.partName}</div>
+                    <div className="w-full">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">AI suggestion</div>
+                      <label htmlFor="photo-part-name" className="sr-only">Suggested part name</label>
+                      <input
+                        id="photo-part-name"
+                        type="text"
+                        value={photoPartName}
+                        onChange={(e) => setPhotoPartName(e.target.value)}
+                        aria-describedby="photo-ai-suggestion-help"
+                        className="field h-auto min-h-0 border-0 bg-transparent p-0 text-lg font-bold text-slate-900 focus:ring-0 dark:bg-transparent"
+                      />
+                      <p id="photo-ai-suggestion-help" className="mt-1 text-[11px] leading-relaxed text-emerald-800 dark:text-emerald-200">
+                        AI suggestion only — confirm or edit the part name before searching.
+                      </p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => onSelect(photoResult.partName!)}
+                    onClick={() => onSelect(photoPartName.trim())}
+                    disabled={!photoPartName.trim()}
                     className="btn btn-primary w-full sm:w-auto whitespace-nowrap"
                   >
                     Find this part <ArrowRight size={16} />
@@ -810,9 +899,10 @@ export function PartSelector({
                   onClick={() => {
                     setPhotoPreview(null)
                     setPhotoResult(null)
+                    setPhotoPartName('')
                     setPhotoError(null)
                   }}
-                  className="text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors"
+                  className="min-h-11 px-2 text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors"
                 >
                   Try another photo
                 </button>
@@ -837,13 +927,17 @@ export function PartSelector({
                 autoCorrect="off"
                 spellCheck={false}
                 enterKeyHint="search"
+                 aria-invalid={dtcHasProblem}
+                 aria-describedby={dtcHasProblem ? `dtc-help ${dtcUnknown ? 'dtc-unknown' : 'dtc-error'}` : 'dtc-help'}
                 className="field pl-9 uppercase"
               />
               <span className="absolute left-3.5 top-3 text-slate-400">
                 <Search size={14} />
               </span>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">Enter a diagnostic error code from your dashboard scanner to see recommended parts.</p>
+            <p id="dtc-help" className="mt-1.5 text-xs text-slate-500">
+              A trouble code identifies a detected condition, not a confirmed failed part. Use it to find components commonly inspected.
+            </p>
           </div>
 
           {matchedDtc ? (
@@ -859,14 +953,14 @@ export function PartSelector({
               </div>
 
               <div className="border-t border-slate-100 pt-3 dark:border-slate-800/60">
-                <div className="eyebrow mb-2">Recommended replacement parts</div>
+                <div className="eyebrow mb-2">Parts commonly inspected for this code</div>
                 <div className="flex flex-col gap-1.5">
                   {matchedDtc.parts.map((partName) => (
                     <button
                       key={partName}
                       type="button"
                       onClick={() => onSelect(partName)}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 hover:border-brand-500 hover:bg-brand-50/10 text-xs font-semibold text-slate-700 transition-all text-left"
+                      className="flex min-h-11 items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 hover:border-brand-500 hover:bg-brand-50/10 text-xs font-semibold text-slate-700 transition-all text-left"
                     >
                       <span>Find {partName}</span>
                       <ArrowRight size={13} className="text-slate-400 group-hover:text-brand-500" />
@@ -875,15 +969,20 @@ export function PartSelector({
                 </div>
               </div>
             </div>
+          ) : dtcUnknown ? (
+            <div id="dtc-unknown" role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+              We don't have a verified explanation for <strong>{codeKey}</strong> yet. Confirm the code with the vehicle manufacturer or a qualified technician before buying parts.
+            </div>
           ) : (
             dtcInput.trim() && (
-              <div className="text-center py-4 text-xs text-slate-400">
+              <div id="dtc-error" role="alert" className="py-4 text-center text-xs text-rose-600">
                 Invalid OBD-II code format (must match pattern like P0302).
               </div>
             )
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

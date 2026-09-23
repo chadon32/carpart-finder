@@ -5,6 +5,7 @@ export type MaintenanceItem = {
   part: string
   intervalMiles: number
   note: string
+  engineSpecific?: boolean
 }
 
 // Broad industry rules of thumb, NOT vehicle-specific schedules. The UI must
@@ -23,13 +24,14 @@ export const maintenanceSchedule: MaintenanceItem[] = [
   { part: 'Coolant', intervalMiles: 60000, note: 'Flush per the manual spec' },
   { part: 'Transmission Fluid', intervalMiles: 60000, note: 'If serviceable — check the manual' },
   { part: 'Serpentine Belt', intervalMiles: 75000, note: 'Sooner if cracked or squealing' },
-  { part: 'Timing Belt', intervalMiles: 90000, note: 'Critical on interference engines' },
+  { part: 'Timing Belt', intervalMiles: 90000, note: 'Critical on interference engines', engineSpecific: true },
 ]
 
 // EVs skip combustion-only items but keep the rest (12V battery, wipers,
 // brakes, cabin filter all still wear).
-export function maintenanceForVehicle(isElectric: boolean): MaintenanceItem[] {
-  if (!isElectric) return maintenanceSchedule
+export function maintenanceForVehicle(isElectric: boolean, hasConfirmedEngine = false): MaintenanceItem[] {
   const iceOnly = new Set(partTypes.filter((p) => p.powertrain === 'ice').map((p) => p.name))
-  return maintenanceSchedule.filter((m) => !iceOnly.has(m.part))
+  return maintenanceSchedule.filter((m) =>
+    (!isElectric || !iceOnly.has(m.part)) && (hasConfirmedEngine || !m.engineSpecific)
+  )
 }

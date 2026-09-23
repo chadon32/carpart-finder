@@ -1,4 +1,7 @@
 {
+  "redirects": [
+    { "source": "/index.html", "destination": "/", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" }
   ],
@@ -6,6 +9,12 @@
     { "path": "/api/cron/check-alerts", "schedule": "0 13 * * *" }
   ],
   "headers": [
+    { "source": "/", "has": [{ "type": "query", "key": "year" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/", "has": [{ "type": "query", "key": "make" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/", "has": [{ "type": "query", "key": "model" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/", "has": [{ "type": "query", "key": "trim" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/", "has": [{ "type": "query", "key": "part" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/api/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
     {
       "source": "/(.*)",
       "headers": [

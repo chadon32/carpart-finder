@@ -61,8 +61,10 @@ test('logout still succeeds and clears the cookie', async () => {
   assert.match(res.headers.get('set-cookie') ?? '', /cpf_token=/)
 })
 
-// The product must stay up. Search needs no database.
-test('the search endpoint still validates input rather than 503ing', async () => {
+// Search uses the shared production budget, so it fails closed until the RPC
+// migration is available rather than silently falling back to one instance.
+test('the search endpoint fails closed when its shared limiter is unavailable', async () => {
   const res = await fetch(`${base}/api/search?year=2018&make=Honda`)
-  assert.equal(res.status, 400) // missing `part` — reached the handler, not the gate
+  assert.equal(res.status, 503)
+  assert.deepEqual(await res.json(), { error: 'Rate limiting is temporarily unavailable. Please try again.' })
 })

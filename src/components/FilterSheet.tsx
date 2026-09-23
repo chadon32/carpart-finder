@@ -5,7 +5,7 @@ type ConditionFilter = 'all' | 'new' | 'used'
 
 // Mobile-first filter panel for the results list. Rendered through Modal, so
 // it opens as a bottom sheet on phones and a centered dialog on desktop.
-// All state lives in ResultsList (persisted); this is a pure control surface.
+// State belongs to the results route/screen; this is a pure control surface.
 export function FilterSheet({
   condition,
   onCondition,
@@ -51,14 +51,15 @@ export function FilterSheet({
 
       <div className="space-y-5 px-5 py-5">
         <div>
-          <div className="field-label">Condition</div>
-          <div className="inline-flex gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+          <div className="field-label" id="filter-condition-label">Condition</div>
+          <div role="group" aria-labelledby="filter-condition-label" className="inline-flex gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
             {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => onCondition(c)}
-                className={`min-h-[40px] touch-manipulation rounded-full px-5 text-xs font-semibold capitalize transition ${
+                aria-pressed={condition === c}
+                className={`min-h-11 touch-manipulation rounded-full px-5 text-xs font-semibold capitalize transition ${
                   condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'
                 }`}
               >

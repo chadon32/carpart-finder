@@ -104,3 +104,33 @@
 - [ ] Signed in: listing detail shows "Email me if X drops below $Y" → sets alert (daily cron checks it)
 - [ ] Account card lists alerts; Remove deletes (cascades via saved search)
 - [ ] Log out clears the session
+
+## Phase 8 - Account deletion hardening (2026-08-02)
+
+### Automated
+
+- [x] `npm test -- --runInBand` - 85/85 passing across 19 suites
+- [x] `npx tsc --noEmit` - clean
+- [x] Root `npm run lint` - website/server and `mobile/src` clean
+- [x] `npx expo export --platform ios --output-dir .codex-audit-ios` - 2.8 MB Hermes bundle, 26 assets
+- [x] Successful deletion clears app-owned stores and replaces the navigation stack with a persistent signed-out success screen
+- [x] Cancel and invalid confirmation cannot start deletion
+- [x] Multiple rapid taps share one in-flight deletion request
+- [x] Signed-out deep links cannot submit deletion
+- [x] Expired sessions preserve the account email, require same-account sign-in, and return to deletion
+- [x] Network errors, timeouts, permission failures, uncertain final-state failures, and already-deleted accounts have tested recovery behavior
+- [x] A post-deletion local-cache failure still reports the permanent server deletion honestly and gives a privacy-safe reinstall action
+
+### Physical TestFlight release gate
+
+- [ ] Install the exact candidate build on a physical iPhone and iPad
+- [ ] Create a staging account, sign out, and sign back in
+- [ ] Navigate: Garage -> Account -> Delete Account
+- [ ] Confirm the warning lists all app-owned data and requires exact `DELETE`
+- [ ] Expire the session, tap **Sign in again**, authenticate with the same email, and confirm the deletion screen reopens
+- [ ] Complete deletion and verify **Account permanently deleted** remains visible after sign-out
+- [ ] Force-quit and relaunch; verify no Garage, Watchlist, recents, preferences, compare state, or session returns
+- [ ] Sign up again with the deleted email to confirm the Supabase Auth identity was removed rather than disabled
+- [ ] Repeat once on poor or interrupted network and confirm retry guidance does not falsely claim success
+- [ ] Test VoiceOver, largest Dynamic Type, keyboard focus, and rapid repeated taps
+- [ ] Record the complete create/sign-in -> navigate -> confirm -> success flow from the exact uploaded build for App Review

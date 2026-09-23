@@ -29,6 +29,8 @@ export function VehicleCard({ vehicle, onPress, onRemove, onHealth }: {
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? `, ${vehicle.trim}` : ''}`}
       onPress={onPress}
       style={{
         flexDirection: 'row',
@@ -65,12 +67,12 @@ export function VehicleCard({ vehicle, onPress, onRemove, onHealth }: {
         {vehicle.trim ? <Text style={{ color: c.subtext, fontSize: 13 }}>{vehicle.trim}</Text> : null}
       </View>
       {onHealth ? (
-        <Pressable onPress={onHealth} hitSlop={12} accessibilityLabel="Vehicle health and recalls">
+        <Pressable accessibilityRole="button" onPress={onHealth} hitSlop={12} accessibilityLabel="Vehicle health and recalls">
           <SymbolView name="heart.text.square" size={20} tintColor={c.subtext} />
         </Pressable>
       ) : null}
       {onRemove ? (
-        <Pressable onPress={onRemove} hitSlop={12} accessibilityLabel="Remove vehicle">
+        <Pressable accessibilityRole="button" onPress={onRemove} hitSlop={12} accessibilityLabel="Remove vehicle">
           <SymbolView name="trash" size={20} tintColor={c.subtext} />
         </Pressable>
       ) : null}

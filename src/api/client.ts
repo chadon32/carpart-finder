@@ -1,3 +1,8 @@
+import { FriendlyApiError, friendlyApiError, readJsonResponse } from '../lib/apiErrors.js'
+import { assertFitmentContract } from '../../shared/apiContract.js'
+import { isRecallList, type Recall } from '../../shared/recalls.js'
+export type { Recall } from '../../shared/recalls.js'
+
 export type Listing = {
   id: string
   title: string
@@ -20,16 +25,41 @@ export type Listing = {
   bestOfferAccepted?: boolean
   shortDescription?: string | null
   shippingCost?: number | null
+  coreCharge?: number | null
   deliveryMin?: string | null
   deliveryMax?: string | null
-  // False when eBay's compatibility filter couldn't be applied and the results
-  // came from a relaxed keyword search instead.
+  // Provider listing freshness is optional; absent data must remain visible
+  // as unavailable rather than being inferred from fitment evidence time.
+  listedAt?: string | null
+  // True only when the provider returned explicit exact compatibility evidence.
+  // Missing/false is always unverified and must never render as a guarantee.
   verifiedFitment?: boolean
+  fitmentTier?: 'verified' | 'fallback'
+  fitmentProof?: string | null
+  fitmentEvidence?: {
+    provider: string
+    matchType: 'EXACT' | null
+    scope: 'year-make-model' | 'year-make-model-trim' | 'keyword-only'
+    matchedVehicle: {
+      year: string
+      make: string
+      model: string
+      trim?: string
+    } | null
+    checkedAt: string
+    note: string
+  }
 }
 
 export type SearchResponse = {
+  fitmentContractVersion: 2
   query: string
+  // Primary results contain only structured provider compatibility matches.
   results: Listing[]
+  // Broad marketplace candidates are kept separate and are never ranked or
+  // automatically selected as fitting choices.
+  fallbackResults?: Listing[]
+  fitmentSummary?: { verified: number; fallback: number; hiddenIrrelevantFallbacks?: number }
   providerErrors: Record<string, string>
   skippedProviders: string[]
   cached?: boolean
@@ -37,13 +67,40 @@ export type SearchResponse = {
   stale?: boolean
 }
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url)
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`)
+const DEFAULT_TIMEOUT_MS = 20_000
+const SEARCH_TIMEOUT_MS = 45_000
+const AI_TIMEOUT_MS = 45_000
+
+async function requestJson<T>(url: string, init: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const controller = new AbortController()
+  const callerSignal = init.signal
+  let timedOut = false
+  const timeout = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  const abortFromCaller = () => controller.abort()
+  if (callerSignal?.aborted) controller.abort()
+  else callerSignal?.addEventListener('abort', abortFromCaller, { once: true })
+
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal })
+    return await readJsonResponse<T>(res, url)
+  } catch (error) {
+    if (timedOut) {
+      throw new FriendlyApiError(`The ${url.includes('/search') || url.includes('/quote') ? 'price search' : 'request'} timed out. Check your connection and try again.`, 408)
+    }
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    if (error instanceof FriendlyApiError) throw error
+    throw new FriendlyApiError(friendlyApiError(url, 0), 0)
+  } finally {
+    window.clearTimeout(timeout)
+    callerSignal?.removeEventListener('abort', abortFromCaller)
   }
-  return data as T
+}
+
+async function getJson<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS, signal?: AbortSignal): Promise<T> {
+  return requestJson(url, { signal }, timeoutMs)
 }
 
 export type VehicleType = 'all' | 'car' | 'suv' | 'truck'
@@ -128,6 +185,7 @@ export type QuoteItem = {
 }
 
 export type QuoteResponse = {
+  fitmentContractVersion: 2
   items: QuoteItem[]
   subtotal: number
   shipping: number
@@ -135,7 +193,7 @@ export type QuoteResponse = {
   currency: string
 }
 
-export function fetchQuote(
+export async function fetchQuote(
   year: string,
   make: string,
   model: string,
@@ -146,21 +204,36 @@ export function fetchQuote(
   const params = new URLSearchParams({ year, make, model, parts: parts.join(',') })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  return getJson(`/api/quote?${params.toString()}`)
+  const response = await getJson<QuoteResponse>(`/api/quote?${params.toString()}`, SEARCH_TIMEOUT_MS)
+  return assertFitmentContract(response)
 }
 
-export function searchParts(
+export async function searchParts(
   year: string,
   make: string,
   model: string,
   part: string,
   trim?: string,
-  zip?: string
+  zip?: string,
+  signal?: AbortSignal
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ year, make, model, part })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
-  return getJson(`/api/search?${params.toString()}`)
+  const response = await getJson<SearchResponse>(`/api/search?${params.toString()}`, SEARCH_TIMEOUT_MS, signal)
+  return assertFitmentContract(response)
+}
+
+export type ApiHealth = {
+  status: 'ok'
+  apiRelease: string
+  buildId: string
+  fitmentContractVersion: 2
+}
+
+export async function fetchApiHealth(): Promise<ApiHealth> {
+  const response = await getJson<ApiHealth>('/api/health')
+  return assertFitmentContract(response)
 }
 
 export type PriceObservation = { date: string; price: number }
@@ -169,24 +242,18 @@ export function fetchPriceHistory(
   year: string,
   make: string,
   model: string,
-  part: string
+  part: string,
+  signal?: AbortSignal
 ): Promise<{ observations: PriceObservation[] }> {
   const params = new URLSearchParams({ year, make, model, part })
-  return getJson(`/api/price-history?${params.toString()}`)
+  return getJson(`/api/price-history?${params.toString()}`, DEFAULT_TIMEOUT_MS, signal)
 }
 
-export type Recall = {
-  campaignNumber: string | null
-  component: string | null
-  summary: string | null
-  consequence: string | null
-  remedy: string | null
-  reportedDate: string | null
-}
-
-export function fetchRecalls(year: string, make: string, model: string): Promise<{ recalls: Recall[] }> {
+export async function fetchRecalls(year: string, make: string, model: string, signal?: AbortSignal): Promise<{ recalls: Recall[] }> {
   const params = new URLSearchParams({ year, make, model })
-  return getJson(`/api/recalls?${params.toString()}`)
+  const data = await getJson<{ recalls: unknown }>(`/api/recalls?${params.toString()}`, DEFAULT_TIMEOUT_MS, signal)
+  if (!isRecallList(data?.recalls)) throw new FriendlyApiError('Recall data was unreadable. Please try again.', 502)
+  return { recalls: data.recalls }
 }
 
 export type VinDecodeResult = {
@@ -207,15 +274,20 @@ export function decodeVinApi(vin: string): Promise<VinDecodeResult> {
   return getJson(`/api/vin?${params.toString()}`)
 }
 
-export function identifyPartFromImage(base64Image: string): Promise<{ identified: boolean; partName: string | null }> {
-  return fetch('/api/identify-part', {
+export async function identifyPartFromImage(base64Image: string): Promise<{ identified: boolean; partName: string | null }> {
+  const data = await requestJson<{ identified?: unknown; partName?: unknown }>('/api/identify-part', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ image: base64Image }),
-  }).then(async (res) => {
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to identify part')
-    return data
-  })
+  }, AI_TIMEOUT_MS)
+  if (typeof data.identified !== 'boolean') {
+    throw new FriendlyApiError('The photo identifier returned an unreadable response. Please try again.', 502)
+  }
+  if (data.partName !== null && data.partName !== undefined && typeof data.partName !== 'string') {
+    throw new FriendlyApiError('The photo identifier returned an unreadable response. Please try again.', 502)
+  }
+  return {
+    identified: data.identified,
+    partName: data.identified && typeof data.partName === 'string' ? data.partName : null,
+  }
 }
-

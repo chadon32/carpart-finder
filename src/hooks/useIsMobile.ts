@@ -10,6 +10,9 @@ export function useIsMobile(): boolean {
     const mql = window.matchMedia(QUERY)
     const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches)
     mql.addEventListener('change', onChange)
+    // A resize can occur after render but before this subscription starts
+    // (for example while a lazy dialog opens). Reconcile that missed change.
+    setIsMobile(mql.matches)
     return () => mql.removeEventListener('change', onChange)
   }, [])
 

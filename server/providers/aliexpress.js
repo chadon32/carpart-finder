@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { fetchWithRetry } from '../httpClient.js'
+import { safeRetailerUrl } from '../../shared/outboundUrl.js'
 
 // AliExpress Open Platform uses the classic "TOP" (Taobao Open Platform) signing
 // convention: sort all request params by key, concatenate key+value pairs, wrap
@@ -78,6 +79,10 @@ export async function search(ctx, { limit = 10 } = {}) {
   const results = []
 
   for (const product of products) {
+    const link = safeRetailerUrl(product.product_detail_url)
+    const price = Number(product.target_sale_price ?? product.sale_price ?? 0)
+    if (!product.product_title || !link || !Number.isFinite(price) || price <= 0) continue
+
     const seller = product.shop_id ? `Shop ${product.shop_id}` : 'AliExpress seller'
     if (seenSellers.has(seller)) continue
     seenSellers.add(seller)
@@ -85,15 +90,28 @@ export async function search(ctx, { limit = 10 } = {}) {
     results.push({
       id: `aliexpress-${product.product_id}`,
       title: product.product_title,
-      price: Number(product.target_sale_price ?? product.sale_price ?? 0),
+      price,
       currency: product.target_sale_price_currency ?? 'USD',
       condition: 'New',
       seller,
       sellerFeedbackPercentage: product.evaluate_rate ?? null,
       image: product.product_main_image_url ?? null,
-      link: product.product_detail_url,
+      link,
       source: 'AliExpress',
       crossBorder: true,
+      // AliExpress results do not provide eBay compatibility evidence. Keep
+      // the provider contract explicit so missing metadata cannot look
+      // verified in a consumer of the API.
+      verifiedFitment: false,
+      fitmentTier: 'fallback',
+      fitmentEvidence: {
+        provider: 'AliExpress',
+        matchType: null,
+        scope: 'keyword-only',
+        matchedVehicle: null,
+        checkedAt: new Date().toISOString(),
+        note: 'This provider did not return structured compatibility evidence for the selected vehicle.',
+      },
       shipsFrom: 'Overseas (China)',
       estimatedDelivery: '2-6 weeks',
     })

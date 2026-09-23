@@ -1,5 +1,8 @@
 // Production, accounts disabled — the same shape as the live deploy.
-process.env.NODE_ENV = 'production'
+// Route behavior tests run in offline development mode. Individual production
+// tests below switch NODE_ENV explicitly so fail-closed limiter behavior stays
+// covered without making every unrelated route assertion depend on Supabase.
+process.env.NODE_ENV = 'development'
 process.env.SUPABASE_URL = ''
 process.env.SUPABASE_ANON_KEY = ''
 process.env.SUPABASE_SERVICE_ROLE_KEY = ''
@@ -21,6 +24,28 @@ test('an unknown route returns a 404 JSON body, not HTML', async () => {
   assert.equal((await res.json()).error, 'Not found')
 })
 
+test('health reports the fitment contract required by the frontend', async () => {
+  const res = await fetch(`${base}/api/health`)
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.status, 'ok')
+  assert.equal(body.fitmentContractVersion, 2)
+  assert.match(body.apiRelease, /^\d{4}-\d{2}-\d{2}/)
+  assert.equal(typeof body.buildId, 'string')
+})
+
+test('search responses carry the fail-closed fitment contract version', async () => {
+  const res = await fetch(`${base}/api/search?year=2020&make=Toyota&model=Camry&part=Brake+Pads`)
+  assert.equal(res.status, 200)
+  assert.equal((await res.json()).fitmentContractVersion, 2)
+})
+
+test('quote responses carry the fail-closed fitment contract version', async () => {
+  const res = await fetch(`${base}/api/quote?year=2020&make=Toyota&model=Camry&parts=Brake+Pads`)
+  assert.equal(res.status, 200)
+  assert.equal((await res.json()).fitmentContractVersion, 2)
+})
+
 test('malformed JSON returns 400 JSON, not an HTML stack page', async () => {
   const res = await fetch(`${base}/api/ai/repair-guide`, {
     method: 'POST',
@@ -33,12 +58,77 @@ test('malformed JSON returns 400 JSON, not an HTML stack page', async () => {
   assert.equal(body.error, 'Malformed JSON body')
 })
 
+test('repair guide requires a server-issued fitment proof', async () => {
+  const res = await fetch(`${base}/api/ai/repair-guide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      year: '2020',
+      make: 'Toyota',
+      model: 'Camry',
+      part: 'Brake Pads',
+      listingId: 'forged-listing',
+      source: 'eBay',
+      fitmentProof: 'forged-proof',
+    }),
+  })
+  assert.equal(res.status, 409)
+  assert.match((await res.json()).error, /not currently verified/i)
+})
+
 test('a disallowed Origin gets 403, not 500', async () => {
   const res = await fetch(`${base}/api/search?year=2018&make=Honda&model=Civic&part=Brake+Pads`, {
     headers: { Origin: 'https://evil.example' },
   })
   assert.equal(res.status, 403)
   assert.equal((await res.json()).error, 'Origin not allowed')
+})
+
+test('production rejects development localhost origins', async () => {
+  const previous = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    const res = await fetch(`${base}/api/search?year=2018&make=Honda&model=Civic&part=Brake+Pads`, {
+      headers: { Origin: 'http://localhost:5173' },
+    })
+    assert.equal(res.status, 403)
+    assert.equal((await res.json()).error, 'Origin not allowed')
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = previous
+  }
+})
+
+test('production authentication fails closed when the shared limiter is unavailable', async () => {
+  const previous = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    const res = await fetch(`${base}/api/supabase/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'owner@example.com', password: 'not-a-real-password' }),
+    })
+    assert.equal(res.status, 503)
+    assert.deepEqual(await res.json(), { error: 'Rate limiting is temporarily unavailable. Please try again.' })
+  } finally {
+    process.env.NODE_ENV = previous
+  }
+})
+
+test('production search fails closed when the shared limiter is unavailable', async () => {
+  const previous = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    const res = await fetch(`${base}/api/search?year=2018&make=Honda&model=Civic&part=Brake+Pads`)
+    assert.equal(res.status, 503)
+    assert.deepEqual(await res.json(), { error: 'Rate limiting is temporarily unavailable. Please try again.' })
+  } finally {
+    process.env.NODE_ENV = previous
+  }
+})
+
+test('proxy trust defaults to zero until the deployment topology is configured', () => {
+  assert.equal(app.get('trust proxy'), 0)
 })
 
 test('an allowed Origin is not blocked', async () => {
