@@ -48,11 +48,8 @@ export async function expectNoHorizontalOverflow(page: Page, label: string) {
 }
 
 export async function openDetails(page: Page) {
-  const card = page.locator('.listing-card').first()
-  const desktopButton = card.getByRole('button', { name: 'Click for Detailed View' })
-  const mobileButton = card.getByRole('button', { name: 'Details' })
-  if (await desktopButton.isVisible()) await desktopButton.click()
-  else await mobileButton.click()
+  // Phones and larger screens each render one visible "Details" button.
+  await page.locator('.listing-card').first().getByRole('button', { name: 'Details', exact: true }).click()
   await expect(page.getByRole('dialog', { name: /listing details/ })).toBeVisible()
 }
 
@@ -64,7 +61,7 @@ export async function openWatchlist(page: Page) {
 }
 
 export async function openGuestAccount(page: Page) {
-  const desktopAccount = page.getByRole('button', { name: 'Open account' })
+  const desktopAccount = page.getByRole('button', { name: /^Account/ })
   if (await desktopAccount.isVisible()) await desktopAccount.click()
   else await page.getByRole('button', { name: 'Account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()

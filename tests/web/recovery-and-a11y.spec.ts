@@ -71,7 +71,7 @@ async function auditCoreJourney(
   const a11y = createWcagAaCollector(testInfo)
   await page.goto(app.baseUrl, { waitUntil: 'domcontentloaded' })
   if (theme === 'dark') {
-    await page.getByRole('button', { name: 'Toggle theme' }).click()
+    await page.getByRole('button', { name: 'Dark mode' }).click()
     await expect(page.locator('html')).toHaveClass(/dark/)
   }
   await expect(page.getByRole('combobox', { name: 'Make' })).toBeEnabled()
@@ -90,8 +90,8 @@ async function auditCoreJourney(
   await goToResults(page, app.baseUrl)
   await a11y.check(page, `${theme}-results`)
   if (await page.evaluate(() => window.innerWidth < 640)) {
-    await page.getByRole('button', { name: 'Filters' }).click()
-    await expect(page.getByRole('dialog', { name: 'Filter listings' })).toBeVisible()
+    await page.getByRole('button', { name: 'Sort & filters' }).click()
+    await expect(page.getByRole('dialog', { name: 'Sort and filter listings' })).toBeVisible()
     await a11y.check(page, `${theme}-filters`)
     await page.getByRole('button', { name: 'Show results' }).click()
   }

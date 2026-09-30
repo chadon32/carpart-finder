@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
-import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine, Activity } from 'lucide-react'
+import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine, Activity, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
-import { fetchMakes, fetchModels, fetchTrims, decodeVinApi, type VehicleType } from '../api/client'
+import { fetchMakes, fetchModels, fetchTrims, decodeVinApi } from '../api/client'
 import { Combobox } from './Combobox'
 import { StickyActionBar } from './StickyActionBar'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { cachedRecallCount } from '../lib/recallCache'
+import { normalizeMake } from '../../shared/vehicleMake.js'
 
 const VehicleHealthModal = lazy(() =>
   import('./VehicleHealthModal').then((module) => ({ default: module.VehicleHealthModal }))
@@ -25,13 +26,6 @@ export type GarageVehicle = Car & { vin?: string; mileage?: number }
 const currentYear = new Date().getFullYear()
 const years = Array.from({ length: currentYear - 1980 + 2 }, (_, i) => String(currentYear + 1 - i))
 
-const vehicleTypeOptions: { value: VehicleType; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'car', label: 'Car' },
-  { value: 'suv', label: 'SUV / Minivan' },
-  { value: 'truck', label: 'Truck' },
-]
-
 // Top 30 most popular car makes in the USA, matched case-insensitively
 // against NHTSA's (uppercase) make names. Order here = display order.
 const POPULAR_MAKES = [
@@ -43,6 +37,22 @@ const POPULAR_MAKES = [
 ]
 const POPULAR_RANK = new Map(POPULAR_MAKES.map((m, i) => [m.toUpperCase(), i]))
 
+// Vehicles saved before makes were shown in readable case carry the NHTSA
+// spelling ("HONDA"). Convert on load so they match what is selected today,
+// and drop the duplicates that conversion can create.
+function readableGarage(saved: GarageVehicle[]): GarageVehicle[] {
+  const seen = new Set<string>()
+  const vehicles: GarageVehicle[] = []
+  for (const entry of saved) {
+    const vehicle = { ...entry, make: normalizeMake(entry.make) }
+    const key = [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].join('|').toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    vehicles.push(vehicle)
+  }
+  return vehicles
+}
+
 export function CarSelector({
   onConfirm,
   onSearchPart,
@@ -50,13 +60,14 @@ export function CarSelector({
   onConfirm: (car: Car) => void
   onSearchPart?: (car: Car, part: string) => void
 }) {
-  const [vehicleType, setVehicleType] = useState<VehicleType>('all')
   const [year, setYear] = useState('')
   const [make, setMake] = useState('')
   const [model, setModel] = useState('')
   const [trim, setTrim] = useState('')
   const trimInputId = useId()
 
+  const [vinOpen, setVinOpen] = useState(false)
+  const vinInputRef = useRef<HTMLInputElement>(null)
   const [vinInput, setVinInput] = useState('')
   const [vinLoading, setVinLoading] = useState(false)
   const [vinError, setVinError] = useState<string | null>(null)
@@ -71,7 +82,8 @@ export function CarSelector({
   const [garage, setGarage] = useState<GarageVehicle[]>(() => {
     try {
       const raw = localStorage.getItem('carpartsradar-garage')
-      return raw ? JSON.parse(raw) : []
+      const saved: unknown = raw ? JSON.parse(raw) : []
+      return Array.isArray(saved) ? readableGarage(saved as GarageVehicle[]) : []
     } catch {
       return []
     }
@@ -122,11 +134,10 @@ export function CarSelector({
   useEffect(() => {
     let cancelled = false
     setMakesLoading(true)
-    setMake('')
-    fetchMakes(vehicleType)
+    fetchMakes()
       .then((res) => {
         if (cancelled) return
-        setMakes(res.makes)
+        setMakes([...new Set(res.makes.map(normalizeMake))])
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -137,7 +148,7 @@ export function CarSelector({
     return () => {
       cancelled = true
     }
-  }, [vehicleType])
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -204,6 +215,11 @@ export function CarSelector({
     }
   }, [make, year, model])
 
+  // Tapping "Have a VIN?" should land in the field, not make people find it.
+  useEffect(() => {
+    if (vinOpen) vinInputRef.current?.focus()
+  }, [vinOpen])
+
   const canConfirm = Boolean(year && make && model)
 
   const handleDecodeVin = async () => {
@@ -213,8 +229,9 @@ export function CarSelector({
       const d = await decodeVinApi(vinInput)
       pendingSelection.current = { model: d.model, trim: d.trim || '' }
       setYear(d.year)
-      setMake(d.make)
+      setMake(normalizeMake(d.make))
       setDecodedVin(vinInput)
+      setVinOpen(false)
       const engineBits = [
         d.engine.displacementL && `${d.engine.displacementL}L`,
         d.engine.cylinders && `${d.engine.cylinders}-cyl`,
@@ -249,16 +266,62 @@ export function CarSelector({
   }
 
   return (
-    <div className="card p-7">
-      <div>
+    <div className="card p-5 sm:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h2 className="section-title">Select your vehicle</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          We separate marketplace year, make, and model compatibility evidence from broader results for the vehicle you pick.
-        </p>
+        <button
+          type="button"
+          onClick={() => setVinOpen((open) => !open)}
+          aria-expanded={vinOpen}
+          aria-controls="vin-panel"
+          className="-mx-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-brand-700 hover:text-brand-800 dark:text-brand-400 dark:hover:text-brand-300"
+        >
+          <ScanLine size={15} aria-hidden="true" /> Have a VIN?
+          <ChevronDown size={15} aria-hidden="true" className={`transition ${vinOpen ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
-      {/* My Garage */}
-      {garage.length > 0 ? (
+      {/* Always rendered so aria-controls resolves; hidden until opened. */}
+      <div id="vin-panel" hidden={!vinOpen} className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+        <label htmlFor="vin-input" className="field-label">Vehicle identification number (VIN)</label>
+        <div className="flex gap-2">
+          <input
+            ref={vinInputRef}
+            id="vin-input"
+            type="text"
+            value={vinInput}
+            onChange={(e) => {
+              setVinInput(e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17))
+              setVinError(null)
+            }}
+            placeholder="17 characters"
+            maxLength={17}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
+            aria-invalid={Boolean(vinError)}
+            aria-describedby={vinError ? 'vin-help vin-error' : 'vin-help'}
+            className="field font-data flex-1 uppercase tracking-[0.08em]"
+          />
+          <button
+            type="button"
+            onClick={handleDecodeVin}
+            disabled={vinInput.length !== 17 || vinLoading}
+            className="btn btn-secondary shrink-0 px-4"
+          >
+            {vinLoading ? 'Decoding…' : 'Decode'}
+          </button>
+        </div>
+        <p id="vin-help" className="mt-1.5 text-xs text-slate-500">
+          Find it on the driver's door jamb or the lower windshield. It has 17 letters and numbers, never I, O, or Q.
+        </p>
+        {vinError && <p id="vin-error" role="alert" className="mt-1.5 text-xs text-rose-700">{vinError}</p>}
+      </div>
+
+      {/* My Garage — hidden until a vehicle is saved; first-time visitors
+          get the form, not a placeholder for a feature they haven't used. */}
+      {garage.length > 0 && (
         <div className="mt-6 border-b border-slate-100 pb-6 dark:border-slate-800/60">
           <h3 className="eyebrow mb-3">My Garage</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -282,14 +345,14 @@ export function CarSelector({
                     <div className="font-bold text-slate-900 truncate text-xs">
                       {c.year} {c.make} {c.model}
                     </div>
-                    {c.trim && <div className="text-[10px] text-slate-400 truncate">{c.trim}</div>}
+                    {c.trim && <div className="text-xs text-slate-500 truncate">{c.trim}</div>}
                   </div>
                 </button>
                 <div className="flex shrink-0 items-center gap-1">
                   {(() => {
                     const count = cachedRecallCount(c.year, c.make, c.model)
                     return count != null && count > 0 ? (
-                      <span className="badge bg-rose-100 text-rose-700 px-1.5 text-[10px]">
+                      <span className="badge bg-rose-100 text-rose-700 px-1.5">
                         {count} recall{count === 1 ? '' : 's'}
                       </span>
                     ) : null
@@ -301,7 +364,7 @@ export function CarSelector({
                       setHealthIndex(i)
                     }}
                     aria-label={`Vehicle health for ${c.year} ${c.make} ${c.model}`}
-                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-100 hover:text-brand-600"
+                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-600"
                   >
                     <Activity size={16} />
                   </button>
@@ -309,7 +372,7 @@ export function CarSelector({
                     type="button"
                     onClick={(e) => removeFromGarage(i, e)}
                     aria-label="Remove vehicle"
-                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-100 hover:text-rose-600"
+                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-rose-600"
                   >
                     <X size={16} />
                   </button>
@@ -317,11 +380,6 @@ export function CarSelector({
               </div>
             ))}
           </div>
-        </div>
-      ) : (
-        <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900/50">
-          <h3 className="eyebrow text-slate-500 dark:text-slate-400">My Garage</h3>
-          <p className="text-xs text-slate-500">Choose a vehicle below, then save it here for faster future searches.</p>
         </div>
       )}
 
@@ -331,65 +389,6 @@ export function CarSelector({
           Couldn't load vehicle data — check your connection and try again.
         </p>
       )}
-
-      <div className="mt-6">
-        <label htmlFor="vin-input" className="field-label flex items-center gap-1.5">
-          <ScanLine size={13} className="text-brand-600" /> Have your VIN? Decode it (fastest)
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="vin-input"
-            type="text"
-            value={vinInput}
-            onChange={(e) => {
-              setVinInput(e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17))
-              setVinError(null)
-            }}
-            placeholder="17-character VIN — driver's door jamb or windshield"
-            maxLength={17}
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            enterKeyHint="go"
-            aria-invalid={Boolean(vinError)}
-            aria-describedby={vinError ? 'vin-help vin-error' : 'vin-help'}
-            className="field font-data flex-1 uppercase tracking-[0.08em]"
-          />
-          <button
-            type="button"
-            onClick={handleDecodeVin}
-            disabled={vinInput.length !== 17 || vinLoading}
-            className="btn btn-secondary shrink-0 px-4"
-          >
-            {vinLoading ? 'Decoding…' : 'Decode'}
-          </button>
-        </div>
-        <p id="vin-help" className="mt-1.5 text-xs text-slate-500">
-          VINs contain 17 letters and numbers. The letters I, O, and Q are not used.
-        </p>
-        {vinError && <p id="vin-error" role="alert" className="mt-1.5 text-xs text-rose-600">{vinError}</p>}
-      </div>
-
-      <div className="mt-6">
-        <div className="field-label" id="vehicle-type-label">Vehicle type</div>
-        <div role="group" aria-labelledby="vehicle-type-label" className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
-          {vehicleTypeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setVehicleType(opt.value)}
-              aria-pressed={vehicleType === opt.value}
-              className={`min-h-11 touch-manipulation rounded-lg px-3.5 py-2.5 text-sm font-medium transition sm:min-h-0 sm:py-1.5 ${
-                vehicleType === opt.value
-                  ? 'bg-white text-brand-700 shadow-sm dark:text-brand-400'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Combobox
@@ -441,7 +440,7 @@ export function CarSelector({
         </p>
 
         {trimsLoading ? (
-          <div className="field bg-slate-50 text-slate-400">Loading trim options…</div>
+          <div className="field bg-slate-50 text-slate-500">Loading trim options…</div>
         ) : trims.length > 0 ? (
           <>
             {/* Nice card-style selector when there aren't too many options */}
@@ -478,7 +477,7 @@ export function CarSelector({
             ) : (
               <Combobox id={trimInputId} label="" ariaLabel="Trim (optional)" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
             )}
-            <p className="mt-2 text-xs text-slate-500">Showing marketplace year, make, model, and trim compatibility evidence from eBay data.</p>
+            <p className="mt-2 text-xs text-slate-500">Trim options come from eBay's vehicle data.</p>
           </>
         ) : (
           <input
@@ -502,14 +501,14 @@ export function CarSelector({
           <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <div className="flex min-w-0 items-center gap-4 sm:gap-5">
               <div className="relative shrink-0 overflow-hidden rounded-lg bg-slate-800 ring-1 ring-white/10">
-                <VehicleThumbnail make={make} model={model} year={year} className="h-16 w-24 sm:h-[92px] sm:w-[138px] object-cover" iconSize={28} />
+                <VehicleThumbnail make={make} model={model} year={year} className="h-16 w-24 sm:h-[92px] sm:w-[138px] object-cover" iconSize={28} tone="dark" />
               </div>
 
               <div className="min-w-0 py-0.5">
                 <div className="mb-1.5 flex items-center gap-1.5">
                   <span className="h-1 w-1 rounded-full bg-emerald-400" />
-                  <span className="font-data text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    YMM compatibility search — active
+                  <span className="font-data text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Your vehicle
                   </span>
                 </div>
 

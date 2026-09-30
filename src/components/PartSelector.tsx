@@ -284,7 +284,7 @@ export function PartSelector({
             disabled={diagnosing || !symptomText.trim()}
             onClick={() => applyRefinement(c)}
             aria-pressed={refineContext?.label === c.label}
-            className={`chip text-[11px] disabled:opacity-40 ${
+            className={`chip text-xs disabled:opacity-40 ${
               refineContext?.label === c.label ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-400' : ''
             }`}
           >
@@ -296,7 +296,7 @@ export function PartSelector({
         <button
           type="button"
           onClick={clearRefinement}
-          className="mt-2 min-h-11 px-2 text-[11px] font-medium text-slate-500 transition hover:text-brand-600"
+          className="mt-2 min-h-11 px-2 text-xs font-medium text-slate-500 transition hover:text-brand-600"
         >
           Clear “{refineContext.label}” ✕
         </button>
@@ -384,7 +384,7 @@ export function PartSelector({
     <div className="card min-w-0 max-w-full overflow-hidden p-5 sm:p-7">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="section-title">What part do you need?</h2>
+          <h1 className="section-title">What part do you need?</h1>
           <p className="mt-1 text-sm text-slate-600">
             Showing parts for{' '}
             <span className="font-medium text-slate-800">
@@ -433,7 +433,7 @@ export function PartSelector({
           <ArrowRight size={14} className="text-slate-400 sm:hidden" />
         </div>
       </div>
-      <p className="-mt-3 mb-4 text-[11px] text-slate-500 sm:hidden">Swipe the tabs to see every search method.</p>
+      <p className="-mt-3 mb-4 text-xs text-slate-500 sm:hidden">Swipe the tabs to see every search method.</p>
 
       <div
         id={`part-panel-${searchMethod}`}
@@ -471,7 +471,7 @@ export function PartSelector({
                       setSymptomText(ex)
                       submitDiagnosis(ex)
                     }}
-                    className="chip shrink-0 whitespace-nowrap text-[11px]"
+                    className="chip shrink-0 whitespace-nowrap text-xs"
                   >
                     {ex}
                   </button>
@@ -572,11 +572,11 @@ export function PartSelector({
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-semibold text-slate-800">{p.name}</span>
-                            <span className={`badge px-2 py-px text-[9px] ${p.priority === 'likely' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            <span className={`badge px-2 py-px text-xs ${p.priority === 'likely' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
                               {p.priority === 'likely' ? 'Most likely' : 'Possible'}
                             </span>
                           </span>
-                          <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">{p.why}</span>
+                          <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{p.why}</span>
                         </span>
                       </label>
                     ))}
@@ -607,7 +607,7 @@ export function PartSelector({
 
               {quoting && (
                 <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 text-center text-xs font-medium text-slate-400 dark:border-slate-800">
-                  Searching live eBay listings for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} with year, make, and model compatibility evidence for your {car.year} {car.make} {car.model}…
+                  Searching eBay for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} that match your {car.year} {car.make} {car.model}…
                 </div>
               )}
 
@@ -618,8 +618,8 @@ export function PartSelector({
                       Your quote — {car.year} {car.make} {car.model}
                       {car.trim ? ` ${car.trim}` : ''}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      Lowest item + known shipping, before tax, among marketplace YMM compatibility matches. Listings without compatibility evidence are excluded.
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Lowest total with shipping, before tax, among listings that match your year, make, and model. Listings that don't list your vehicle are excluded.
                     </p>
                   </div>
 
@@ -636,18 +636,18 @@ export function PartSelector({
                         <div className="min-w-0 flex-1">
                           <div className="text-xs font-semibold text-slate-800">{item.part}</div>
                           {item.listing ? (
-                            <p className="truncate text-[11px] text-slate-500">
+                            <p className="truncate text-xs text-slate-500">
                               {item.listing.condition} · {item.listing.seller} · {item.listing.source}
-                              {' · marketplace YMM compatibility evidence'}
+                              {' · year, make & model match'}
                             </p>
                           ) : (
-                            <p className="text-[11px] text-slate-400">No marketplace compatibility matches found right now</p>
+                            <p className="text-xs text-slate-500">No matching listings found right now</p>
                           )}
                         </div>
                         {item.listing && (
                           <div className="shrink-0 text-right">
                             <div className="font-data text-sm font-bold text-slate-900">${item.listing.price.toFixed(2)}</div>
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-xs text-slate-500">
                               {item.listing.shippingCost ? `+ $${item.listing.shippingCost.toFixed(2)} ship` : 'Free shipping'}
                             </div>
                           </div>
@@ -675,17 +675,17 @@ export function PartSelector({
                         Items ${quote.subtotal.toFixed(2)} + known shipping ${quote.shipping.toFixed(2)}
                       </div>
                       <div className="font-data text-lg font-bold tracking-tight text-slate-950">
-                        Item + known shipping, before tax: ~${quote.total.toFixed(2)}
+                        Total with shipping, before tax: ~${quote.total.toFixed(2)}
                       </div>
                     </div>
-                    <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
                       Estimate only — parts, not labor. Confirm engine, drivetrain, options, and original part number before purchase.
                     </p>
                   </div>
                 </div>
               )}
 
-              <p className="text-[10px] leading-relaxed text-slate-400">
+              <p className="text-xs leading-relaxed text-slate-500">
                 Based on commonly reported causes for these symptoms — not a professional inspection. When in doubt, have a mechanic confirm before buying parts.
               </p>
             </div>
@@ -753,7 +753,7 @@ export function PartSelector({
                   className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 text-left transition-all hover:border-brand-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50"
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${kit.background} ${kit.color}`}>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-300">
                       <Icon size={22} strokeWidth={2} />
                     </div>
                     <div>
@@ -808,7 +808,7 @@ export function PartSelector({
                   onChange={handlePhotoUpload}
                 />
               </label>
-              <p id="part-photo-help" className="text-center text-[11px] leading-relaxed text-slate-500">
+              <p id="part-photo-help" className="text-center text-xs leading-relaxed text-slate-500">
                 Use a clear, well-lit photo of the part only. The image is compressed before it is sent for AI identification.
               </p>
             </div>
@@ -858,7 +858,7 @@ export function PartSelector({
                       <CheckCircle2 size={22} />
                     </div>
                     <div className="w-full">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">AI suggestion</div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">AI suggestion</div>
                       <label htmlFor="photo-part-name" className="sr-only">Suggested part name</label>
                       <input
                         id="photo-part-name"
@@ -868,7 +868,7 @@ export function PartSelector({
                         aria-describedby="photo-ai-suggestion-help"
                         className="field h-auto min-h-0 border-0 bg-transparent p-0 text-lg font-bold text-slate-900 focus:ring-0 dark:bg-transparent"
                       />
-                      <p id="photo-ai-suggestion-help" className="mt-1 text-[11px] leading-relaxed text-emerald-800 dark:text-emerald-200">
+                      <p id="photo-ai-suggestion-help" className="mt-1 text-xs leading-relaxed text-emerald-800 dark:text-emerald-200">
                         AI suggestion only — confirm or edit the part name before searching.
                       </p>
                     </div>

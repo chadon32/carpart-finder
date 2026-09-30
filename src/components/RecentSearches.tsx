@@ -12,17 +12,8 @@ export function RecentSearches({
   onClear: () => void
   onRemove: (search: RecentSearch) => void
 }) {
-  if (searches.length === 0) {
-    return (
-      <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900/50">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
-          <Clock size={15} className="text-slate-400" />
-          Recent searches
-        </div>
-        <p className="text-xs text-slate-500">Search for a part and it will appear here for quick access.</p>
-      </div>
-    )
-  }
+  // Nothing to show a first-time visitor; the section appears after a search.
+  if (searches.length === 0) return null
 
   return (
     <div className="mt-10">

@@ -45,12 +45,12 @@ export function BottomNav({
               <span className="relative">
                 <Icon size={21} strokeWidth={isActive ? 2.4 : 2} />
                 {t.id === 'watchlist' && watchlistCount > 0 && (
-                  <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-[9px] font-bold text-white">
+                  <span className="absolute -right-3 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1 text-xs font-bold text-white">
                     {watchlistCount}
                   </span>
                 )}
               </span>
-              <span className="font-data text-[10px] font-semibold uppercase tracking-[0.08em]">{t.label}</span>
+              <span className="font-data text-xs font-semibold uppercase tracking-[0.08em]">{t.label}</span>
             </button>
           )
         })}

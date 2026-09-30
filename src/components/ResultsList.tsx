@@ -11,6 +11,7 @@ import {
   Truck,
   Store,
   Share2,
+  ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Car } from './CarSelector'
@@ -44,8 +45,8 @@ import {
 import { maintenanceKitForSearch } from '../data/maintenanceKits'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
 import { guideForPart } from '../data/guideSearch'
+import { SORT_OPTIONS, type SortKey } from '../lib/listingSort'
 
-type SortKey = 'value' | 'price' | 'rating'
 type ConditionFilter = 'all' | 'new' | 'used'
 
 function SkeletonCard() {
@@ -62,6 +63,65 @@ function SkeletonCard() {
         </div>
       </div>
     </li>
+  )
+}
+
+type ListingFilters = {
+  condition: ConditionFilter
+  hideOverseas: boolean
+  fastDelivery: boolean
+  minRating: number
+}
+
+function applyFilters(listings: Listing[], filters: ListingFilters): Listing[] {
+  let list = listings
+  if (filters.condition === 'new') list = list.filter(isNew)
+  if (filters.condition === 'used') list = list.filter(isUsed)
+  if (filters.hideOverseas) list = list.filter((listing) => !listing.crossBorder)
+  // Fast delivery = eBay's own worst-case estimate arrives within 7 days.
+  if (filters.fastDelivery) {
+    const cutoff = Date.now() + 7 * 24 * 60 * 60 * 1000
+    list = list.filter((listing) => listing.deliveryMax && new Date(listing.deliveryMax).getTime() <= cutoff)
+  }
+  if (filters.minRating > 0) {
+    list = list.filter((listing) => Number(listing.sellerFeedbackPercentage ?? 0) >= filters.minRating)
+  }
+  return list
+}
+
+const sellerRating = (listing: Listing) => (listing.sellerFeedbackPercentage ? Number(listing.sellerFeedbackPercentage) : 0)
+
+function sortListings(listings: Listing[], sortBy: SortKey): Listing[] {
+  return [...listings].sort((a, b) => {
+    if (sortBy === 'total') return compareKnownTotal(a, b)
+    if (sortBy === 'price') return a.price - b.price
+    if (sortBy === 'rating') return sellerRating(b) - sellerRating(a) || a.price - b.price
+    return compareValueEstimate(a, b)
+  })
+}
+
+// Other-store searches, shared by the sidebar card and the phone disclosure.
+function StoreLinks({ vehicleLabel, part }: { vehicleLabel: string; part: string }) {
+  const searchQuery = `${vehicleLabel} ${part}`.trim()
+  return (
+    <div className="flex flex-col gap-2">
+      {retailerLinks.map((retailer) => (
+        <OutboundLink
+          key={retailer.name}
+          href={retailer.buildUrl(searchQuery)}
+          onClick={() => trackRetailerClick({
+            retailer: retailer.name,
+            placement: 'store-comparison',
+            vehicleLabel,
+            part,
+          })}
+          className="group flex min-h-11 items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-700"
+        >
+          {retailer.name}
+          <ExternalLink size={14} className="text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
+        </OutboundLink>
+      ))}
+    </div>
   )
 }
 
@@ -90,7 +150,10 @@ export function ResultsList({
   const providerErrors = data?.providerErrors ?? EMPTY_PROVIDER_ERRORS
   const stale = Boolean(data?.stale)
 
-  const [sortBy, setSortBy] = usePersistedState<SortKey>('cpf-sort', 'price')
+  // Default to what the buyer actually pays: item + known shipping, with
+  // unknown shipping last. Item price alone put $1 listings with hidden
+  // shipping first. The key changed so returning visitors get this default.
+  const [sortBy, setSortBy] = usePersistedState<SortKey>('cpf-sort-v2', 'total')
   const [condition, setCondition] = usePersistedState<ConditionFilter>('cpf-condition', 'all')
   const [hideOverseas, setHideOverseas] = usePersistedState<boolean>('cpf-hide-overseas', false)
   const [zipInput, setZipInput] = useState(zip)
@@ -174,58 +237,15 @@ export function ResultsList({
   // Results contain different products, not offers for a single product.
   // Do not present this internal search as Product/AggregateOffer rich-result data.
 
-  const visible = useMemo(() => {
-    let list = results.slice()
-    if (condition === 'new') list = list.filter(isNew)
-    if (condition === 'used') list = list.filter(isUsed)
-    if (hideOverseas) list = list.filter((l) => !l.crossBorder)
-
-    // Fast delivery = eBay's own worst-case estimate arrives within 7 days.
-    if (filterFastDelivery) {
-      const cutoff = Date.now() + 7 * 24 * 60 * 60 * 1000
-      list = list.filter((l) => l.deliveryMax && new Date(l.deliveryMax).getTime() <= cutoff)
-    }
-    if (minRating > 0) list = list.filter((l) => Number(l.sellerFeedbackPercentage ?? 0) >= minRating)
-
-    list.sort((a, b) => {
-      if (sortBy === 'price') return a.price - b.price
-      if (sortBy === 'rating') {
-        const ra = a.sellerFeedbackPercentage ? Number(a.sellerFeedbackPercentage) : 0
-        const rb = b.sellerFeedbackPercentage ? Number(b.sellerFeedbackPercentage) : 0
-        if (rb !== ra) return rb - ra
-        return a.price - b.price
-      }
-      return compareValueEstimate(a, b)
-    })
-    return list
-
-  }, [results, sortBy, condition, hideOverseas, filterFastDelivery, minRating])
-
-  const visibleFallbacks = useMemo(() => {
-    let list = fallbackResults.slice()
-    if (condition === 'new') list = list.filter(isNew)
-    if (condition === 'used') list = list.filter(isUsed)
-    if (hideOverseas) list = list.filter((listing) => !listing.crossBorder)
-    if (filterFastDelivery) {
-      const cutoff = Date.now() + 7 * 24 * 60 * 60 * 1000
-      list = list.filter((listing) => listing.deliveryMax && new Date(listing.deliveryMax).getTime() <= cutoff)
-    }
-    if (minRating > 0) {
-      list = list.filter((listing) => Number(listing.sellerFeedbackPercentage ?? 0) >= minRating)
-    }
-    list.sort((a, b) => {
-      if (sortBy === 'price') return a.price - b.price
-      if (sortBy === 'rating') {
-        const aRating = Number(a.sellerFeedbackPercentage ?? 0)
-        const bRating = Number(b.sellerFeedbackPercentage ?? 0)
-        if (bRating !== aRating) return bRating - aRating
-      }
-      return compareValueEstimate(a, b)
-    })
-    return list
-  }, [fallbackResults, sortBy, condition, hideOverseas, filterFastDelivery, minRating])
-
-  const hasComparison = visible.length >= 2
+  const filters = useMemo(
+    () => ({ condition, hideOverseas, fastDelivery: filterFastDelivery, minRating }),
+    [condition, hideOverseas, filterFastDelivery, minRating],
+  )
+  const visible = useMemo(() => sortListings(applyFilters(results, filters), sortBy), [results, filters, sortBy])
+  const visibleFallbacks = useMemo(
+    () => sortListings(applyFilters(fallbackResults, filters), sortBy),
+    [fallbackResults, filters, sortBy],
+  )
 
   const bestValueId = useMemo(() => {
     const complete = visible.filter((listing) => knownTotalCost(listing) != null)
@@ -237,12 +257,6 @@ export function ResultsList({
     const complete = visible.filter((listing) => knownTotalCost(listing) != null)
     if (complete.length < 2) return null
     return [...complete].sort(compareKnownTotal)[0].id
-  }, [visible])
-
-  const priceRange = useMemo(() => {
-    if (visible.length === 0) return null
-    const prices = visible.map((l) => l.price)
-    return { min: Math.min(...prices), max: Math.max(...prices) }
   }, [visible])
 
   const activeFilterCount =
@@ -266,6 +280,20 @@ export function ResultsList({
   )
   const maintenanceKit = useMemo(() => maintenanceKitForSearch(part), [part])
 
+  // With nothing marketplace-confirmed, the unconfirmed results ARE the list;
+  // they get one honest notice rather than a second, duplicate section. A kit
+  // search never lists loose keyword results.
+  const noneConfirmed = results.length === 0
+  const kitWithoutMatches = noneConfirmed && Boolean(maintenanceKit)
+  const mainListings = kitWithoutMatches ? EMPTY_LISTINGS : noneConfirmed ? visibleFallbacks : visible
+  const otherFallbacks = noneConfirmed || maintenanceKit ? EMPTY_LISTINGS : visibleFallbacks
+  const hasComparison = mainListings.length >= 2
+  const priceRange = useMemo(() => {
+    if (mainListings.length === 0) return null
+    const prices = mainListings.map((l) => l.price)
+    return { min: Math.min(...prices), max: Math.max(...prices) }
+  }, [mainListings])
+
   const failedProviders = Object.keys(providerErrors)
   const vehicleLabel = `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}`
 
@@ -277,6 +305,13 @@ export function ResultsList({
       part,
       listingId: listing.id,
       fitmentStatus: listing.verifiedFitment === true ? 'verified' : 'unverified',
+    })
+  }
+
+  const toggleCompare = (listing: Listing) => {
+    setCompareList((current) => {
+      if (current.some((item) => item.id === listing.id)) return current.filter((item) => item.id !== listing.id)
+      return current.length < 4 ? [...current, listing] : current
     })
   }
 
@@ -337,8 +372,8 @@ export function ResultsList({
               }
             }}
             aria-label="Save search"
-            className={`btn btn-accent px-4 py-2 text-xs flex items-center gap-1.5 shadow-md ${
-              saveState === 'error' ? 'bg-rose-600 hover:bg-rose-700' : saveState === 'auth' ? 'bg-brand-700 hover:bg-brand-800' : ''
+            className={`btn btn-secondary px-4 py-2 text-xs flex items-center gap-1.5 ${
+              saveState === 'error' ? 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100' : saveState === 'auth' ? 'border-brand-300 bg-brand-50 text-brand-800 hover:bg-brand-100' : ''
             }`}
           >
             {saveState === 'saved' && <Check size={13} className="text-emerald-600 animate-scale-up" />}
@@ -352,7 +387,7 @@ export function ResultsList({
                     ? 'Sign in to save'
                     : saveState === 'error'
                       ? "Couldn't save — try again"
-                      : 'Save Search'}
+                      : 'Save search'}
             </span>
           </button>
           <button
@@ -382,7 +417,7 @@ export function ResultsList({
         <>
           {/* The scan in progress — the radar sweep here is the same mark as
               the logo, doing the thing the logo promises. */}
-          <div className="font-data mt-6 flex items-center justify-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 dark:text-brand-400" role="status">
+          <div className="font-data mt-6 flex items-center justify-center gap-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-brand-700 dark:text-brand-400" role="status">
             <RadarMark className="h-5 w-5" />
             Scanning live listings for your {car.year} {car.make} {car.model}
           </div>
@@ -398,7 +433,7 @@ export function ResultsList({
         <div className="mt-8 flex flex-col items-center rounded-3xl border border-red-100 bg-red-50 p-8 text-center">
           <AlertTriangle className="text-red-500" size={28} />
           <p className="mt-2 font-semibold text-red-800">We couldn't complete this search.</p>
-          <p className="break-anywhere mt-1 max-w-full text-xs text-red-500">{error}</p>
+          <p className="break-anywhere mt-1 max-w-full text-xs text-red-700">{error}</p>
           <button type="button" onClick={retry} className="btn btn-primary mt-4 px-5 py-2">
             <RotateCw size={15} /> Try again
           </button>
@@ -411,7 +446,7 @@ export function ResultsList({
             <>
               <AlertTriangle className="text-amber-500" size={28} />
               <p className="mt-2 font-semibold text-slate-700">Couldn't reach {failedProviders.join(' and ')}.</p>
-              <p className="mt-1 text-xs text-slate-400">{Object.values(providerErrors)[0]}</p>
+              <p className="mt-1 text-xs text-slate-500">{Object.values(providerErrors)[0]}</p>
             </>
           ) : (
             <>
@@ -470,15 +505,20 @@ export function ResultsList({
             )
           )}
 
-          {results.length === 0 && (
-            <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100" aria-labelledby="no-verified-matches">
+          {noneConfirmed && (
+            <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100" aria-labelledby="none-confirmed-heading">
               <div className="flex items-start gap-3">
                 <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div>
-                  <h2 id="no-verified-matches" className="font-semibold">No marketplace YMM compatibility evidence found</h2>
+                  <h2 id="none-confirmed-heading" className="font-semibold">
+                    {maintenanceKit
+                      ? `No ${maintenanceKit.title.toLowerCase()} kit is confirmed for your ${vehicleLabel}`
+                      : `None of these are confirmed for your ${vehicleLabel}`}
+                  </h2>
                   <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
-                    We will not call broad keyword results a fit for your full vehicle. Confirm the original part number,
-                    engine, drivetrain, dimensions, and options before considering the separate marketplace results below.
+                    {maintenanceKit
+                      ? 'Search the components separately, and check each part number before buying.'
+                      : "eBay doesn't list your vehicle as compatible with these results. Before buying, check the part number, engine, and dimensions against your original part."}
                   </p>
                   {maintenanceKit && onSearchPart && (
                     <div className="mt-3 flex flex-wrap gap-2" aria-label="Search maintenance components separately">
@@ -494,43 +534,49 @@ export function ResultsList({
             </section>
           )}
 
-          {/* Mobile toolbar: one thumb-scrollable row; detail filters live in the sheet */}
-          <div className="-mx-6 mt-6 flex items-center gap-2 overflow-x-auto scrollbar-none px-6 sm:hidden">
+          {/* Where the sidebar drops below the list, other stores are a long
+              scroll away, so offer them right under the notice. */}
+          {noneConfirmed && (
+            <details className="group mt-3 rounded-xl border border-slate-200 bg-white lg:hidden dark:border-slate-800 dark:bg-slate-900">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-semibold text-slate-800 dark:text-slate-200 [&::-webkit-details-marker]:hidden">
+                Check other stores
+                <ChevronDown size={16} aria-hidden="true" className="transition group-open:rotate-180" />
+              </summary>
+              <div className="px-4 pb-4">
+                <StoreLinks vehicleLabel={vehicleLabel} part={part} />
+              </div>
+            </details>
+          )}
+
+          {!kitWithoutMatches && (
+            <>
+          {/* Phone toolbar: sorting and the detail filters share one sheet */}
+          <div className="mt-6 flex flex-wrap items-center gap-2 sm:hidden">
             <button
               type="button"
               onClick={() => setShowFilters(true)}
               className="btn btn-secondary relative shrink-0 px-4 text-xs"
             >
-              <SlidersHorizontal size={15} /> Filters
+              <SlidersHorizontal size={15} /> Sort &amp; filters
               {activeFilterCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-bold text-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-xs font-bold text-white">
                   {activeFilterCount}
                 </span>
               )}
             </button>
-            <div role="group" aria-label="Condition" className="inline-flex shrink-0 gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <div role="group" aria-label="Condition" className="ml-auto inline-flex shrink-0 gap-0.5 rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
               {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setCondition(c)}
                   aria-pressed={condition === c}
-                  className={`min-h-11 touch-manipulation rounded-full px-4 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}
+                  className={`min-h-11 touch-manipulation rounded-full px-3 text-xs font-semibold capitalize transition ${condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'}`}
                 >
                   {c === 'all' ? 'All' : c}
                 </button>
               ))}
             </div>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              aria-label="Sort listings"
-              className="field w-auto shrink-0 py-2.5 pr-8 text-xs font-semibold"
-            >
-              <option value="price">Lowest item price</option>
-              <option value="value">Best value estimate</option>
-              <option value="rating">Seller rating</option>
-            </select>
           </div>
 
           <div className="mt-6 hidden flex-wrap items-center justify-between gap-3 sm:flex">
@@ -621,21 +667,30 @@ export function ResultsList({
                 onChange={(e) => setSortBy(e.target.value as SortKey)}
                 className="field w-auto py-2 pr-8 text-xs font-semibold"
               >
-                <option value="price">Lowest item price</option>
-                <option value="value">Best value estimate</option>
-                <option value="rating">Seller rating</option>
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
           </div>
 
-          <div className="mt-6 grid min-w-0 gap-8 md:grid-cols-12">
-            <div className="min-w-0 md:col-span-7 xl:col-span-8">
+          </>
+          )}
+
+          <div className="mt-6 grid min-w-0 gap-8 lg:grid-cols-12">
+            <div className="min-w-0 lg:col-span-7 xl:col-span-8">
+              {!kitWithoutMatches && (
+                <>
               <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
                 <div className="min-w-0 max-w-full">
-                  <div className="eyebrow text-brand-600 dark:text-brand-400">Marketplace YMM compatibility evidence</div>
-                  <p className="mt-2 max-w-xl text-xs leading-relaxed text-slate-500">
-                    We rank listings with marketplace compatibility evidence first. A shared part may be titled for another vehicle, so open Details to review the match before buying.
-                  </p>
+                  {!noneConfirmed && (
+                    <>
+                      <h2 className="text-base font-semibold text-slate-950 dark:text-slate-50">Matches for your {vehicleLabel}</h2>
+                      <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                        eBay lists your year, make, and model as compatible. Trim, engine, and options can differ, so check Details before you buy.
+                      </p>
+                    </>
+                  )}
                   {matchingGuide && (
                     <a
                       href={`/guides/${matchingGuide.id}.html`}
@@ -645,23 +700,26 @@ export function ResultsList({
                     </a>
                   )}
                   <div className="font-display text-3xl text-slate-950">
-                    {visible.length} {visible.length === 1 ? 'listing' : 'listings'}
+                    {mainListings.length}{' '}
+                    {noneConfirmed
+                      ? (mainListings.length === 1 ? 'possible match' : 'possible matches')
+                      : (mainListings.length === 1 ? 'listing' : 'listings')}
                     {priceRange && (
-                      <span className="font-data inline-block max-w-full text-base font-normal text-slate-500 sm:ml-2">
+                      <span className="font-data ml-2 inline-block max-w-full text-base font-normal text-slate-500">
                         {priceRange.min === priceRange.max
                           ? `$${priceRange.min.toFixed(2)}`
                           : `$${priceRange.min.toFixed(2)} – $${priceRange.max.toFixed(2)}`}
                       </span>
                     )}
                   </div>
-                  {!hasComparison && visible.length === 1 && (
+                  {!hasComparison && mainListings.length === 1 && (
                     <p className="mt-1 max-w-md text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                      Only one matching marketplace listing is available, so there is not enough data for a price comparison. Check the other-store searches below.
+                      Only one {noneConfirmed ? 'possible match' : 'matching listing'} is available, so there is not enough data for a price comparison. Check the other-store searches below.
                     </p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {activeFilterCount > 0 && visible.length > 0 && (
+                  {activeFilterCount > 0 && mainListings.length > 0 && (
                     <button
                       type="button"
                       onClick={clearFilters}
@@ -670,19 +728,10 @@ export function ResultsList({
                       Clear filters
                     </button>
                   )}
-                  {compareList.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCompareModal(true)}
-                      className="btn btn-primary px-4 py-1.5 text-xs"
-                    >
-                      Compare ({compareList.length})
-                    </button>
-                  )}
                 </div>
               </div>
 
-              {results.length > 0 && visible.length === 0 && (
+              {mainListings.length === 0 && (
                 <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">
                   No listings match these filters.{' '}
                   <button
@@ -696,7 +745,7 @@ export function ResultsList({
               )}
 
               <ul className="flex flex-col gap-4">
-                {visible.map((listing, i) => {
+                {mainListings.map((listing, i) => {
                   const inWatchlist = isInWatchlist(listing.id)
                   const isBestValue = listing.id === bestValueId
                   const isCheapest = listing.id === cheapestId
@@ -713,69 +762,52 @@ export function ResultsList({
                       onSelect={setSelectedListing}
                       onAddToWatchlist={onAddToWatchlist}
                       onOutboundClick={() => trackListingClick(listing)}
-                      onToggleCompare={(l) => {
-                        const isComparing = compareList.some(comp => comp.id === l.id)
-                        if (isComparing) {
-                          setCompareList(compareList.filter(comp => comp.id !== l.id))
-                        } else if (compareList.length < 4) {
-                          setCompareList([...compareList, l])
-                        }
-                      }}
+                      onToggleCompare={toggleCompare}
                     />
                   )
                 })}
               </ul>
 
-              {!maintenanceKit && visibleFallbacks.length > 0 && (
+              {otherFallbacks.length > 0 && (
                 <section className="mt-10 border-t border-slate-200 pt-7 dark:border-slate-800" aria-labelledby="fallback-results-heading">
                   <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
                     <h2 id="fallback-results-heading" className="font-semibold text-amber-950 dark:text-amber-100">
-                      Other marketplace keyword results
+                      More results that do not list your vehicle
                     </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
-                    These {visibleFallbacks.length} listings mention the part or vehicle terms, but the marketplace did not
-                    confirm compatibility. They are not fitment-ranked or automatically recommended, but you can still sort them;
-                    they are never used for automatic quotes or repair guides.
-                  </p>
-                  {hiddenIrrelevantFallbacks > 0 && (
-                    <p className="mt-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                      We also left out {hiddenIrrelevantFallbacks} accessory-only marketplace {hiddenIrrelevantFallbacks === 1 ? 'listing' : 'listings'} that did not clearly match {part}.
+                    <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-200">
+                      These {otherFallbacks.length} mention {part}, but eBay doesn't list your vehicle as compatible. Check the part number before buying. They are not ranked as fitting choices and are never used for quotes or repair guides.
                     </p>
-                  )}
+                    {hiddenIrrelevantFallbacks > 0 && (
+                      <p className="mt-2 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                        We also hid {hiddenIrrelevantFallbacks} accessory-only {hiddenIrrelevantFallbacks === 1 ? 'listing' : 'listings'} that did not clearly match {part}.
+                      </p>
+                    )}
                   </div>
                   <ul className="flex flex-col gap-4">
-                    {visibleFallbacks.map((listing, index) => {
-                      const inWatchlist = isInWatchlist(listing.id)
-                      return (
-                        <ListingCard
-                          key={listing.id}
-                          listing={listing}
-                          index={visible.length + index}
-                          isBestValue={false}
-                          isCheapest={false}
-                          inWatchlist={inWatchlist}
-                          isComparing={compareList.some((item) => item.id === listing.id)}
-                          effectiveZip={effectiveZip}
-                          onSelect={setSelectedListing}
-                          onAddToWatchlist={onAddToWatchlist}
-                          onOutboundClick={() => trackListingClick(listing)}
-                          onToggleCompare={(item) => {
-                            const selected = compareList.some((comparison) => comparison.id === item.id)
-                            if (selected) {
-                              setCompareList(compareList.filter((comparison) => comparison.id !== item.id))
-                            } else if (compareList.length < 4) {
-                              setCompareList([...compareList, item])
-                            }
-                          }}
-                        />
-                      )
-                    })}
+                    {otherFallbacks.map((listing, index) => (
+                      <ListingCard
+                        key={listing.id}
+                        listing={listing}
+                        index={mainListings.length + index}
+                        isBestValue={false}
+                        isCheapest={false}
+                        inWatchlist={isInWatchlist(listing.id)}
+                        isComparing={compareList.some((item) => item.id === listing.id)}
+                        effectiveZip={effectiveZip}
+                        onSelect={setSelectedListing}
+                        onAddToWatchlist={onAddToWatchlist}
+                        onOutboundClick={() => trackListingClick(listing)}
+                        onToggleCompare={toggleCompare}
+                      />
+                    ))}
                   </ul>
                 </section>
               )}
+                </>
+              )}
             </div>
 
-            <aside className="min-w-0 space-y-6 md:col-span-5 xl:col-span-4">
+            <aside className="min-w-0 space-y-6 lg:col-span-5 xl:col-span-4">
               {companions.length > 0 && onSearchPart && (
                 <div className="card p-[16px] sm:p-6">
                   <div className="flex flex-wrap items-center gap-3">
@@ -809,31 +841,8 @@ export function ResultsList({
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-2">
-                  {retailerLinks.map((retailer, idx) => {
-                    const Icon = retailer.icon
-                    // Build a high-quality search query
-                    const searchQuery = `${vehicleLabel} ${part}`.trim()
-                    return (
-                      <OutboundLink
-                        key={idx}
-                        href={retailer.buildUrl(searchQuery)}
-                        onClick={() => trackRetailerClick({
-                          retailer: retailer.name,
-                          placement: 'store-comparison',
-                          vehicleLabel,
-                          part,
-                        })}
-                        className="group flex min-h-11 items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-700"
-                      >
-                        <span className="flex items-center gap-3">
-                          <Icon size={17} className={retailer.color} />
-                          {retailer.name}
-                        </span>
-                        <ExternalLink size={14} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
-                      </OutboundLink>
-                    )
-                  })}
+                <div className="mt-5">
+                  <StoreLinks vehicleLabel={vehicleLabel} part={part} />
                 </div>
               </div>
 
@@ -881,6 +890,8 @@ export function ResultsList({
           </div>
         )}>
         <FilterSheet
+          sortBy={sortBy}
+          onSortBy={setSortBy}
           condition={condition}
           onCondition={setCondition}
           hideOverseas={hideOverseas}
@@ -903,7 +914,7 @@ export function ResultsList({
       {compareList.length > 0 && (
         <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 animate-slide-up items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-950/20 max-w-sm sm:max-w-md w-[calc(100%-2rem)] sm:bottom-6">
           <div className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-[11px] font-extrabold text-white">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs font-extrabold text-white">
               {compareList.length}
             </span>
             <span className="text-xs font-semibold text-slate-200 sm:text-sm">
@@ -924,7 +935,7 @@ export function ResultsList({
               disabled={compareList.length < 2}
               className="btn btn-primary rounded-xl px-4 py-1.5 text-xs font-bold"
             >
-              {compareList.length < 2 ? 'Select one more' : 'Compare Now'}
+              {compareList.length < 2 ? 'Select one more' : 'Compare now'}
             </button>
           </div>
         </div>

@@ -139,8 +139,13 @@ function footer() {
     </footer>`
 }
 
-function pageShell({ title, description, path, body, type = 'website', modified, crumbs }) {
-  const pageTitle = title === site.name ? title : `${title} | ${site.name}`
+// The same typefaces as the app (index.html). editorial-content.test.mjs
+// fails if the two URLs drift apart.
+const BRAND_FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap'
+
+function pageShell({ title, description, path, body, type = 'website', modified, crumbs, indexable = true }) {
+  // "About CarPartsRadar | CarPartsRadar" says the name twice; add the suffix only when the title lacks it.
+  const pageTitle = title.includes(site.name) ? title : `${title} | ${site.name}`
   const pageUrl = canonical(path)
   return `<!doctype html>
 <html lang="en">
@@ -150,9 +155,12 @@ function pageShell({ title, description, path, body, type = 'website', modified,
   <meta name="theme-color" content="#2050c8" />
   <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(description)}" />
-  <link rel="canonical" href="${pageUrl}" />
+  ${indexable ? `<link rel="canonical" href="${pageUrl}" />` : '<meta name="robots" content="noindex" />'}
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="${BRAND_FONTS_HREF}" />
   <link rel="stylesheet" href="/editorial.css" />
   <meta property="og:type" content="${type}" />
   <meta property="og:site_name" content="CarPartsRadar" />
@@ -160,12 +168,14 @@ function pageShell({ title, description, path, body, type = 'website', modified,
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:url" content="${pageUrl}" />
   <meta property="og:image" content="${site.origin}/editorial/parts-workbench.webp" />
+  <meta property="og:image:width" content="1440" />
+  <meta property="og:image:height" content="960" />
   <meta property="og:image:alt" content="Replacement car parts arranged on a workbench" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
   <meta name="twitter:image" content="${site.origin}/editorial/parts-workbench.webp" />
-  ${structuredData({ title, description, path, type, modified, crumbs })}
+  ${indexable ? structuredData({ title, description, path, type, modified, crumbs }) : ''}
 </head>
 <body>
   ${header()}
@@ -354,6 +364,32 @@ function standardPage(page, path) {
   })
 }
 
+// Vercel serves /404.html, with a real 404 status, for any unknown path.
+function notFoundPage() {
+  const body = `
+    <main id="main-content">
+      <article class="standard-page shell">
+        <header>
+          <p class="eyebrow">Page not found</p>
+          <h1>We can't find that page.</h1>
+          <p class="article-dek">The link may be old or mistyped. Search for a part for your vehicle, or browse the buying guides.</p>
+        </header>
+        <div class="standard-body">
+          <p><a class="compare-cta" href="/">Search for a part <span aria-hidden="true">→</span></a></p>
+          <p><a class="text-link" href="/guides.html">Browse buying guides <span aria-hidden="true">→</span></a></p>
+        </div>
+      </article>
+    </main>`
+
+  return pageShell({
+    title: 'Page not found',
+    description: 'This page could not be found. Search for a car part or browse the CarPartsRadar buying guides.',
+    path: '/404.html',
+    body,
+    indexable: false,
+  })
+}
+
 function sitemap() {
   const paths = [
     '/',
@@ -406,6 +442,7 @@ export async function generateEditorialPages() {
     [resolve(publicDir, 'privacy.html'), standardPage(legalPages.privacy, '/privacy.html')],
     [resolve(publicDir, 'terms.html'), standardPage(legalPages.terms, '/terms.html')],
     [resolve(publicDir, 'affiliate-disclosure.html'), standardPage(legalPages.disclosure, '/affiliate-disclosure.html')],
+    [resolve(publicDir, '404.html'), notFoundPage()],
     [resolve(publicDir, 'sitemap.xml'), sitemap()],
     [resolve(publicDir, 'feed.xml'), feed()],
     ...guides.map((guide) => [resolve(guideDir, `${guide.slug}.html`), guidePage(guide)]),

@@ -102,7 +102,7 @@ export function VehicleHealthModal({
         <p id="vehicle-mileage-help" className="mt-1 text-xs text-slate-500">Optional. Enter a whole number from 0 to 1,000,000.</p>
         {mileageError && <p id="vehicle-mileage-error" role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">{mileageError}</p>}
         {vehicle.vin && (
-          <p className="font-data mt-1 text-[11px] uppercase tracking-[0.14em] text-slate-600">VIN · {vehicle.vin}</p>
+          <p className="font-data mt-1 text-xs uppercase tracking-[0.14em] text-slate-600">VIN · {vehicle.vin}</p>
         )}
       </div>
 
@@ -137,11 +137,11 @@ export function VehicleHealthModal({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="badge bg-rose-600 text-white">Recall</span>
                     {r.campaignNumber && (
-                      <span className="font-data text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-700 dark:text-rose-300">
+                      <span className="font-data text-xs font-semibold uppercase tracking-[0.1em] text-rose-700 dark:text-rose-300">
                         {r.campaignNumber}
                       </span>
                     )}
-                    {r.reportedDate && <span className="text-[11px] text-slate-600">{r.reportedDate}</span>}
+                    {r.reportedDate && <span className="text-xs text-slate-600">{r.reportedDate}</span>}
                   </div>
                   {r.component && <p className="mt-2 text-sm font-semibold text-slate-900">{r.component}</p>}
                   {r.summary && <p className="mt-1 text-sm leading-relaxed text-slate-600">{r.summary}</p>}

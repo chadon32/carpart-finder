@@ -14,13 +14,15 @@ test('comparison keeps an unknown shipping total unavailable', async ({ page, ap
 
   await goToResults(page, app.baseUrl)
   await expectResults(page)
-  const cards = page.locator('.listing-card')
-  await cards.nth(1).getByRole('button', { name: 'Compare' }).click()
-  await cards.nth(0).getByRole('button', { name: 'Compare' }).click()
+  // Pick cards by title: results sort by known total, so the listing with
+  // unknown shipping moves last and positions no longer identify listings.
+  const card = (title: string) => page.locator('.listing-card').filter({ hasText: title })
+  await card('Toyota Camry Ceramic Brake Pads').getByRole('button', { name: 'Compare' }).click()
+  await card('2020 Toyota Camry Front Brake Pad Set').getByRole('button', { name: 'Compare' }).click()
   await page.getByRole('button', { name: 'Compare Now' }).click()
 
   const comparison = page.getByRole('dialog', { name: 'Compare listings' })
-  // Columns follow selection order: the second result was selected first.
+  // Columns follow selection order, not result order.
   await expect(comparison.getByRole('columnheader')).toContainText([
     'Attribute', 'Toyota Camry Ceramic Brake Pads', '2020 Toyota Camry Front Brake Pad Set',
   ])

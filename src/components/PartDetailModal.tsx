@@ -60,8 +60,8 @@ export function PartDetailModal({
 
   return (
     <Modal label={`${part} — listing details`} onClose={onClose}>
-      {/* Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
+      {/* Header — pinned so Close stays reachable while the details scroll */}
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-4">
           <div>
             <div className="text-xs font-semibold tracking-[1px] text-brand-600 dark:text-brand-400">DETAILED VIEW</div>
             <div className="font-semibold text-xl tracking-tight text-slate-950">{part}</div>
@@ -133,11 +133,11 @@ export function PartDetailModal({
 
             {!isFitmentVerified ? (
               <div className="mt-5 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
-                <AlertTriangle size={14} /> No marketplace YMM compatibility evidence for {vehicleLabel} — check before buying
+                <AlertTriangle size={14} /> Fit not confirmed for your {vehicleLabel}. Check the part number before buying.
               </div>
             ) : (
               <div className="mt-5 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
-                <ShieldCheck size={14} /> Marketplace YMM compatibility evidence for {vehicleLabel} — not a full-vehicle fitment guarantee
+                <ShieldCheck size={14} /> eBay lists your {vehicleLabel} as compatible. That is a year, make, and model match, not a fitment guarantee, so confirm trim, engine, and options before buying.
               </div>
             )}
             
@@ -223,8 +223,9 @@ export function PartDetailModal({
           </div>
         </div>
 
-        {/* Footer Actions — pinned to the sheet bottom on mobile */}
-        <div className="sticky bottom-0 mt-4 border-t bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:static sm:p-6">
+        {/* Footer actions — pinned to the bottom on every screen size so the
+            retailer link never sits below the fold of a long listing */}
+        <div className="sticky bottom-0 z-10 mt-4 border-t bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
           <AffiliateDisclosure className="mb-3" />
           <div className="flex flex-col gap-3 sm:flex-row">
             <button

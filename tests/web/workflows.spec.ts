@@ -9,7 +9,7 @@ test('keyboard vehicle-to-part journey preserves labels and browser history', as
   for (const name of ['Year', 'Make', 'Model']) {
     await expect(page.getByRole('combobox', { name })).toHaveAccessibleName(name)
   }
-  await expect(page.getByLabel(/Have your VIN/)).toHaveAccessibleName(/Have your VIN/)
+  await expect(page.getByRole('button', { name: /Have a VIN/ })).toBeVisible()
   await expectNoHorizontalOverflow(page, 'vehicle selector')
 
   await fillCombobox(page, 'Year', 'P0302')

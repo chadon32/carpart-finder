@@ -102,6 +102,15 @@ export function Combobox({
     setActiveIndex(-1)
   }, [trimmedQuery, open])
 
+  // While the user types, the first match is highlighted so Enter and Tab
+  // commit what they typed instead of silently discarding it. It is derived
+  // during render rather than set in an effect, so an Enter that lands right
+  // after the last keystroke already sees it. Free-text fields keep their own
+  // Enter handling, and reopening a filled field highlights nothing.
+  const typing = !allowFreeText && open && trimmedQuery !== '' &&
+    trimmedQuery.toLowerCase() !== value.toLowerCase()
+  const highlightedIndex = activeIndex >= 0 ? activeIndex : typing && items.length > 0 ? 0 : -1
+
   // Keep the highlighted option visible while arrowing through a long list.
   useEffect(() => {
     if (activeIndex >= 0) {
@@ -126,15 +135,15 @@ export function Combobox({
       }
       if (items.length === 0) return
       const delta = e.key === 'ArrowDown' ? 1 : -1
-      setActiveIndex((prev) => prev < 0
+      setActiveIndex(highlightedIndex < 0
         ? (delta > 0 ? 0 : items.length - 1)
-        : (prev + delta + items.length) % items.length)
+        : (highlightedIndex + delta + items.length) % items.length)
       return
     }
     if (e.key === 'Enter') {
-      if (open && activeIndex >= 0 && items[activeIndex]) {
+      if (open && items[highlightedIndex]) {
         e.preventDefault()
-        submit(items[activeIndex].value)
+        submit(items[highlightedIndex].value)
       } else if (allowFreeText) {
         e.preventDefault()
         // Track input events outside React's render cycle so a rapid clear +
@@ -156,7 +165,10 @@ export function Combobox({
       return
     }
     if (e.key === 'Tab') {
-      setOpen(false)
+      // Tab accepts the highlighted option, as in a native autocomplete.
+      const highlighted = allowFreeText ? undefined : items[highlightedIndex]
+      if (highlighted && highlighted.value !== value) submit(highlighted.value)
+      else setOpen(false)
     }
   }
 
@@ -172,7 +184,7 @@ export function Combobox({
           aria-expanded={open && !disabled}
           aria-controls={open && !disabled ? listId : undefined}
           aria-autocomplete="list"
-          aria-activedescendant={open && !disabled && items[activeIndex] ? `${listId}-opt-${activeIndex}` : undefined}
+          aria-activedescendant={open && !disabled && items[highlightedIndex] ? `${listId}-opt-${highlightedIndex}` : undefined}
           disabled={disabled}
           placeholder={placeholder}
           enterKeyHint={enterKeyHint}
@@ -196,7 +208,16 @@ export function Combobox({
           aria-invalid={emptySubmit || undefined}
           aria-describedby={emptySubmit ? `${listId}-empty-submit` : undefined}
           onBlur={() => {
-            blurTimeout.current = setTimeout(() => setOpen(false), 150)
+            blurTimeout.current = setTimeout(() => {
+              // Keep an exact typed match when focus leaves. submit() clears
+              // latestInputValue, so a value already committed is not re-sent.
+              const typed = latestInputValue.current.trim().toLowerCase()
+              const exact = !allowFreeText && typed
+                ? items.find((item) => item.value.toLowerCase() === typed)
+                : undefined
+              if (exact && exact.value !== value) submit(exact.value)
+              else setOpen(false)
+            }, 150)
           }}
           className="field pr-9"
         />
@@ -215,7 +236,7 @@ export function Combobox({
           aria-label={accessibleName}
           className="absolute z-30 mt-1.5 max-h-60 w-full animate-fade-in overflow-auto rounded-xl border border-slate-200/80 bg-white p-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5 sm:max-h-72"
         >
-          {items.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">No matches</li>}
+          {items.length === 0 && <li className="px-3 py-2 text-sm text-slate-500">No matches</li>}
           {entries.map((entry) =>
             entry.kind === 'header' ? (
               <li key={`h-${entry.label}`} aria-hidden className="px-3 py-1.5 text-xs font-bold tracking-wider text-slate-500">
@@ -233,9 +254,9 @@ export function Combobox({
                 className={`cursor-pointer touch-manipulation rounded-lg px-3 py-3 text-sm transition sm:py-2 ${
                   entry.isFree
                     ? `flex items-center gap-2 font-semibold text-brand-700 ${
-                        activeIndex === entry.index ? 'bg-brand-50' : 'hover:bg-brand-50'
+                        highlightedIndex === entry.index ? 'bg-brand-50' : 'hover:bg-brand-50'
                       }`
-                    : activeIndex === entry.index
+                    : highlightedIndex === entry.index
                       ? 'bg-slate-100 text-slate-900'
                       : entry.value === value
                         ? 'bg-brand-50 font-semibold text-brand-700'

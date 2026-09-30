@@ -15,7 +15,7 @@ test('search metadata stays unique and returns to an indexable homepage', async 
   expect(schemas.join('')).not.toContain('AggregateOffer')
 
   await page.getByRole('button', { name: /^CarPartsRadar(?: Live price comparison)?$/i }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Find the right part.')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Compare car part prices for your vehicle.')
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow')
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(1)
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://carpartsradar.com/')
@@ -37,10 +37,26 @@ test('guide jump links and comparison CTA are accessible and usable', async ({ p
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/#before-you-order$/)
   await expect(page.locator('#before-you-order')).toBeInViewport()
-  await page.getByRole('link', { name: /Choose your vehicle and compare parts/ }).click()
+  await page.getByRole('link', { name: /Choose your vehicle and review a part category/ }).click()
   await expect(page).toHaveURL(/\?guide=compare-total-car-part-cost$/)
   await expect(page.getByRole('combobox', { name: 'Make', exact: true })).toBeEnabled()
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow')
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://carpartsradar.com/')
+  assertNoUnexpectedRuntimeErrors(app, fixtureServer, testInfo)
+})
+
+// Per docs/audits/2026-09-22-seo-release.md: referral-only parameters such as
+// ?guide= keep the clean homepage canonical. Once a vehicle is in the URL the
+// page is a search, which is not a landing page.
+test('a guide link is indexable with the homepage canonical until a vehicle is chosen', async ({ page, app, fixtureServer }, testInfo) => {
+  await page.goto(`${app.baseUrl}/?guide=compare-total-car-part-cost`, { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Compare car part prices for your vehicle.')
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow')
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://carpartsradar.com/')
+
+  await page.goto(`${app.baseUrl}/?guide=compare-total-car-part-cost&year=2020&make=Toyota&model=Camry`, { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What part do you need?')
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, follow')
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0)
   assertNoUnexpectedRuntimeErrors(app, fixtureServer, testInfo)
 })

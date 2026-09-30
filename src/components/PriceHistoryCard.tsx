@@ -41,7 +41,7 @@ export function PriceHistoryCard({ car, part }: { car: Car; part: string }) {
       <div className="mt-4 text-brand-600 dark:text-brand-400">
         <Sparkline points={history} />
       </div>
-      <div className="font-data mt-3 flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500">
+      <div className="font-data mt-3 flex items-center justify-between text-xs font-medium uppercase tracking-[0.06em] text-slate-500">
         <span>Low ${Math.min(...history.map((point) => point.price)).toFixed(2)}</span>
         <span>High ${Math.max(...history.map((point) => point.price)).toFixed(2)}</span>
         <span>Since {new Date(`${history[0].date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>

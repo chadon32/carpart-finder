@@ -28,12 +28,15 @@ export function VehicleThumbnail({
   year,
   className = 'h-14 w-20',
   iconSize = 22,
+  tone = 'light',
 }: {
   make: string
   model: string
   year?: string
   className?: string
   iconSize?: number
+  // "dark" for placement on the dark spec plate, so the frame never flashes white.
+  tone?: 'light' | 'dark'
 }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,22 +56,23 @@ export function VehicleThumbnail({
     }
   }, [make, model, year])
 
-  const frame = `${className} shrink-0 overflow-hidden rounded-2xl border border-slate-200 shadow-sm`
+  const dark = tone === 'dark'
+  const frame = `${className} shrink-0 overflow-hidden rounded-2xl border shadow-sm ${dark ? 'border-white/10' : 'border-slate-200'}`
 
   if (loading) {
-    return <div className={`${frame} animate-pulse bg-slate-100`} />
+    return <div className={`${frame} animate-pulse ${dark ? 'bg-slate-700/60' : 'bg-slate-100'}`} />
   }
 
   if (!imageUrl || failed) {
     return (
-      <div className={`${frame} flex items-center justify-center bg-brand-50 text-brand-400`}>
+      <div className={`${frame} flex items-center justify-center ${dark ? 'bg-slate-700 text-slate-300' : 'bg-brand-50 text-brand-600'}`}>
         <CarIcon size={iconSize} strokeWidth={1.8} />
       </div>
     )
   }
 
   return (
-    <div className={`${frame} bg-slate-50 ring-1 ring-slate-100`}>
+    <div className={`${frame} ring-1 ${dark ? 'bg-slate-800 ring-white/10' : 'bg-slate-50 ring-slate-100'}`}>
       <img
         src={imageUrl}
         alt={`${make} ${model}`}

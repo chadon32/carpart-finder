@@ -18,6 +18,33 @@ Never add credentials or private keys to the client applications.
   admin or personal keys must never use a `VITE_` variable.
 - Keep the Amazon website tag distinct from any mobile-app tag.
 
+### Third-party scripts
+
+The website loads no third-party script tag. The only external code is PostHog
+analytics: the bundled `posthog-js` fetches its recorder from
+`us-assets.i.posthog.com`. `script-src` in `vercel.json` allows only the app and
+PostHog, and `scripts/editorial-content.test.mjs` fails if that list or
+`index.html` gains another host, so adding a script is always a deliberate
+change.
+
+The Commission Junction page script (`am.js`) was removed on 2026-09-30:
+
+- It was already failing in production. Its request is redirected to
+  `www.yceml.net`, a host the CSP did not allow, so the browser blocked it and
+  it never ran.
+- Its configuration had `generateLinkOnLoad=false`, so it rewrites no links even
+  when it does run. All it does is send the list of every link on the page,
+  including retailer search URLs that contain the shopper's vehicle and part, to
+  CJ's tracking server (`www.qksrv.net`) along with cookies.
+- CJ changes the file's contents, so Subresource Integrity is not possible and a
+  CJ compromise would have been a compromise of every visitor.
+
+To use CJ again, get CJ's current approved publisher guidance and prefer tracked
+links over a page script. Add only the hosts it needs to `vercel.json` and to the
+allowlist test, and update the affiliate disclosure page
+(`legalPages.disclosure` in `scripts/editorial-content.mjs`), which still says
+CarPartsRadar "may use Commission Junction links".
+
 ### iOS and Android
 
 Affiliate programs treat an installed app as a separate promotional property.

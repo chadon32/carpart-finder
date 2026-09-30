@@ -81,7 +81,7 @@ test('unknown shipping is never displayed or ranked as a zero-cost delivered tot
 
   assert.match(helpers, /shippingCost == null/)
   assert.match(helpers, /return null/)
-  assert.match(listing, /Shipping shown by seller at checkout/)
+  assert.match(listing, /Shipping shown at checkout/)
   assert.match(listing, /knownTotal == null/)
   assert.match(results, /filter\(\(listing\) => knownTotalCost\(listing\) != null\)/)
 })

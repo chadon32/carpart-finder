@@ -23,7 +23,13 @@
     />
     <meta data-rh="true" property="og:url" content="https://carpartsradar.com/" />
     <meta property="og:image" content="https://carpartsradar.com/editorial/parts-workbench.webp" />
+    <meta property="og:image:width" content="1440" />
+    <meta property="og:image:height" content="960" />
+    <meta property="og:image:alt" content="Replacement car parts arranged on a workbench" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CarPartsRadar | Compare Car Part Prices and Fitment" />
+    <meta name="twitter:description" content="Compare live car-part listings, review fitment evidence, and use independent buying guides before ordering for your vehicle." />
+    <meta name="twitter:image" content="https://carpartsradar.com/editorial/parts-workbench.webp" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -40,22 +46,14 @@
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- CJ (Commission Junction) Page-Based Link auto-monetization: rewrites
-         outbound clicks to joined CJ advertisers into tracked affiliate links.
-
-         ACCEPTED RISK: a third-party script with full DOM access. Subresource
-         Integrity is not possible because CJ rotates the file's contents, so a
-         CJ compromise is a compromise of every visitor. It is allow-listed by
-         name in the Content-Security-Policy in vercel.json rather than being
-         covered by a blanket policy, which means removing this tag also closes
-         the hole. Revisit if the affiliate revenue stops justifying it.
-
-         The CSP's script-src also lists CJ's redirect domains (dpbolvw,
-         tqlkg, kqzyfj, jdoqocy, tkqlhce) because am.js loads siblings from
-         them; style-src needs 'unsafe-inline' for Tailwind, sonner's runtime
-         style injection, and inline style attributes; img-src needs https:
-         because eBay and Wikimedia image hostnames rotate. -->
-    <script defer src="https://www.anrdoezrs.net/am/101820027/impressions/page/am.js"></script>
+    <!-- Content-Security-Policy notes (the policy lives in vercel.json, which
+         cannot hold comments). script-src allows only this app and PostHog, so
+         a new third-party script has to be added there and to the allowlist
+         test in scripts/editorial-content.test.mjs on purpose. style-src needs
+         'unsafe-inline' for Tailwind, sonner's runtime style injection, and
+         inline style attributes; img-src needs https: because eBay and
+         Wikimedia image hostnames rotate. The Commission Junction page script
+         was removed on purpose; the reasons are in docs/MONETIZATION.md. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",

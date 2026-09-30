@@ -1,6 +1,7 @@
 import type { Car } from '../components/CarSelector'
 import { isValidPartQuery, normalizePartQuery } from './searchInput.js'
 import { guideSearchStart } from '../data/guideSearch'
+import { normalizeMake } from '../../shared/vehicleMake.js'
 
 export type Step = 'car' | 'part' | 'results'
 
@@ -21,7 +22,8 @@ export function routeFromSearch(search: string): AppRoute {
   const p = new URLSearchParams(search)
   const guide = guideSearchStart(p.get('guide'))?.id ?? null
   const year = p.get('year')?.trim() || ''
-  const make = p.get('make')?.trim() || ''
+  // Links made before makes were shown in readable case carry HONDA.
+  const make = normalizeMake(p.get('make'))
   const model = p.get('model')?.trim() || ''
   const trim = p.get('trim')?.trim() || ''
   const rawPart = normalizePartQuery(p.get('part') || '')

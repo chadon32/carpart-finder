@@ -96,12 +96,12 @@ export function ComparisonShareCard({
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h5 className="break-anywhere text-sm font-semibold leading-snug text-slate-950 dark:text-slate-50">{privacySafeShareValue(listing.title)}</h5>
-                  <p className="mt-1 text-[11px] text-slate-500">{privacySafeShareValue(listing.source || 'Retailer unavailable')}</p>
+                  <p className="mt-1 text-xs text-slate-500">{privacySafeShareValue(listing.source || 'Retailer unavailable')}</p>
                 </div>
                 {verified ? <ShieldCheck size={16} className="shrink-0 text-emerald-600" aria-hidden /> : <AlertTriangle size={16} className="shrink-0 text-amber-600" aria-hidden />}
               </div>
 
-              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                 <div>
                   <dt className="text-slate-500">Item price</dt>
                   <dd className="font-data font-semibold text-slate-900 dark:text-slate-100">{formatComparisonMoney(listing.price)}</dd>
@@ -128,7 +128,7 @@ export function ComparisonShareCard({
                 </div>
               </dl>
 
-              <p className={`mt-3 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed ${verified ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200' : 'bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200'}`}>
+              <p className={`mt-3 rounded-lg px-2.5 py-2 text-xs leading-relaxed ${verified ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200' : 'bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200'}`}>
                 {comparisonFitmentLabel(listing)}
               </p>
 
@@ -140,7 +140,7 @@ export function ComparisonShareCard({
         })}
       </ul>
 
-      <div className="border-t border-brand-200/70 px-4 py-3 text-[11px] leading-relaxed text-slate-600 dark:border-brand-900/50 dark:text-slate-300">
+      <div className="border-t border-brand-200/70 px-4 py-3 text-xs leading-relaxed text-slate-600 dark:border-brand-900/50 dark:text-slate-300">
         Structured compatibility evidence is evidence, not a guarantee. Keyword matches are broader and do not establish compatibility. Confirm the exact configuration, part number, final price, shipping, core terms, inventory, delivery, and returns with the retailer. CarPartsRadar does not guarantee fitment, price, inventory, delivery, or savings.
       </div>
       <AffiliateDisclosure className="m-4 mt-0 border-brand-200/70 bg-white/70 dark:border-brand-900/50 dark:bg-slate-900/70" />

@@ -6,6 +6,7 @@ import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, de
 import { DeleteAccountPanel } from './DeleteAccountPanel'
 import { isRequiredAccountDeletionEmail } from '../lib/accountDeletionState.js'
 import { clearLocalUserData } from '../lib/clearLocalUserData.js'
+import { normalizeMake } from '../../shared/vehicleMake.js'
 
 interface DashboardProps {
   onClose: () => void
@@ -251,7 +252,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
 
               <div className="relative mb-6 flex items-center py-1">
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                <span className="shrink-0 px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Or</span>
+                <span className="shrink-0 px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Or</span>
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
               </div>
             </>
@@ -447,13 +448,13 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                         <div className="min-w-0">
                           <div className="font-bold text-slate-900 dark:text-white truncate text-sm mb-1">{s.part}</div>
                           <div className="text-xs text-slate-500 font-medium truncate">
-                            {s.year} {s.make} {s.model} {s.trim ? `· ${s.trim}` : ''}
+                            {s.year} {normalizeMake(s.make)} {s.model} {s.trim ? `· ${s.trim}` : ''}
                           </div>
                         </div>
                         <div className="flex flex-col gap-2 shrink-0">
                           <button
                             type="button"
-                            onClick={() => onRunSearch({ year: s.year, make: s.make, model: s.model, trim: s.trim || '' }, s.part)}
+                            onClick={() => onRunSearch({ year: s.year, make: normalizeMake(s.make), model: s.model, trim: s.trim || '' }, s.part)}
                             className="btn btn-primary px-3 py-1.5 text-xs"
                           >
                             Search Now
@@ -515,7 +516,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                           </div>
                           <div className="text-xs text-slate-500 font-medium mb-3 truncate">
                             {a.saved_searches
-                              ? `${a.saved_searches.year} ${a.saved_searches.make} ${a.saved_searches.model}`
+                              ? `${a.saved_searches.year} ${normalizeMake(a.saved_searches.make)} ${a.saved_searches.model}`
                               : 'Vehicle'}
                           </div>
                           
@@ -548,7 +549,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                               ✓ Dropped to <span className="font-data">${Number(a.last_price).toFixed(2)}</span>
                             </div>
                           ) : a.last_price != null ? (
-                            <div className="text-[10px] font-medium text-slate-500">
+                            <div className="text-xs font-medium text-slate-500">
                               Checked: <span className="font-data">${Number(a.last_price).toFixed(2)}</span>
                             </div>
                           ) : null}

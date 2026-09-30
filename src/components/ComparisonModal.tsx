@@ -127,7 +127,7 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
                       </span>
                     )}
                     {evidence && (
-                      <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-slate-500">
+                      <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500">
                         <div><span className="font-semibold text-slate-600">Scope:</span> {fitmentScopeLabels[evidence.scope]}</div>
                         {evidence.provider && <div><span className="font-semibold text-slate-600">Provider:</span> {evidence.provider}</div>}
                         <div><span className="font-semibold text-slate-600">Fitment evidence checked:</span> {checkedAt || 'Unavailable'}</div>
@@ -148,7 +148,7 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
                 <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
                   <div className="font-medium text-slate-800 truncate max-w-[220px]">{item.seller || 'Direct Partner'}</div>
                   {item.sellerFeedbackPercentage && (
-                    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                       <Star size={10} className="fill-amber-400 text-amber-400" />
                       <span>{item.sellerFeedbackPercentage}% feedback</span>
                       {item.topRatedSeller && <Award size={10} className="text-brand-500" />}

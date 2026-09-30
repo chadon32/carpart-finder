@@ -149,6 +149,59 @@ test('guide schema, dates, jump links and contextual recommendations match visib
   }
 })
 
+test('generated pages load the same brand typefaces as the app', async () => {
+  const appHtml = await readFile(resolve(root, 'index.html'), 'utf8')
+  const fontsHref = appHtml.match(/href="(https:\/\/fonts\.googleapis\.com\/css2\?[^"]+)"/)?.[1]
+  assert.ok(fontsHref, 'index.html must load the brand fonts')
+  for (const path of ['guides.html', 'about.html', `guides/${guides[0].slug}.html`]) {
+    const html = await readFile(resolve(publicDir, path), 'utf8')
+    assert.ok(html.includes(`href="${fontsHref}"`), `${path} must load the same fonts as the app`)
+  }
+  const css = await readFile(resolve(publicDir, 'editorial.css'), 'utf8')
+  assert.match(css, /font-family:\s*"Barlow Condensed"/, 'headlines must use the brand display face')
+})
+
+test('the editorial logo keeps its blue tile instead of being filtered to white', async () => {
+  const css = await readFile(resolve(publicDir, 'editorial.css'), 'utf8')
+  const rule = css.match(/\.brand-mark img\s*\{([^}]*)\}/)?.[1] ?? ''
+  assert.doesNotMatch(rule, /filter:\s*brightness\(0\)/)
+})
+
+test('a branded 404 page gives people a way forward and stays out of search results', async () => {
+  const html = await readFile(resolve(publicDir, '404.html'), 'utf8')
+  assert.match(html, /<meta name="robots" content="noindex" \/>/)
+  assert.doesNotMatch(html, /<link rel="canonical"/)
+  assert.match(html, /<h1>We can't find that page\.<\/h1>/)
+  assert.match(html, /href="\/"/)
+  assert.match(html, /href="\/guides\.html"/)
+  for (const match of html.matchAll(/href="(\/[^"]+)"/g)) {
+    await assert.doesNotReject(stat(localTarget(match[1])), `404.html has a broken link to ${match[1]}`)
+  }
+  const sitemapXml = await readFile(resolve(publicDir, 'sitemap.xml'), 'utf8')
+  assert.doesNotMatch(sitemapXml, /404/)
+})
+
+test('page titles mention the brand once', async () => {
+  for (const path of ['guides.html', 'about.html', 'methodology.html', 'contact.html', 'privacy.html', 'terms.html', 'affiliate-disclosure.html', `guides/${guides[0].slug}.html`]) {
+    const html = await readFile(resolve(publicDir, path), 'utf8')
+    const title = html.match(/<title>([^<]+)<\/title>/)[1]
+    assert.ok((title.match(/CarPartsRadar/g) ?? []).length <= 1, `${path} repeats the brand: ${title}`)
+  }
+})
+
+test('social previews declare the image size and description on the homepage and generated pages', async () => {
+  const home = await readFile(resolve(root, 'index.html'), 'utf8')
+  const about = await readFile(resolve(publicDir, 'about.html'), 'utf8')
+  for (const html of [home, about]) {
+    assert.match(html, /<meta property="og:image:width" content="1440" \/>/)
+    assert.match(html, /<meta property="og:image:height" content="960" \/>/)
+    assert.match(html, /<meta property="og:image:alt" content="[^"]+" \/>/)
+    assert.match(html, /<meta name="twitter:image" content="https:\/\/carpartsradar\.com\/editorial\/parts-workbench\.webp" \/>/)
+  }
+  assert.match(home, /<meta name="twitter:title" content="[^"]+" \/>/)
+  assert.match(home, /<meta name="twitter:description" content="[^"]+" \/>/)
+})
+
 test('indexing rules exclude search/API URLs without blocking canonical pages', async () => {
   const config = JSON.parse(await readFile(resolve(root, 'vercel.json'), 'utf8'))
   assert.ok(config.redirects.some((rule) => rule.source === '/index.html' && rule.destination === '/' && rule.permanent))
@@ -159,5 +212,18 @@ test('indexing rules exclude search/API URLs without blocking canonical pages', 
   assert.ok(!config.headers.some((rule) => !rule.has && rule.source !== '/api/:path*' && rule.headers.some((header) => header.key === 'X-Robots-Tag')))
   const html = await readFile(resolve(root, 'index.html'), 'utf8')
   assert.match(html, /<link data-rh="true" rel="canonical"/)
-  assert.match(html, /<script defer src="https:\/\/www.anrdoezrs.net/)
+})
+
+// The Commission Junction page script was removed (see docs/MONETIZATION.md).
+// A third-party script has full access to the page, so adding one back should
+// be a deliberate change to both index.html and this allowlist.
+test('the site loads no third-party script and the CSP allows only the app and PostHog', async () => {
+  const html = await readFile(resolve(root, 'index.html'), 'utf8')
+  const externalScripts = [...html.matchAll(/<script\b[^>]*\bsrc="(https?:\/\/[^"]+)"/g)].map((match) => match[1])
+  assert.deepEqual(externalScripts, [], 'index.html must not load third-party scripts')
+
+  const config = JSON.parse(await readFile(resolve(root, 'vercel.json'), 'utf8'))
+  const csp = config.headers.flatMap((rule) => rule.headers).find((header) => header.key === 'Content-Security-Policy').value
+  const scriptSrc = csp.split(';').map((directive) => directive.trim()).find((directive) => directive.startsWith('script-src'))
+  assert.deepEqual(scriptSrc.split(/\s+/).slice(1), ["'self'", 'https://us.i.posthog.com', 'https://us-assets.i.posthog.com'])
 })

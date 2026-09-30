@@ -12,7 +12,7 @@ export function PartIdentificationDemo({ onTryPhoto }: { onTryPhoto: () => void 
             decoding="async"
             className="h-full min-h-52 w-full object-cover"
           />
-          <figcaption className="absolute inset-x-3 bottom-3 rounded-lg bg-slate-950/85 px-2.5 py-2 text-[10px] font-medium leading-relaxed text-white">
+          <figcaption className="absolute inset-x-3 bottom-3 rounded-lg bg-slate-950/85 px-2.5 py-2 text-xs font-medium leading-relaxed text-white">
             Original local vector illustration. It contains no customer vehicle details or third-party image data.
           </figcaption>
         </figure>
@@ -40,7 +40,7 @@ export function PartIdentificationDemo({ onTryPhoto }: { onTryPhoto: () => void 
             </div>
           </dl>
 
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             Use the suggestion as a search starting point only. Confirm the label, part number, and vehicle configuration before buying.
           </p>
           <button type="button" onClick={onTryPhoto} className="btn btn-secondary mt-4 w-full text-xs sm:w-auto">

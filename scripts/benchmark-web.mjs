@@ -143,7 +143,7 @@ async function measurePage(browser, { baseUrl, profile, scenario, screenshotPath
         if (!root) return false
         if (expectedScenario.startsWith('results')) return root.textContent?.includes('Marketplace search for') && document.querySelectorAll('.listing-card').length > 0
         const makeInput = document.querySelector('input[placeholder="Select make"]')
-        return root.textContent?.includes('Find the right part.') && makeInput instanceof HTMLInputElement && !makeInput.disabled
+        return root.textContent?.includes('Compare car part prices') && makeInput instanceof HTMLInputElement && !makeInput.disabled
       }, { timeout: 10_000 }, scenario)
       const usableContentMs = await page.evaluate(() => performance.now())
       await page.waitForNetworkIdle({ idleTime: 250, timeout: 3_000 }).catch(() => {})

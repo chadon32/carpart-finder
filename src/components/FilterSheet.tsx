@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { Modal } from './Modal'
+import { SORT_OPTIONS, type SortKey } from '../lib/listingSort'
 
 type ConditionFilter = 'all' | 'new' | 'used'
 
@@ -7,6 +8,8 @@ type ConditionFilter = 'all' | 'new' | 'used'
 // it opens as a bottom sheet on phones and a centered dialog on desktop.
 // State belongs to the results route/screen; this is a pure control surface.
 export function FilterSheet({
+  sortBy,
+  onSortBy,
   condition,
   onCondition,
   hideOverseas,
@@ -21,6 +24,8 @@ export function FilterSheet({
   onClearAll,
   onClose,
 }: {
+  sortBy: SortKey
+  onSortBy: (sort: SortKey) => void
   condition: ConditionFilter
   onCondition: (c: ConditionFilter) => void
   hideOverseas: boolean
@@ -36,13 +41,13 @@ export function FilterSheet({
   onClose: () => void
 }) {
   return (
-    <Modal label="Filter listings" onClose={onClose} maxWidth="max-w-md">
+    <Modal label="Sort and filter listings" onClose={onClose} maxWidth="max-w-md">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800/60">
-        <h3 className="section-title text-lg">Filters</h3>
+        <h3 className="section-title text-lg">Sort &amp; filters</h3>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close filters"
+          aria-label="Close sort and filters"
           className="hidden rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 sm:block"
         >
           <X size={18} />
@@ -50,6 +55,25 @@ export function FilterSheet({
       </div>
 
       <div className="space-y-5 px-5 py-5">
+        <fieldset>
+          <legend className="field-label">Sort by</legend>
+          <div className="space-y-0.5">
+            {SORT_OPTIONS.map((option) => (
+              <label key={option.value} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-1">
+                <input
+                  type="radio"
+                  name="sort-listings"
+                  value={option.value}
+                  checked={sortBy === option.value}
+                  onChange={() => onSortBy(option.value)}
+                  className="h-5 w-5 accent-brand-600"
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
         <div>
           <div className="field-label" id="filter-condition-label">Condition</div>
           <div role="group" aria-labelledby="filter-condition-label" className="inline-flex gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800">

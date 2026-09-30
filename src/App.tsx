@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, Suspense, lazy } from 'react'
 import { Toaster, toast } from 'sonner'
 import { Helmet } from 'react-helmet-async'
-import { Car as CarIcon, Bookmark, BookOpen, ShieldCheck, Zap, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
+import { Car as CarIcon, Bookmark, BookOpen, ShieldCheck, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
 import { RadarMark } from './components/RadarMark'
 import { ApiReadinessBanner } from './components/ApiReadinessBanner'
 import { BottomNav } from './components/BottomNav'
@@ -35,6 +35,7 @@ import { trackGuideSearchStarted, trackSearch } from './lib/analytics'
 import { isValidPartQuery, normalizePartQuery } from './lib/searchInput.js'
 import { clearLocalUserData } from './lib/clearLocalUserData.js'
 import { guideSearchStart } from './data/guideSearch'
+import { normalizeMake } from '../shared/vehicleMake.js'
 
 function App() {
   const { user, darkMode, setDarkMode } = useAppContext()
@@ -109,7 +110,7 @@ function App() {
       toast.error('Enter a part name between 1 and 60 characters.')
       return
     }
-    const fullCar: Car = { ...selectedCar, trim: selectedCar.trim || '' }
+    const fullCar: Car = { ...selectedCar, make: normalizeMake(selectedCar.make), trim: selectedCar.trim || '' }
     recent.record(fullCar, normalizedPart)
     trackSearch(fullCar.year, fullCar.make, fullCar.model, normalizedPart)
     if (guide) trackGuideSearchStarted(guide)
@@ -140,10 +141,13 @@ function App() {
 
   const viewKey = showWatchlist ? 'watchlist' : step
   // Internal searches and private views are useful to people, not search landing pages.
-  // Vercel also sends noindex for search URLs before JavaScript runs.
+  // Vercel also sends noindex for search URLs before JavaScript runs. A ?guide=
+  // link is a referral into the homepage, so it keeps the homepage canonical
+  // (docs/audits/2026-09-22-seo-release.md) and only becomes a search once a
+  // vehicle or part is in the URL.
   const query = new URLSearchParams(window.location.search)
   const noIndex = showWatchlist || step === 'dashboard' ||
-    ['year', 'make', 'model', 'trim', 'part', 'guide'].some((key) => query.has(key))
+    ['year', 'make', 'model', 'trim', 'part'].some((key) => query.has(key))
   const guideStart = guideSearchStart(guide)
   const vehicleLabel = car ? `${car.year} ${car.make} ${car.model}${car.trim ? ` ${car.trim}` : ''}` : ''
   const showingResults = step === 'results' && !showWatchlist && car && part
@@ -166,6 +170,19 @@ function App() {
         {!noIndex && <meta property="og:url" content="https://carpartsradar.com/" />}
       </Helmet>
       
+      <a
+        href="#main-content"
+        onClick={(event) => {
+          // A plain #hash link would fire popstate, which re-derives the view
+          // from the URL and would close the account or watchlist screens.
+          event.preventDefault()
+          mainRef.current?.focus()
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-brand-700 focus:shadow-lg dark:focus:bg-slate-900 dark:focus:text-brand-300"
+      >
+        Skip to content
+      </a>
+
       <Toaster position="top-center" richColors />
       <header ref={headroomRef} className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
@@ -177,14 +194,14 @@ function App() {
               <span className="font-display block truncate text-[22px] leading-none text-slate-950 dark:text-slate-50 sm:text-[26px]">
                 CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
               </span>
-              <span className="font-data hidden text-[10px] font-medium tracking-[1.5px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
+              <span className="font-data hidden text-xs font-medium tracking-[1px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
             </div>
           </button>
 
           <div className="flex items-center gap-2">
             <a
               href="/guides.html"
-              className="btn btn-secondary hidden px-3 py-2.5 text-sm sm:inline-flex sm:px-4"
+              className="btn btn-secondary hidden px-3 py-2.5 text-sm min-[360px]:inline-flex sm:px-4"
               aria-label="Open buying guides"
             >
               <BookOpen size={17} strokeWidth={2.3} />
@@ -199,7 +216,7 @@ function App() {
               <Bookmark size={17} strokeWidth={2.3} />
               <span className="hidden sm:inline">Watchlist</span>
               {watchlist.items.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1.5 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1.5 text-xs font-bold text-white ring-2 ring-white dark:ring-slate-900">
                   {watchlist.items.length}
                 </span>
               )}
@@ -211,7 +228,7 @@ function App() {
                 setShowWatchlist(false)
               }}
               className={`btn hidden items-center gap-2 px-3 py-2.5 text-sm sm:inline-flex sm:px-4 ${step === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
-              aria-label="Open account"
+              aria-label={user ? `Account, ${user.name.split(' ')[0]}` : undefined}
             >
               <UserIcon size={17} strokeWidth={2.3} />
               <span className="hidden sm:inline">{user ? user.name.split(' ')[0] : 'Account'}</span>
@@ -220,7 +237,8 @@ function App() {
               type="button"
               onClick={() => setDarkMode(!darkMode)}
               className="btn btn-secondary flex min-w-11 shrink-0 items-center justify-center p-2.5"
-              aria-label="Toggle theme"
+              aria-label="Dark mode"
+              aria-pressed={darkMode}
             >
               {darkMode ? <Sun size={17} /> : <Moon size={17} />}
             </button>
@@ -230,8 +248,16 @@ function App() {
 
       <ApiReadinessBanner />
 
-      <main ref={mainRef} tabIndex={-1} className="mx-auto min-w-0 w-full max-w-6xl flex-1 overflow-x-clip px-[20px] pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 focus:outline-none sm:px-6 sm:pb-10">
-        {!showWatchlist && step !== 'dashboard' && <StepIndicator current={step as Step} />}
+      <main id="main-content" ref={mainRef} tabIndex={-1} className="mx-auto min-w-0 w-full max-w-6xl flex-1 overflow-x-clip px-[20px] pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 focus:outline-none sm:px-6 sm:pb-10">
+        {!showWatchlist && step !== 'dashboard' && step !== 'car' && (
+          <StepIndicator
+            current={step as Step}
+            onNavigate={(target) => {
+              if (target === 'car') goHome()
+              else if (car) navigate({ step: 'part', car, part: null, guide })
+            }}
+          />
+        )}
         {/* Keep primary content visible from its first paint. A page-wide
             opacity/transform animation delayed reading and also trapped fixed
             descendants (such as the compare bar) until the animation ended. */}
@@ -261,38 +287,17 @@ function App() {
             <>
               {step === 'car' && (
                 <>
-                  {/* Hero — the thesis. A radar live badge, a racing-decal
-                      headline, and the honest fitment promise underneath.
-                      The small radar sweep adds motion without hiding the
-                      headline, instructions, or controls behind a stagger. */}
-                  <div className="blueprint-grid relative mb-10 pt-4 text-center sm:mb-16 sm:pt-10">
-                    <div className="font-data mx-auto mb-5 inline-flex max-w-full flex-wrap items-center justify-center gap-2.5 rounded-full border border-brand-200/70 bg-white px-4 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-900/40 dark:bg-slate-900 dark:text-brand-400 sm:mb-7">
-                      <RadarMark className="h-4 w-4 text-brand-600 dark:text-brand-400" />
-                      Live scan — prices pulled per search
-                    </div>
-
-                    <h1 className="font-display break-anywhere mx-auto max-w-4xl text-balance text-4xl text-slate-950 sm:text-7xl md:text-8xl">
-                      Find the right part.
-                      <br />
-                      <span className="text-brand-600 dark:text-brand-400">Prices on radar.</span>
+                  {/* Hero — the form is this page's job, so one headline says what
+                      the site does and the vehicle picker follows right away. */}
+                  <div className="blueprint-grid relative mb-6 pt-2 text-center sm:mb-8 sm:pt-6">
+                    <h1 className="font-display break-anywhere mx-auto max-w-4xl text-balance text-[2.15rem] text-slate-950 sm:text-6xl md:text-7xl">
+                      Compare car part prices{' '}
+                      <span className="block text-brand-600 dark:text-brand-400">for your vehicle.</span>
                     </h1>
 
-                    <p className="mx-auto mt-4 max-w-lg text-balance text-base text-slate-600 sm:mt-6 sm:text-lg">
-                      Pick your year, make, and model. Marketplace compatibility matches stay separate
-                      from broader keyword results, so unknown fitment is never presented as confirmed.
+                    <p className="mx-auto mt-3 max-w-xl text-balance text-base text-slate-600 sm:mt-4 sm:text-lg">
+                      Pick your year, make, and model. Listings that match your vehicle come first; anything else is marked “fit not confirmed.”
                     </p>
-
-                    <div tabIndex={0} role="region" aria-label="Search features" className="-mx-5 mt-6 flex items-center gap-2.5 overflow-x-auto scrollbar-none px-5 sm:mx-0 sm:mt-8 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
-                      <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
-                        <ShieldCheck size={13} className="text-brand-600" /> Evidence shown for every match
-                      </div>
-                      <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
-                        <Zap size={13} className="text-brand-600" /> Prices pulled live
-                      </div>
-                      <div className="font-data flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-slate-600 shadow-sm">
-                        <Tag size={13} className="text-brand-600" /> Matched results ranked by total value
-                      </div>
-                    </div>
                   </div>
 
                   {guideStart && (
@@ -400,7 +405,7 @@ function App() {
               <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/affiliate-disclosure.html">Affiliate disclosure</a>
             </nav>
           </div>
-          <p className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-400 dark:border-slate-800/60">
+          <p className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-500 dark:border-slate-800/60">
             © {new Date().getFullYear()} CarPartsRadar. We are not a retailer and do not sell listed products.
           </p>
         </div>

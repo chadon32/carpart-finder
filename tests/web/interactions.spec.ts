@@ -43,8 +43,8 @@ test('watchlist and result dialogs remain local and keyboard accessible', async 
   await page.getByRole('button', { name: 'Start Searching Parts' }).click()
   await expectResults(page)
   if (await page.evaluate(() => window.innerWidth < 640)) {
-    await page.getByRole('button', { name: 'Filters' }).click()
-    const filters = page.getByRole('dialog', { name: 'Filter listings' })
+    await page.getByRole('button', { name: 'Sort & filters' }).click()
+    const filters = page.getByRole('dialog', { name: 'Sort and filter listings' })
     await expect(filters).toBeVisible()
     await expect(filters).toContainText('Delivery ZIP code')
     await page.keyboard.press('Tab')

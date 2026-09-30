@@ -25,6 +25,11 @@ async function clickButton(page, name) {
   for (const button of buttons) {
     const text = await button.evaluate((element) => (element.getAttribute('aria-label') || element.textContent).trim())
     if (text === name && await button.boundingBox()) {
+      // Fixed bars (sticky action bar, bottom tabs) can cover a button that is
+      // technically inside the viewport. Bring it to the middle first, as a
+      // person would, so the click lands on the button and not on the bar.
+      // Instant, because the page's smooth scrolling would still be moving.
+      await button.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' }))
       await button.click()
       return
     }
@@ -136,7 +141,7 @@ try {
       await page.screenshot({ path: path.join(screenshotDir, `${profile}-results.png`), fullPage: true })
 
       if (profile === 'mobile') {
-        await clickButton(page, 'Filters')
+        await clickButton(page, 'Sort & filters')
         await page.waitForSelector('[role="dialog"]', { visible: true })
         await page.waitForFunction(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement))
         assert.ok([...scripts].some((url) => /\/FilterSheet-[^/]+\.js$/.test(url)), 'Filter dialog should load on demand')
@@ -146,7 +151,7 @@ try {
         await page.screenshot({ path: path.join(screenshotDir, 'mobile-filters.png') })
         await clickButton(page, 'Show results')
         await page.waitForSelector('[role="dialog"]', { hidden: true })
-        await page.waitForFunction(() => document.activeElement?.textContent.trim() === 'Filters')
+        await page.waitForFunction(() => document.activeElement?.textContent.trim() === 'Sort & filters')
       }
       await page.reload({ waitUntil: 'networkidle0' })
       await page.waitForFunction(() => document.querySelectorAll('.listing-card').length === 2)

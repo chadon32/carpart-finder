@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Car } from '../components/CarSelector'
 import { isValidPartQuery, normalizePartQuery } from '../lib/searchInput.js'
+import { normalizeMake } from '../../shared/vehicleMake.js'
 
 export type RecentSearch = {
   car: Car
@@ -38,7 +39,7 @@ function load(): RecentSearch[] {
       })
       .map((entry) => ({
         ...entry,
-        car: { ...entry.car, trim: entry.car.trim || '' },
+        car: { ...entry.car, make: normalizeMake(entry.car.make), trim: entry.car.trim || '' },
         part: normalizePartQuery(entry.part),
       }))
       .slice(0, MAX)

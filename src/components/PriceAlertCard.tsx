@@ -111,7 +111,7 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
           >
             {subscribing ? 'Creating alert…' : 'Notify Me'}
           </button>
-          {error && <p id="price-alert-error" role="alert" className="text-[11px] text-rose-600">{error}</p>}
+          {error && <p id="price-alert-error" role="alert" className="text-xs text-rose-600">{error}</p>}
         </form>
       )}
     </div>
