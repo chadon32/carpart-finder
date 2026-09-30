@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  buildCompatibilityFilter,
   buildSearchAttempts,
   buildEndUserCtx,
   filterExactCompatibility,
@@ -9,6 +10,7 @@ import {
   itemDestination,
   mapItem,
   marketplaceSearchKeyword,
+  toEbayMake,
 } from './ebay.js'
 
 test('buildEndUserCtx with campaign and zip joins with a comma, campaign first', () => {
@@ -68,6 +70,31 @@ test('only an explicit EXACT compatibility result is verified', () => {
     ]).map((item) => item.itemId),
     ['exact']
   )
+})
+
+// NHTSA (and therefore every web search) sends upper-case makes. eBay matches
+// compatibility_filter values case-sensitively, so "Make:HONDA" silently
+// returned zero EXACT matches for every search.
+test('compatibility filter converts an NHTSA upper-case make to eBay casing', () => {
+  assert.equal(
+    buildCompatibilityFilter({ year: '2018', make: 'HONDA', model: 'Civic' }),
+    'Year:2018;Make:Honda;Model:Civic'
+  )
+})
+
+test('eBay make casing follows eBay names where title case would be wrong', () => {
+  assert.equal(toEbayMake('MERCEDES-BENZ'), 'Mercedes-Benz')
+  assert.equal(toEbayMake('LAND ROVER'), 'Land Rover')
+  assert.equal(toEbayMake('RAM'), 'Ram')
+  assert.equal(toEbayMake('BMW'), 'BMW')
+  assert.equal(toEbayMake('INFINITI'), 'INFINITI')
+  assert.equal(toEbayMake('MCLAREN'), 'McLaren')
+  assert.equal(toEbayMake('WHITEGMC'), 'White/GMC')
+  assert.equal(toEbayMake('Honda'), 'Honda')
+})
+
+test('compatibility filter is omitted without a complete vehicle', () => {
+  assert.equal(buildCompatibilityFilter({ year: '2018', make: 'HONDA' }), undefined)
 })
 
 test('marketplace keyword uses the part name without over-narrowing on trim', () => {

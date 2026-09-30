@@ -4,6 +4,7 @@ import { fetchWithRetry } from '../httpClient.js'
 import { mapWithConcurrency } from '../lib/concurrency.js'
 import { listingDoesNotContradictVehicle } from '../lib/fitmentPolicy.js'
 import { safeRetailerUrl } from '../../shared/outboundUrl.js'
+import { normalizeMake } from '../../shared/vehicleMake.js'
 
 const SEARCH_URL = `${EBAY_API_ROOT}/buy/browse/v1/item_summary/search`
 const ITEM_URL = `${EBAY_API_ROOT}/buy/browse/v1/item`
@@ -207,13 +208,21 @@ export function filterVehicleContradictions(items, vehicle) {
   return items.filter((item) => listingDoesNotContradictVehicle(item, vehicle))
 }
 
+// eBay matches Make case-sensitively; see shared/vehicleMake.js.
+export const toEbayMake = normalizeMake
+
+export function buildCompatibilityFilter(ctx) {
+  return ctx.year && ctx.make && ctx.model
+    ? `Year:${ctx.year};Make:${toEbayMake(ctx.make)};Model:${ctx.model}`
+    : undefined
+}
+
 // ctx: { year, make, model, trim, part, query }
 export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
   const token = await getAccessToken()
 
   const categoryId = ctx.part ? categoryForPart(ctx.part) : undefined
-  const compatibilityFilter =
-    ctx.year && ctx.make && ctx.model ? `Year:${ctx.year};Make:${ctx.make};Model:${ctx.model}` : undefined
+  const compatibilityFilter = buildCompatibilityFilter(ctx)
   // The category constrains the part type and the compatibility filter
   // constrains the vehicle. A verbose trim label such as "LE Sedan 4-Door"
   // over-narrows eBay's keyword search, so keep the keyword to the part name.
