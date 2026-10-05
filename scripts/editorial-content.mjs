@@ -669,7 +669,8 @@ export const legalPages = {
       {
         heading: 'Website analytics and local storage',
         paragraphs: [
-          'The website uses PostHog for aggregate product analytics, such as feature use and search-flow performance. The iOS app does not include an analytics or advertising SDK. Service providers may process technical information according to their own policies and our configuration.',
+          'The website records allowlisted first-party page and feature events to measure visits, search progress, and outbound retailer clicks. A random browser-tab session ID expires after 30 minutes without recorded activity. The server uses a daily keyed hash of the request network address and user-agent text to estimate daily unique visitors; raw addresses and user-agent text are not stored in this analytics dataset. Returning on a different day may count as another daily visitor. No names, email addresses, VINs, uploaded photos, raw search text, or full URLs are included in these events. Do Not Track and Global Privacy Control opt-outs are respected, and known automated traffic is excluded.',
+          'Optional PostHog analytics receives only allowlisted product-event properties, with DOM autocapture and session replay disabled. The iOS app does not include an analytics or advertising SDK. Service providers may process technical information according to their own policies and our configuration.',
           'Garage vehicles, watchlist items, recent searches, and interface preferences are stored locally in the browser or app. Clearing browser storage, deleting the app, or using the audited account-deletion flow removes applicable local data.',
         ],
       },

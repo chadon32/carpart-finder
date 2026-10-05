@@ -5,8 +5,10 @@ import './index.css'
 import App from './App.tsx'
 import { AppProvider } from './contexts/AppContext.tsx'
 import { initAnalytics } from './lib/analytics.ts'
+import { OwnerRoute } from './OwnerRoute'
 
-initAnalytics()
+const isOwnerDashboard = /^\/admin(?:\/|$)/.test(window.location.pathname)
+if (!isOwnerDashboard) initAnalytics()
 
 // Keep useful metadata in the initial HTML, then give the app one owner.
 // Helmet 3 uses React 19's native metadata hoisting, which does not replace
@@ -16,9 +18,9 @@ document.head.querySelectorAll('[data-rh="true"]').forEach((element) => element.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HelmetProvider>
-      <AppProvider>
+      {isOwnerDashboard ? <OwnerRoute /> : <AppProvider>
         <App />
-      </AppProvider>
+      </AppProvider>}
     </HelmetProvider>
   </StrictMode>,
 )

@@ -149,6 +149,11 @@ function safePartSearch(properties) {
 export function sanitizeAnalyticsEvent(eventName, properties = {}) {
   properties = properties && typeof properties === 'object' ? properties : {}
   switch (eventName) {
+    case 'Vehicle Selected':
+    case 'Search Started':
+    case 'Search Failed':
+    case 'Listing Opened':
+      return { name: eventName, properties: {} }
     case 'Searched Part':
       return { name: eventName, properties: safePartSearch(properties) }
     case 'Search Results Viewed':

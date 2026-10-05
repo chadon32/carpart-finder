@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { guides, legalPages, site, trustPages } from './editorial-content.mjs'
@@ -175,7 +175,7 @@ function pageShell({ title, description, path, body, type = 'website', modified,
   <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
   <meta name="twitter:image" content="${site.origin}/editorial/parts-workbench.webp" />
-  ${indexable ? structuredData({ title, description, path, type, modified, crumbs }) : ''}
+  ${indexable ? `${structuredData({ title, description, path, type, modified, crumbs })}\n  <script type="module" src="/site-analytics.js"></script>` : ''}
 </head>
 <body>
   ${header()}
@@ -433,6 +433,8 @@ ${guides.map((guide) => `    <item>
 
 export async function generateEditorialPages() {
   await mkdir(guideDir, { recursive: true })
+  // Static pages share the same closed analytics contract as the React app.
+  await copyFile(resolve(root, 'shared/visitAnalytics.mjs'), resolve(publicDir, 'analytics-contract.js'))
 
   const pages = new Map([
     [resolve(publicDir, 'guides.html'), guideIndex()],

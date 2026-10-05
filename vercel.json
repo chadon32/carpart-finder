@@ -3,12 +3,16 @@
     { "source": "/index.html", "destination": "/", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/:path*", "destination": "/index.html" },
     { "source": "/api/:path*", "destination": "/api" }
   ],
   "crons": [
     { "path": "/api/cron/check-alerts", "schedule": "0 13 * * *" }
   ],
   "headers": [
+    { "source": "/admin", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "Cache-Control", "value": "no-store" }] },
+    { "source": "/admin/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "Cache-Control", "value": "no-store" }] },
     { "source": "/", "has": [{ "type": "query", "key": "year" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
     { "source": "/", "has": [{ "type": "query", "key": "make" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
     { "source": "/", "has": [{ "type": "query", "key": "model" }], "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },

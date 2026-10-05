@@ -302,7 +302,7 @@ export async function startFixtureServer(distDir, { images = false, slowSearchMs
         } else sendJson(response, fixture.status, fixture.body)
         return
       }
-      const requested = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '')
+      const requested = url.pathname === '/' || /^\/admin(?:\/|$)/.test(url.pathname) ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '')
       const file = resolve(root, normalize(requested))
       if (!file.startsWith(`${root}${sep}`) || !existsSync(file) || statSync(file).isDirectory()) {
         unexpectedRequests.push(`${request.method} ${url.pathname}`)

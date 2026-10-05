@@ -21,6 +21,7 @@ import { parseIdentificationImage, sanitizeIdentifiedPartName } from '../server/
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { API_RELEASE, FITMENT_CONTRACT_VERSION } from '../shared/apiContract.js'
 import { createSharedRateLimiter } from '../server/rateLimit.js'
+import ownerAnalyticsRoutes from '../server/routes/ownerAnalytics.js'
 
 const app = express()
 const API_BUILD_ID = String(
@@ -134,6 +135,10 @@ const trustedProxyHops = Number.isInteger(configuredProxyHops) && configuredProx
   ? configuredProxyHops
   : 0
 app.set('trust proxy', trustedProxyHops)
+
+// Owner access is independent from shopper accounts. Anonymous analytics has
+// its own shared budget and never spends search/provider quota.
+app.use('/api', ownerAnalyticsRoutes)
 
 // Rate-limit only the expensive endpoint (each visitor's search flow makes
 // ~5-7 API calls total, so a whole-app 100/15min cap would starve real use).

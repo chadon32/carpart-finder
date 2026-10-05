@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { trackEvent } from '../lib/analytics'
 import { searchParts, type SearchResponse } from '../api/client'
 import type { Car } from '../components/CarSelector'
 
@@ -12,8 +13,13 @@ export function usePartsSearch(car: Car, part: string, zip: string) {
   const [completed, setCompleted] = useState<CompletedSearch | null>(null)
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
   const key = JSON.stringify([car.year, car.make, car.model, car.trim, part, effectiveZip, revision])
+  const trackedKey = useRef('')
 
   useEffect(() => {
+    if (trackedKey.current !== key) {
+      trackedKey.current = key
+      trackEvent('Search Started')
+    }
     const controller = new AbortController()
     let cancelled = false
     void searchParts(car.year, car.make, car.model, part, car.trim, effectiveZip || undefined, controller.signal)
@@ -21,11 +27,14 @@ export function usePartsSearch(car: Car, part: string, zip: string) {
         if (!cancelled) setCompleted({ key, data, error: null })
       })
       .catch((error: unknown) => {
-        if (!cancelled) setCompleted({
-          key,
-          data: null,
-          error: error instanceof Error ? error.message : 'The search failed. Check your connection and try again.',
-        })
+        if (!cancelled) {
+          trackEvent('Search Failed')
+          setCompleted({
+            key,
+            data: null,
+            error: error instanceof Error ? error.message : 'The search failed. Check your connection and try again.',
+          })
+        }
       })
     return () => {
       cancelled = true

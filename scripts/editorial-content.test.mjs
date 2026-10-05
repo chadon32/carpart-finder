@@ -209,7 +209,9 @@ test('indexing rules exclude search/API URLs without blocking canonical pages', 
     assert.ok(config.headers.some((rule) => rule.source === '/' && rule.has?.some((condition) => condition.type === 'query' && condition.key === key) && rule.headers.some((header) => header.key === 'X-Robots-Tag' && header.value === 'noindex, follow')))
   }
   assert.ok(config.headers.some((rule) => rule.source === '/api/:path*' && rule.headers.some((header) => header.key === 'X-Robots-Tag')))
-  assert.ok(!config.headers.some((rule) => !rule.has && rule.source !== '/api/:path*' && rule.headers.some((header) => header.key === 'X-Robots-Tag')))
+  const privatePaths = ['/api/:path*', '/admin', '/admin/:path*']
+  assert.ok(!config.headers.some((rule) => !rule.has && !privatePaths.includes(rule.source) && rule.headers.some((header) => header.key === 'X-Robots-Tag')))
+  assert.ok(config.headers.some((rule) => rule.source === '/admin' && rule.headers.some((header) => header.key === 'X-Robots-Tag' && header.value === 'noindex, nofollow')))
   const html = await readFile(resolve(root, 'index.html'), 'utf8')
   assert.match(html, /<link data-rh="true" rel="canonical"/)
 })

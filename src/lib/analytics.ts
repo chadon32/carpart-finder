@@ -1,5 +1,6 @@
 import { guideSearchStart } from '../data/guideSearch'
 import { sanitizeAnalyticsEvent } from '../../shared/analyticsPrivacy.mjs'
+import { analyticsAllowed, recordVisitEvent } from './visitAnalytics'
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || ''
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
@@ -18,6 +19,7 @@ function loadPosthog() {
 }
 
 export function initAnalytics() {
+  if (!analyticsAllowed()) return
   const pending = loadPosthog()
   if (!pending || initialized) return
   initialized = true
@@ -57,8 +59,11 @@ export function initAnalytics() {
 }
 
 export function trackEvent(eventName: string, properties?: Record<string, unknown>) {
+  if (!analyticsAllowed()) return
   const sanitized = sanitizeAnalyticsEvent(eventName, properties)
   if (!sanitized) return
+  // The owner dashboard works independently of the optional PostHog SDK.
+  recordVisitEvent(sanitized.name, sanitized.properties)
   const pending = loadPosthog()
   if (!pending) return
   void pending.then((posthog) => posthog.capture(sanitized.name, sanitized.properties)).catch(() => {

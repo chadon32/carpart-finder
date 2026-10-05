@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "owner:configure": "node scripts/configure-owner-access.mjs",
+    "owner:password": "node scripts/hash-owner-password.mjs",
     "generate:editorial": "node scripts/generate-editorial-pages.mjs",
     "predev": "npm run generate:editorial",
     "dev": "vite",
@@ -42,6 +44,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^24.13.2",

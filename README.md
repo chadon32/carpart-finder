@@ -33,6 +33,58 @@ npm run test:e2e
 
 The tests start and close their own loopback fixture servers. No production account, API key, or long-running development server is needed. Do not run performance benchmarks concurrently with tests or builds. Automated browser emulation is not a substitute for physical iPhone/iPad, VoiceOver, or native build validation.
 
+## Owner website analytics
+
+The private `/admin` workspace shows daily visitor estimates, visits, page/screen
+views, search attempts, retailer clicks, daily trends, a cumulative visit funnel,
+traffic/device breakdowns, and engagement actions over 7, 30, or 90 Phoenix calendar
+days. It never exposes individual visitors or customer information.
+
+Backend setup in the existing CarPartsRadar deployment:
+
+1. Review and apply `server/website-analytics-migration.sql` in the intended Supabase
+   project. This creates a service-role-only event table and aggregate RPC; it does
+   not modify customer tables. Keep the existing shared rate-limit migration enabled.
+2. Set server-only `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
+   `SUPABASE_SERVICE_ROLE_KEY` (existing account configuration).
+   On Vercel's single-edge deployment, set `TRUST_PROXY_HOPS=1` so the server
+   hashes the trusted client address, not the proxy address. Do not trust forwarded
+   addresses on a directly exposed development server.
+3. Set `OWNER_EMAIL`, `OWNER_PASSWORD_HASH`, and `OWNER_SESSION_SECRET` on the server.
+   Run `npm run owner:password` in an interactive terminal to create the scrypt hash
+   without echoing the password. Generate a separate 32+ random-byte session secret.
+   Never use a plaintext password or `VITE_*` for owner/server credentials.
+   For the existing Vercel deployment, `npm run owner:configure -- --email EMAIL
+   --project-dir "LINKED_PROJECT_DIRECTORY"` is a private interactive alternative.
+   It hashes the entered password, creates independent session/analytics secrets,
+   and sends only server configuration to the linked `carpart-finder` production
+   project through the official Vercel CLI. Passwords are never echoed or logged;
+   secret values use stdin, not process arguments. It refuses to overwrite existing
+   variables, requires an already-authenticated Vercel CLI, and does not deploy code.
+   Vercel's protected production secrets cannot be read back to copy another site's
+   password hash; enter that same password privately if reusing it is intended.
+4. Deploy the web and API together. Open `/admin` and sign in with the owner email
+   and password. Ordinary shopper accounts cannot grant owner access.
+
+Tracking is best-effort and independent of optional PostHog. It respects DNT/GPC,
+excludes known bots and automated browser tests, and never delays searches. A visit
+is a browser-tab session, renewed after 30 minutes without recorded activity or at
+Phoenix midnight.
+Visitors are DAILY keyed network/user-agent estimates, not identified people or
+deduplicated people across the whole date range. The raw address/user-agent, full
+URL, VIN, search text, account identity and uploaded photo are never stored in this
+dataset. Shared search links imply the earlier funnel stages; the funnel reports
+furthest progress, not a strictly ordered experiment or customer satisfaction.
+Retailer clicks are not purchases. Tracking starts at enablement; historical traffic
+cannot be reconstructed from unrecorded events. Missing configuration/storage is an
+explicit unavailable state, never fabricated zero data. Rotate the owner session
+secret to revoke all owner sessions.
+
+`npm test` runs the actual migration and aggregation against an in-memory PostgreSQL
+engine, plus owner-auth, route, privacy, idempotency and date-boundary tests. Browser
+fixtures verify owner login/logout, range switching, empty/unavailable states, and
+the public visit/search/details/store-click instrumentation without production data.
+
 ## Original web template notes
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

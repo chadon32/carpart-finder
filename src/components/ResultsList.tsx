@@ -174,6 +174,10 @@ export function ResultsList({
   const [showFilters, setShowFilters] = useState(false)
 
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
+  const openListing = (listing: Listing) => {
+    trackEvent('Listing Opened')
+    setSelectedListing(listing)
+  }
   const [copied, setCopied] = useState(false)
   const copyInFlight = useRef(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -218,9 +222,11 @@ export function ResultsList({
   const matchingGuide = guideForPart(part)
 
   const effectiveZip = /^\d{5}$/.test(zip) ? zip : ''
+  const trackedResults = useRef<typeof data>(null)
 
   useEffect(() => {
-    if (data) {
+    if (data && trackedResults.current !== data) {
+      trackedResults.current = data
       trackEvent('Search Results Viewed', {
         year: car.year,
         make: car.make,
@@ -759,7 +765,7 @@ export function ResultsList({
                       inWatchlist={inWatchlist}
                       isComparing={compareList.some(l => l.id === listing.id)}
                       effectiveZip={effectiveZip}
-                      onSelect={setSelectedListing}
+                      onSelect={openListing}
                       onAddToWatchlist={onAddToWatchlist}
                       onOutboundClick={() => trackListingClick(listing)}
                       onToggleCompare={toggleCompare}
@@ -794,7 +800,7 @@ export function ResultsList({
                         inWatchlist={isInWatchlist(listing.id)}
                         isComparing={compareList.some((item) => item.id === listing.id)}
                         effectiveZip={effectiveZip}
-                        onSelect={setSelectedListing}
+                        onSelect={openListing}
                         onAddToWatchlist={onAddToWatchlist}
                         onOutboundClick={() => trackListingClick(listing)}
                         onToggleCompare={toggleCompare}

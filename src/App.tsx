@@ -31,7 +31,8 @@ import { useRecentSearches } from './hooks/useRecentSearches'
 import { useHeadroom } from './hooks/useHeadroom'
 import { routeFromSearch, searchFromRoute, type AppRoute, type Step } from './lib/searchUrl'
 import { useAppContext } from './contexts/useAppContext'
-import { trackGuideSearchStarted, trackSearch } from './lib/analytics'
+import { trackEvent, trackGuideSearchStarted, trackSearch } from './lib/analytics'
+import { recordPageView } from './lib/visitAnalytics'
 import { isValidPartQuery, normalizePartQuery } from './lib/searchInput.js'
 import { clearLocalUserData } from './lib/clearLocalUserData.js'
 import { guideSearchStart } from './data/guideSearch'
@@ -140,6 +141,15 @@ function App() {
   }
 
   const viewKey = showWatchlist ? 'watchlist' : step
+  const trackedVehicle = useRef('')
+  useEffect(() => {
+    // Account screens are deliberately outside website-usage reporting.
+    if (viewKey === 'dashboard') return
+    recordPageView(viewKey === 'car' ? 'home' : viewKey === 'part' ? 'part-selection' : viewKey)
+    const vehicleKey = car ? JSON.stringify([car.year, car.make, car.model, car.trim]) : ''
+    if (vehicleKey && vehicleKey !== trackedVehicle.current) trackEvent('Vehicle Selected')
+    trackedVehicle.current = vehicleKey
+  }, [viewKey, car])
   // Internal searches and private views are useful to people, not search landing pages.
   // Vercel also sends noindex for search URLs before JavaScript runs. A ?guide=
   // link is a referral into the homepage, so it keeps the homepage canonical
