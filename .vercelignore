@@ -8,6 +8,9 @@ terminals/
 .agents/
 .claude/
 
+# API tests are local checks, not additional serverless endpoints.
+api/*.test.js
+
 # Environment files and secret material never belong in the deployment input.
 .env
 .env.*
