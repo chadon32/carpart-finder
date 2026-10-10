@@ -37,43 +37,41 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
   return (
     <Modal label="Compare listings" onClose={onClose} maxWidth="max-w-5xl">
-      <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-line-soft px-6 py-4">
         <div>
-          <div className="text-xs font-semibold tracking-wider text-brand-600 dark:text-brand-400 uppercase">Comparison Matrix</div>
-          <h3 className="text-base font-bold tracking-tight text-slate-900">Side-by-Side Part Comparison</h3>
+          <h3 className="text-base font-bold tracking-tight text-ink">Side-by-Side Part Comparison</h3>
         </div>
         <button
           onClick={onClose}
           aria-label="Close"
-          className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition"
+          className="rounded-full p-2 text-ink-5 hover:bg-surface-2 hover:text-ink-2 transition"
         >
           <X size={18} />
         </button>
       </div>
 
-      <p className="px-6 pt-4 text-xs text-slate-500 sm:hidden">Swipe sideways to compare every selected listing.</p>
-      <ComparisonShareCard listings={listings} vehicle={vehicle} part={part} />
+      <p className="px-6 pt-4 text-sm text-ink-4 sm:hidden">Swipe sideways to compare every selected listing.</p>
       <div className="overflow-x-auto p-6" tabIndex={0} aria-label="Scrollable listing comparison table">
-        <table className="w-full min-w-[700px] border-collapse text-left text-xs text-slate-600">
+        <table className="w-full min-w-[700px] border-collapse text-left text-xs text-ink-3">
           <thead>
             <tr>
-              <th className="w-40 pb-4 pr-4 font-semibold text-slate-500 uppercase tracking-wider">Attribute</th>
+              <th className="w-40 pb-4 pr-4 font-semibold text-ink-4">Attribute</th>
               {listings.map((item) => (
-                <th key={item.id} className="pb-4 px-4 align-top w-64 border-l border-slate-100/80">
+                <th key={item.id} className="pb-4 px-4 align-top w-64 border-l border-line-soft/80">
                   <div className="flex flex-col gap-2">
-                    <span className="badge w-max bg-slate-100 text-slate-800 font-semibold px-2 py-0.5">{item.source}</span>
-                    <div className="line-clamp-2 text-xs font-bold text-slate-900 leading-snug min-h-[32px]">{item.title}</div>
+                    <span className="badge w-max bg-surface-3 text-ink font-semibold px-2 py-0.5">{item.source}</span>
+                    <div className="line-clamp-2 text-xs font-bold text-ink leading-snug min-h-[32px]">{item.title}</div>
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line-soft">
             {/* Price */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Retail Price</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Retail Price</td>
               {listings.map((item) => (
-                <td key={item.id} className="font-data py-4 px-4 font-bold text-sm text-slate-900 border-l border-slate-100/80">
+                <td key={item.id} className="font-data py-4 px-4 font-bold text-sm text-ink border-l border-line-soft/80">
                   ${item.price.toFixed(2)}
                 </td>
               ))}
@@ -81,15 +79,15 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
             {/* Shipping */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Shipping Cost</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Shipping Cost</td>
               {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
+                <td key={item.id} className="py-4 px-4 border-l border-line-soft/80">
                   {item.shippingCost === 0 ? (
                     <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free shipping</span>
                   ) : item.shippingCost != null ? (
                     `+$${item.shippingCost.toFixed(2)}`
                   ) : (
-                    <span className="text-slate-500">Shown at checkout</span>
+                    <span className="text-ink-4">Shown at checkout</span>
                   )}
                 </td>
               ))}
@@ -97,11 +95,11 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
             {/* Total Price */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Item + known shipping (before tax)</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Item + known shipping (before tax)</td>
               {listings.map((item) => {
                 const total = knownTotalCost(item)
                 return (
-                  <td key={item.id} className="font-data py-4 px-4 font-bold text-base text-slate-950 border-l border-slate-100/80">
+                  <td key={item.id} className="font-data py-4 px-4 font-bold text-base text-ink border-l border-line-soft/80">
                     {total == null ? 'Total unavailable' : `$${total.toFixed(2)}`}
                   </td>
                 )
@@ -110,13 +108,13 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
             {/* Fitment */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Marketplace compatibility</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Marketplace compatibility</td>
               {listings.map((item) => {
                 const evidence = item.fitmentEvidence
                 const checkedAt = evidence ? formatCheckedAt(evidence.checkedAt) : null
 
                 return (
-                  <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
+                  <td key={item.id} className="py-4 px-4 border-l border-line-soft/80">
                     {item.verifiedFitment !== true ? (
                       <span className="inline-flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-300">
                         <AlertTriangle size={13} /> Marketplace compatibility not confirmed
@@ -127,13 +125,13 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
                       </span>
                     )}
                     {evidence && (
-                      <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500">
-                        <div><span className="font-semibold text-slate-600">Scope:</span> {fitmentScopeLabels[evidence.scope]}</div>
-                        {evidence.provider && <div><span className="font-semibold text-slate-600">Provider:</span> {evidence.provider}</div>}
-                        <div><span className="font-semibold text-slate-600">Fitment evidence checked:</span> {checkedAt || 'Unavailable'}</div>
-                        <div><span className="font-semibold text-slate-600">Listing freshness:</span> {comparisonListingFreshnessLabel(item)}</div>
+                      <div className="mt-2 space-y-1 text-xs leading-relaxed text-ink-4">
+                        <div><span className="font-semibold text-ink-3">Scope:</span> {fitmentScopeLabels[evidence.scope]}</div>
+                        {evidence.provider && <div><span className="font-semibold text-ink-3">Provider:</span> {evidence.provider}</div>}
+                        <div><span className="font-semibold text-ink-3">Fitment evidence checked:</span> {checkedAt || 'Unavailable'}</div>
+                        <div><span className="font-semibold text-ink-3">Listing freshness:</span> {comparisonListingFreshnessLabel(item)}</div>
                         {evidence.note && <p>{evidence.note}</p>}
-                        <p className="text-slate-500">Marketplace data can omit engine, drivetrain, options, and part-number details. Confirm before buying.</p>
+                        <p className="text-ink-4">Marketplace data can omit engine, drivetrain, options, and part-number details. Confirm before buying.</p>
                       </div>
                     )}
                   </td>
@@ -143,12 +141,12 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
             {/* Seller */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Seller & Rating</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Seller & Rating</td>
               {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
-                  <div className="font-medium text-slate-800 truncate max-w-[220px]">{item.seller || 'Direct Partner'}</div>
+                <td key={item.id} className="py-4 px-4 border-l border-line-soft/80">
+                  <div className="font-medium text-ink truncate max-w-[220px]">{item.seller || 'Direct Partner'}</div>
                   {item.sellerFeedbackPercentage && (
-                    <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-ink-4">
                       <Star size={10} className="fill-amber-400 text-amber-400" />
                       <span>{item.sellerFeedbackPercentage}% feedback</span>
                       {item.topRatedSeller && <Award size={10} className="text-brand-500" />}
@@ -160,9 +158,9 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
             {/* Delivery Date */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Est. Delivery</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Est. Delivery</td>
               {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 border-l border-slate-100/80 font-medium text-slate-700">
+                <td key={item.id} className="py-4 px-4 border-l border-line-soft/80 font-medium text-ink-2">
                   {getDeliveryText(item)}
                 </td>
               ))}
@@ -170,9 +168,9 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
 
             {/* Location */}
             <tr>
-              <td className="py-4 pr-4 font-semibold text-slate-900">Ships From</td>
+              <td className="py-4 pr-4 font-semibold text-ink">Ships From</td>
               {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 border-l border-slate-100/80 text-slate-500">
+                <td key={item.id} className="py-4 px-4 border-l border-line-soft/80 text-ink-4">
                   {item.itemLocation || '—'}
                 </td>
               ))}
@@ -182,7 +180,7 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
             <tr>
               <td className="py-4 pr-4" />
               {listings.map((item) => (
-                <td key={item.id} className="py-4 px-4 border-l border-slate-100/80">
+                <td key={item.id} className="py-4 px-4 border-l border-line-soft/80">
                   <OutboundLink
                     href={item.link}
                     className="btn btn-primary w-full text-center py-2"
@@ -195,6 +193,8 @@ export function ComparisonModal({ listings, vehicle, part, onClose }: { listings
           </tbody>
         </table>
       </div>
+      {/* The table answers the question first; sharing it comes after. */}
+      <ComparisonShareCard listings={listings} vehicle={vehicle} part={part} />
     </Modal>
   )
 }

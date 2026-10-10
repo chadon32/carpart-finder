@@ -1,3 +1,5 @@
+import { COMMERCIAL_MAKES, OTHER_VEHICLES_THRESHOLD, otherMakeModelsNamed } from './otherVehicles.js'
+
 export function totalPrice(listing) {
   const price = Number(listing?.price)
   const shipping = listing?.shippingCost
@@ -27,6 +29,7 @@ const VEHICLE_MAKES = [
   'mercury', 'mini', 'mitsubishi', 'nissan', 'oldsmobile', 'pontiac', 'porsche',
   'ram', 'rolls royce', 'saab', 'saturn', 'scion', 'subaru', 'tesla', 'toyota',
   'volkswagen', 'volvo',
+  ...COMMERCIAL_MAKES,
 ]
 
 function normalizeWords(value) {
@@ -82,13 +85,18 @@ export function titleDoesNotContradictVehicle(title, vehicle) {
   const normalizedTitle = normalizeWords(title)
   const yearConsistent = titleYearDoesNotContradictVehicle(title, vehicle.year)
   if (!yearConsistent) return false
-  if (containsPhrase(normalizedTitle, vehicle.model)) return true
+  // eBay may name the selected model more specifically (RX -> RX350, RX450h).
+  // A title that names any of those variants names the selected model.
+  const modelNames = [vehicle.model, ...(Array.isArray(vehicle.modelAliases) ? vehicle.modelAliases : [])]
+  if (modelNames.some((name) => containsPhrase(normalizedTitle, name))) return true
 
   const selectedMake = normalizeWords(vehicle.make).trim()
   const namedMakes = VEHICLE_MAKES.filter((make) => containsPhrase(normalizedTitle, make))
   if (namedMakes.some((make) => make !== selectedMake)) return false
   if (namedMakes.includes(selectedMake)) return false
-  return true
+  // No make named, but several models of other makes are ("FITS Accord Civic
+  // Odyssey CR-V"): the listing is for other vehicles.
+  return otherMakeModelsNamed(normalizedTitle, selectedMake).length < OTHER_VEHICLES_THRESHOLD
 }
 
 export function listingDoesNotContradictVehicle(listing, vehicle) {

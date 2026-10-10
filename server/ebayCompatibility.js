@@ -93,3 +93,56 @@ export async function getTrims(year, make, model) {
   trimPromises.set(key, promise)
   return promise
 }
+
+const modelCache = new Map()
+const modelPromises = new Map()
+
+// eBay's own model names for a year and make. The make must already be spelled
+// the way eBay spells it (see shared/vehicleMake.js).
+export async function getEbayModels(year, make) {
+  const key = `${year}::${make.toLowerCase()}`
+  const cached = modelCache.get(key)
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data
+  }
+
+  if (modelPromises.has(key)) {
+    return modelPromises.get(key)
+  }
+
+  const promise = (async () => {
+    try {
+      const treeId = await getMotorsCategoryTreeId()
+      const token = await getAccessToken()
+
+      const params = new URLSearchParams({
+        category_id: PARTS_CATEGORY_ID,
+        compatibility_property: 'Model',
+        filter: `Year:${year},Make:${make}`,
+      })
+
+      // Optional enrichment on the search path: fail fast rather than make a
+      // search wait on it.
+      const res = await fetchWithRetry(
+        `${TAXONOMY_URL}/category_tree/${treeId}/get_compatibility_property_values?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        { timeoutMs: 4000, retries: 0 }
+      )
+
+      if (!res.ok) {
+        throw new Error(`eBay model lookup failed (${res.status})`)
+      }
+
+      const data = await res.json()
+      const models = (data.compatibilityPropertyValues || []).map((v) => v.value).sort()
+
+      modelCache.set(key, { data: models, expiresAt: Date.now() + CACHE_TTL_MS })
+      return models
+    } finally {
+      modelPromises.delete(key)
+    }
+  })()
+
+  modelPromises.set(key, promise)
+  return promise
+}

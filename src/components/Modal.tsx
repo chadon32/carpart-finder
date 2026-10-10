@@ -67,7 +67,7 @@ export function Modal({
               event.preventDefault()
               restoreRef.current?.focus()
             }}
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-white outline-none dark:bg-slate-900"
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-3xl bg-surface outline-none"
           >
             <Drawer.Title className="sr-only">{label}</Drawer.Title>
             <div aria-hidden className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700" />
@@ -115,7 +115,7 @@ export function Modal({
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
-        className={`max-h-[90vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-100 outline-none`}
+        className={`max-h-[90vh] w-full ${maxWidth} overflow-y-auto rounded-2xl bg-surface shadow-overlay border border-line-soft outline-none`}
       >
         {children}
       </div>

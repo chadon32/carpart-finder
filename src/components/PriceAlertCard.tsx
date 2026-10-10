@@ -75,8 +75,8 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
           <Mail size={17} />
         </div>
         <div className="min-w-0 flex-1 basis-40">
-          <div className="font-semibold tracking-tight text-slate-950">Price drop alerts</div>
-          <div className="text-xs text-slate-500">Get notified when this part gets cheaper</div>
+          <div className="font-semibold tracking-tight text-ink">Price drop alerts</div>
+          <div className="text-xs text-ink-4">Get notified when this part gets cheaper</div>
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
         </div>
       ) : (
         <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-3">
-          <p className="text-xs text-slate-600 leading-relaxed">
+          <p className="text-sm text-ink-3 leading-relaxed">
             Target set to the current lowest known total of <strong>${targetPrice.toFixed(2)}</strong> (item + known shipping, before tax).
           </p>
           <label htmlFor="price-alert-email" className="field-label">Email address</label>
@@ -107,11 +107,11 @@ export function PriceAlertCard({ car, part, targetPrice }: { car: Car; part: str
           <button
             type="submit"
             disabled={subscribing}
-            className="btn btn-primary w-full py-2.5 text-xs font-bold"
+            className="btn btn-primary w-full py-2.5 font-bold"
           >
             {subscribing ? 'Creating alert…' : 'Notify Me'}
           </button>
-          {error && <p id="price-alert-error" role="alert" className="text-xs text-rose-600">{error}</p>}
+          {error && <p id="price-alert-error" role="alert" className="text-sm text-rose-600">{error}</p>}
         </form>
       )}
     </div>

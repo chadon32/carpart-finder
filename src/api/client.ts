@@ -35,6 +35,9 @@ export type Listing = {
   // Missing/false is always unverified and must never render as a guarantee.
   verifiedFitment?: boolean
   fitmentTier?: 'verified' | 'fallback'
+  // Part-number searches only: whether the listing's own text states the
+  // number ('exact') or it is merely related ('related'). Never a fit claim.
+  partNumberMatch?: 'exact' | 'related' | null
   fitmentProof?: string | null
   fitmentEvidence?: {
     provider: string
@@ -59,7 +62,16 @@ export type SearchResponse = {
   // Broad marketplace candidates are kept separate and are never ranked or
   // automatically selected as fitting choices.
   fallbackResults?: Listing[]
-  fitmentSummary?: { verified: number; fallback: number; hiddenIrrelevantFallbacks?: number }
+  fitmentSummary?: {
+    verified: number
+    fallback: number
+    hiddenIrrelevantFallbacks?: number
+    // eBay's more specific names for the selected model that the confirmed
+    // results matched (RX -> RX350, RX450h). Empty when it is the same name.
+    matchedModels?: string[]
+  }
+  // True when the part searched for looks like a part number.
+  partNumberSearch?: boolean
   providerErrors: Record<string, string>
   skippedProviders: string[]
   cached?: boolean
@@ -215,11 +227,13 @@ export async function searchParts(
   part: string,
   trim?: string,
   zip?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  limit?: number
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ year, make, model, part })
   if (trim) params.set('trim', trim)
   if (zip) params.set('zip', zip)
+  if (limit) params.set('limit', String(limit))
   const response = await getJson<SearchResponse>(`/api/search?${params.toString()}`, SEARCH_TIMEOUT_MS, signal)
   return assertFitmentContract(response)
 }

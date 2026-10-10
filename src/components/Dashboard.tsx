@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useAppContext } from '../contexts/useAppContext'
 import { getSavedSearches, getPriceAlerts, signupUser, loginUser, logoutUser, deleteSavedSearch, deletePriceAlert, ApiError } from '../api/supabase'
 import { DeleteAccountPanel } from './DeleteAccountPanel'
+import { ForgotPasswordForm, ResetPasswordCard } from './PasswordRecovery'
 import { isRequiredAccountDeletionEmail } from '../lib/accountDeletionState.js'
 import { clearLocalUserData } from '../lib/clearLocalUserData.js'
 import { normalizeMake } from '../../shared/vehicleMake.js'
@@ -17,7 +18,7 @@ interface DashboardProps {
 type AccountTab = 'searches' | 'alerts'
 
 export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardProps) {
-  const { user, setUser, accountData, setAccountData } = useAppContext()
+  const { user, setUser, accountData, setAccountData, recoveryToken } = useAppContext()
   const [accountTab, setAccountTab] = useState<AccountTab>('searches')
   const [accountLoading, setAccountLoading] = useState(false)
   const [accountLoadError, setAccountLoadError] = useState<{ searches: boolean; alerts: boolean } | null>(null)
@@ -28,6 +29,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const [forgotMode, setForgotMode] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
@@ -203,18 +205,27 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
     setUser(null)
   }
 
+  // The link in a password-reset email lands here, whether or not someone is
+  // already signed in.
+  if (recoveryToken) {
+    return <ResetPasswordCard token={recoveryToken} onDone={onClose} onRequestNewLink={() => setForgotMode(true)} />
+  }
+
   if (!user) {
     return (
       <div className="mx-auto max-w-md card p-8 mt-12 animate-slide-up">
-        <button onClick={onClose} className="btn btn-ghost -ml-3 mb-6 px-3 text-sm font-medium text-slate-500 hover:text-brand-600">
+        <button onClick={onClose} className="btn btn-ghost -ml-3 mb-6 px-3 text-sm font-medium text-ink-4 hover:text-brand-600">
           <ChevronLeft size={16} /> Back to Search
         </button>
+        {forgotMode ? (
+          <ForgotPasswordForm initialEmail={signupEmail} onBack={() => setForgotMode(false)} />
+        ) : (
         <form noValidate onSubmit={(e) => { e.preventDefault(); handleAuth(); }}>
           <div className="mb-6 text-center">
             <h3 className="section-title dark:text-white">
               {resumeAccountDeletion ? 'Sign in again' : isRegisterMode ? 'Create your account' : 'Welcome back'}
             </h3>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-ink-4">
               {resumeAccountDeletion
                 ? 'Reauthenticate to continue permanent account deletion.'
                 : isRegisterMode
@@ -239,7 +250,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
             <>
               <a
                 href="/api/supabase/oauth/google"
-                className="btn w-full py-3 mb-4 flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition shadow-sm rounded-xl font-medium"
+                className="btn w-full py-3 mb-4 flex items-center justify-center gap-2 border border-line bg-surface text-ink-2 hover:bg-surface-2 dark:border-slate-800 dark:hover:bg-slate-800 transition shadow-sm rounded-xl font-medium"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -251,16 +262,16 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
               </a>
 
               <div className="relative mb-6 flex items-center py-1">
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                <span className="shrink-0 px-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Or</span>
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <div className="flex-grow border-t border-line dark:border-slate-800"></div>
+                <span className="shrink-0 px-3 text-xs font-bold text-ink-4 uppercase tracking-wider">Or</span>
+                <div className="flex-grow border-t border-line dark:border-slate-800"></div>
               </div>
             </>
           )}
 
           {isRegisterMode && (
             <div className="mb-4">
-              <label htmlFor="auth-name" className="field-label">Full name <span className="font-normal text-slate-400">(optional)</span></label>
+              <label htmlFor="auth-name" className="field-label">Full name <span className="font-normal text-ink-5">(optional)</span></label>
               <input
                 id="auth-name"
                 type="text"
@@ -291,7 +302,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                 setAuthFieldErrors((current) => ({ ...current, email: undefined }))
               }}
             />
-            {authFieldErrors.email && <p id="auth-email-error" role="alert" className="mt-1.5 text-xs text-rose-600">{authFieldErrors.email}</p>}
+            {authFieldErrors.email && <p id="auth-email-error" role="alert" className="mt-1.5 text-sm text-rose-600">{authFieldErrors.email}</p>}
           </div>
 
           <div className="mb-6">
@@ -308,7 +319,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                   ? authFieldErrors.password ? 'auth-password-help auth-password-error' : 'auth-password-help'
                   : authFieldErrors.password ? 'auth-password-error' : undefined
               }
-              placeholder="••••••••"
+              placeholder={isRegisterMode ? 'At least 8 characters' : 'Your password'}
               className="field"
               value={signupPassword}
               onChange={(e) => {
@@ -316,8 +327,19 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                 setAuthFieldErrors((current) => ({ ...current, password: undefined }))
               }}
             />
-            {isRegisterMode && <p id="auth-password-help" className="mt-1.5 text-xs text-slate-500">Use at least 8 characters.</p>}
-            {authFieldErrors.password && <p id="auth-password-error" role="alert" className="mt-1.5 text-xs text-rose-600">{authFieldErrors.password}</p>}
+            {isRegisterMode && <p id="auth-password-help" className="mt-1.5 text-sm text-ink-4">Use at least 8 characters.</p>}
+            {authFieldErrors.password && <p id="auth-password-error" role="alert" className="mt-1.5 text-sm text-rose-600">{authFieldErrors.password}</p>}
+            {!isRegisterMode && !resumeAccountDeletion && (
+              <div className="mt-1 text-right">
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(true); setAuthError(null); setAuthNotice(null); setAuthFieldErrors({}) }}
+                  className="inline-flex min-h-11 items-center px-1 text-xs font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800 dark:text-brand-300"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
 
           <button
@@ -329,7 +351,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
           </button>
 
           {!resumeAccountDeletion && (
-            <div className="mt-6 border-t border-slate-100 pt-5 text-center dark:border-slate-800/60">
+            <div className="mt-6 border-t border-line-soft pt-5 text-center dark:border-slate-800/60">
               <button
                 type="button"
                 onClick={() => {
@@ -338,7 +360,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                   setAuthNotice(null)
                   setAuthFieldErrors({})
                 }}
-                className="inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium text-slate-500 transition hover:text-brand-600"
+                className="inline-flex min-h-11 items-center justify-center gap-1 px-2 text-sm font-medium text-ink-4 transition hover:text-brand-600"
               >
                 {isRegisterMode ? (
                   <>Already have an account? <span className="font-bold text-brand-600 dark:text-brand-400">Sign in</span></>
@@ -349,6 +371,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
             </div>
           )}
         </form>
+        )}
       </div>
     )
   }
@@ -356,10 +379,10 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
   return (
     <div className="mx-auto max-w-4xl animate-slide-up">
       <div className="mb-6 flex items-center justify-between">
-        <button onClick={onClose} className="btn btn-ghost -ml-3 px-3 text-sm font-medium text-slate-500 hover:text-brand-600">
+        <button onClick={onClose} className="btn btn-ghost -ml-3 px-3 text-sm font-medium text-ink-4 hover:text-brand-600">
           <ChevronLeft size={16} /> Back
         </button>
-        <button onClick={handleLogout} disabled={authLoading} className="btn btn-ghost text-sm text-slate-500 hover:text-rose-600">
+        <button onClick={handleLogout} disabled={authLoading} className="btn btn-ghost text-sm text-ink-4 hover:text-rose-600">
           <LogOut size={16} className="mr-1.5" /> Log Out
         </button>
       </div>
@@ -374,7 +397,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
 
       <div className="card p-6 sm:p-8">
         <h2 className="section-title mb-2 dark:text-white">Welcome, {user.name.split(' ')[0]}</h2>
-        <p className="text-sm text-slate-500 mb-8">Manage your saved searches and active price alerts.</p>
+        <p className="text-sm text-ink-4 mb-8">Manage your saved searches and active price alerts.</p>
 
         {accountData ? (
           <div>
@@ -387,14 +410,14 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                   type="button"
                   onClick={() => void loadAccountData()}
                   disabled={accountLoading}
-                  className="btn btn-secondary shrink-0 px-3 py-1.5 text-xs"
+                  className="btn btn-secondary shrink-0 px-3 py-1.5"
                 >
                   {accountLoading ? 'Retrying…' : 'Retry'}
                 </button>
               </div>
             )}
 
-            <div role="tablist" aria-label="Account data" className="flex border-b border-slate-200 dark:border-slate-800 mb-6">
+            <div role="tablist" aria-label="Account data" className="flex border-b border-line dark:border-slate-800 mb-6">
               <button
                 type="button"
                 ref={(element) => { accountTabRefs.current.searches = element }}
@@ -407,7 +430,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                 onKeyDown={handleAccountTabKeyDown}
                 className={`tab text-base px-6 py-3 ${accountTab === 'searches' ? 'tab-active' : ''}`}
               >
-                Saved Searches <span className="ml-2 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs">{accountData.searches.length}</span>
+                Saved Searches <span className="ml-2 rounded-full bg-surface-3 px-2 py-0.5 text-xs">{accountData.searches.length}</span>
               </button>
               <button
                 type="button"
@@ -421,7 +444,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                 onKeyDown={handleAccountTabKeyDown}
                 className={`tab text-base px-6 py-3 ${accountTab === 'alerts' ? 'tab-active' : ''}`}
               >
-                Price Alerts <span className="ml-2 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs">{accountData.alerts.length}</span>
+                Price Alerts <span className="ml-2 rounded-full bg-surface-3 px-2 py-0.5 text-xs">{accountData.alerts.length}</span>
               </button>
             </div>
 
@@ -435,19 +458,19 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
               {accountTab === 'searches' ? (
                 accountLoadError?.searches && accountData.searches.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <p className="font-semibold text-slate-700 dark:text-slate-200">Saved searches are unavailable right now</p>
-                    <p className="mt-1 max-w-xs text-sm text-slate-500">Retry loading your account data to see your saved searches.</p>
+                    <p className="font-semibold text-ink-2">Saved searches are unavailable right now</p>
+                    <p className="mt-1 max-w-xs text-sm text-ink-4">Retry loading your account data to see your saved searches.</p>
                   </div>
                 ) : accountData.searches.length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {accountData.searches.map((s: any, i: number) => (
                       <div
                         key={s.id ?? i}
-                        className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm hover:border-brand-300 transition"
+                        className="flex items-start justify-between gap-3 rounded-2xl border border-line dark:border-slate-800 bg-surface p-4 shadow-sm hover:border-brand-300 transition"
                       >
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 dark:text-white truncate text-sm mb-1">{s.part}</div>
-                          <div className="text-xs text-slate-500 font-medium truncate">
+                          <div className="font-bold text-ink truncate text-sm mb-1">{s.part}</div>
+                          <div className="text-xs text-ink-4 font-medium truncate">
                             {s.year} {normalizeMake(s.make)} {s.model} {s.trim ? `· ${s.trim}` : ''}
                           </div>
                         </div>
@@ -455,7 +478,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                           <button
                             type="button"
                             onClick={() => onRunSearch({ year: s.year, make: normalizeMake(s.make), model: s.model, trim: s.trim || '' }, s.part)}
-                            className="btn btn-primary px-3 py-1.5 text-xs"
+                            className="btn btn-primary px-3 py-1.5"
                           >
                             Search Now
                           </button>
@@ -477,7 +500,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                                 toast.error('Failed to delete search')
                               }
                             }}
-                            className="text-xs font-semibold text-slate-400 hover:text-rose-600 text-right"
+                            className="text-xs font-semibold text-ink-5 hover:text-rose-600 text-right"
                           >
                             Remove
                           </button>
@@ -487,12 +510,12 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <div className="icon-tile mb-4 h-12 w-12 bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                    <div className="icon-tile mb-4 h-12 w-12 bg-surface-3 text-ink-5">
                       <Search size={22} />
                     </div>
-                    <p className="font-semibold text-slate-700 dark:text-slate-200">No saved searches yet</p>
-                    <p className="mt-1 max-w-xs text-sm text-slate-500">
-                      Run a search and tap <span className="font-medium text-slate-600 dark:text-slate-300">Save Search</span> to keep it here for one-click access.
+                    <p className="font-semibold text-ink-2">No saved searches yet</p>
+                    <p className="mt-1 max-w-xs text-sm text-ink-4">
+                      Run a search and tap <span className="font-medium text-ink-3">Save Search</span> to keep it here for one-click access.
                     </p>
                     <button type="button" onClick={onClose} className="btn btn-secondary mt-5">Start a search</button>
                   </div>
@@ -500,28 +523,28 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
               ) : (
                 accountLoadError?.alerts && accountData.alerts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-14 text-center">
-                    <p className="font-semibold text-slate-700 dark:text-slate-200">Price alerts are unavailable right now</p>
-                    <p className="mt-1 max-w-xs text-sm text-slate-500">Retry loading your account data to see your price alerts.</p>
+                    <p className="font-semibold text-ink-2">Price alerts are unavailable right now</p>
+                    <p className="mt-1 max-w-xs text-sm text-ink-4">Retry loading your account data to see your price alerts.</p>
                   </div>
                 ) : accountData.alerts.length > 0 ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {accountData.alerts.map((a: any, i: number) => (
                       <div
                         key={a.id ?? i}
-                        className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm"
+                        className="flex items-start justify-between gap-3 rounded-2xl border border-line dark:border-slate-800 bg-surface p-4 shadow-sm"
                       >
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 dark:text-white truncate text-sm mb-1">
+                          <div className="font-bold text-ink truncate text-sm mb-1">
                             {a.saved_searches?.part || 'Part'}
                           </div>
-                          <div className="text-xs text-slate-500 font-medium mb-3 truncate">
+                          <div className="text-xs text-ink-4 font-medium mb-3 truncate">
                             {a.saved_searches
                               ? `${a.saved_searches.year} ${normalizeMake(a.saved_searches.make)} ${a.saved_searches.model}`
                               : 'Vehicle'}
                           </div>
                           
-                          <div className="inline-flex items-center gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 px-2.5 py-1.5">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Target: <span className="font-data">${a.target_price}</span></span>
+                          <div className="inline-flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5">
+                            <span className="text-xs font-bold text-ink-2">Target: <span className="font-data">${a.target_price}</span></span>
                           </div>
                         </div>
                         
@@ -539,17 +562,17 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                                 toast.error('Failed to delete alert')
                               }
                             }}
-                            className="btn btn-ghost p-1.5 text-slate-400 hover:text-rose-600 mb-2"
+                            className="btn btn-ghost p-1.5 text-ink-5 hover:text-rose-600 mb-2"
                           >
                             <Trash2 size={15} />
                           </button>
                           
                           {a.triggered_at ? (
-                            <div className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-md">
+                            <div className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-lg">
                               ✓ Dropped to <span className="font-data">${Number(a.last_price).toFixed(2)}</span>
                             </div>
                           ) : a.last_price != null ? (
-                            <div className="text-xs font-medium text-slate-500">
+                            <div className="text-xs font-medium text-ink-4">
                               Checked: <span className="font-data">${Number(a.last_price).toFixed(2)}</span>
                             </div>
                           ) : null}
@@ -562,8 +585,8 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
                     <div className="icon-tile mb-4 h-12 w-12 bg-amber-50 text-amber-500 dark:bg-amber-950/30 dark:text-amber-400">
                       <Bell size={22} />
                     </div>
-                    <p className="font-semibold text-slate-700 dark:text-slate-200">No price alerts yet</p>
-                    <p className="mt-1 max-w-xs text-sm text-slate-500">
+                    <p className="font-semibold text-ink-2">No price alerts yet</p>
+                    <p className="mt-1 max-w-xs text-sm text-ink-4">
                       Set a target price on any part and we'll email you the moment it drops below it.
                     </p>
                     <button type="button" onClick={onClose} className="btn btn-secondary mt-5">Find a part</button>
@@ -574,7 +597,7 @@ export function Dashboard({ onClose, onRunSearch, onAccountDeleted }: DashboardP
           </div>
         ) : (
           <div className="flex h-40 items-center justify-center" role="status" aria-label="Loading your account">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600 dark:border-slate-700 dark:border-t-brand-400" />
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-line border-t-brand-600 dark:border-slate-700 dark:border-t-brand-400" />
           </div>
         )}
       </div>

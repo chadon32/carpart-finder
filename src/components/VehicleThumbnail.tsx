@@ -57,22 +57,22 @@ export function VehicleThumbnail({
   }, [make, model, year])
 
   const dark = tone === 'dark'
-  const frame = `${className} shrink-0 overflow-hidden rounded-2xl border shadow-sm ${dark ? 'border-white/10' : 'border-slate-200'}`
+  const frame = `${className} shrink-0 overflow-hidden rounded-2xl border shadow-sm ${dark ? 'border-white/10' : 'border-line'}`
 
   if (loading) {
-    return <div className={`${frame} animate-pulse ${dark ? 'bg-slate-700/60' : 'bg-slate-100'}`} />
+    return <div className={`${frame} animate-pulse ${dark ? 'bg-slate-700/60' : 'bg-surface-3'}`} />
   }
 
   if (!imageUrl || failed) {
     return (
-      <div className={`${frame} flex items-center justify-center ${dark ? 'bg-slate-700 text-slate-300' : 'bg-brand-50 text-brand-600'}`}>
+      <div className={`${frame} flex items-center justify-center ${dark ? 'bg-slate-700 text-slate-300' : 'bg-brand-50 text-brand-600 dark:bg-slate-800 dark:text-brand-300'}`}>
         <CarIcon size={iconSize} strokeWidth={1.8} />
       </div>
     )
   }
 
   return (
-    <div className={`${frame} ring-1 ${dark ? 'bg-slate-800 ring-white/10' : 'bg-slate-50 ring-slate-100'}`}>
+    <div className={`${frame} ring-1 ${dark ? 'bg-slate-800 ring-white/10' : 'bg-surface-2 ring-line-soft'}`}>
       <img
         src={imageUrl}
         alt={`${make} ${model}`}

@@ -103,28 +103,28 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
 
   return (
     <Modal label={`AI Repair Guide for ${part}`} onClose={onClose} maxWidth="max-w-3xl">
-      <div className="flex items-center justify-between rounded-t-2xl border-b bg-slate-50 px-6 py-4">
+      <div className="flex items-center justify-between rounded-t-2xl border-b bg-surface-2 px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 text-brand-600 shadow-inner">
             <Sparkles size={20} />
           </div>
           <div>
             <h2 className="section-title text-lg sm:text-xl">AI Repair Guide</h2>
-            <p className="text-xs text-slate-500">{vehicleLabel} • {part}</p>
+            <p className="text-sm text-ink-4">{vehicleLabel} • {part}</p>
           </div>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full p-2 text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700">
+        <button type="button" onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full p-2 text-ink-3 transition-colors hover:bg-slate-200 hover:text-ink-2">
           <X size={20} />
         </button>
       </div>
 
       <div className="min-h-[50vh] p-6 md:p-8">
         {isGenerating && (
-          <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-20 text-slate-500">
+          <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-20 text-ink-4">
             <Loader2 size={32} className="mb-4 animate-spin text-brand-500" />
-            <p className="text-base font-medium text-slate-700">Gemini is writing your repair guide...</p>
-            <p className="mt-2 text-sm text-slate-600">Preparing a cautious overview for {vehicleLabel}</p>
-            <p className="mt-2 max-w-sm text-center text-xs leading-relaxed text-slate-500">
+            <p className="text-base font-medium text-ink-2">Gemini is writing your repair guide...</p>
+            <p className="mt-2 text-sm text-ink-3">Preparing a cautious overview for {vehicleLabel}</p>
+            <p className="mt-2 max-w-sm text-center text-sm leading-relaxed text-ink-4">
               {takingLong
                 ? 'Still working. You can close this window to cancel and try again later.'
                 : 'This usually takes 20–30 seconds. Closing this window cancels the request.'}
@@ -153,7 +153,7 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
         )}
 
         {guide && (
-          <div className="repair-guide-content text-slate-700">
+          <div className="repair-guide-content text-ink-2">
             <ReactMarkdown
               allowedElements={[...SAFE_GUIDE_ELEMENTS]}
               unwrapDisallowed
@@ -166,8 +166,8 @@ export function RepairGuideModal({ vehicle, listing, part, onClose }: RepairGuid
       </div>
 
       {!isGenerating && !guideError && (
-        <div className="flex items-center justify-between rounded-b-2xl border-t bg-slate-50 px-6 py-4">
-          <p className="text-xs text-slate-600">
+        <div className="flex items-center justify-between rounded-b-2xl border-t bg-surface-2 px-6 py-4">
+          <p className="text-sm text-ink-3">
             AI overview only. Confirm the exact procedure and specifications in the manufacturer service manual.
           </p>
           <button type="button" onClick={onClose} className="btn btn-secondary ml-4 shrink-0 px-4 py-2">

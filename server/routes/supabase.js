@@ -16,6 +16,7 @@ import {
   resolveOAuthRedirectOrigin,
   validateAccessToken,
   validateAuthInput,
+  validateNewPassword,
   validateSavedSearchInput,
   validateTargetPrice,
 } from '../lib/accountInputPolicy.js'
@@ -215,6 +216,50 @@ router.post('/login', async (req, res) => {
     user: data.user,
     confirmationRequired: !token,
   })
+})
+
+// Ask for a password reset link. The answer is the same whether or not an
+// account exists for the address, so this cannot be used to find out who has
+// one. The link Supabase emails returns to this site (never to an address the
+// caller supplies) with a short-lived recovery token in the URL fragment.
+router.post('/password/forgot', async (req, res) => {
+  const email = normalizeEmail(req.body?.email)
+  if (!email) return res.status(400).json({ error: 'Enter a valid email address' })
+
+  if (!isMockMode) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resolveOAuthRedirectOrigin(),
+    })
+    // Rate limits and unknown addresses both land here. Log, never reveal.
+    if (error) console.error('[supabase] password reset request failed:', String(error.message || ''))
+  }
+  res.json({ success: true })
+})
+
+// Finish a reset. The recovery token proves control of the mailbox, so it is
+// verified with Supabase before anything changes; the new password is then set
+// with the service role and the person is signed in with the same token.
+router.post('/password/reset', async (req, res) => {
+  const { access_token: accessToken } = req.body || {}
+  if (!validateAccessToken(accessToken)) return res.status(400).json({ error: 'This reset link is not valid. Request a new one.' })
+  const password = validateNewPassword(req.body?.password)
+  if (password.error) return res.status(400).json({ error: password.error })
+
+  if (isMockMode) return res.status(503).json({ error: 'Password reset is not available in local mock mode.' })
+
+  const { data, error } = await supabase.auth.getUser(accessToken)
+  if (error || !data?.user) {
+    return res.status(401).json({ error: 'This reset link has expired. Request a new link and try again.' })
+  }
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(data.user.id, { password: password.value })
+  if (updateError) {
+    console.error('[supabase] password update failed:', String(updateError.message || ''))
+    return res.status(400).json({ error: 'Could not set the new password. Choose a different one and try again.' })
+  }
+
+  setAuthCookie(res, accessToken)
+  res.json({ user: data.user })
 })
 
 // Start Google OAuth Flow

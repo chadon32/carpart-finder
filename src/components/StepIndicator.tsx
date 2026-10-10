@@ -28,8 +28,8 @@ export function StepIndicator({ current, onNavigate }: { current: Step; onNaviga
                   done
                     ? 'bg-brand-500 text-white'
                     : active
-                      ? 'bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-4 ring-brand-100 dark:ring-brand-900/25'
-                      : 'border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400'
+                      ? 'bg-brand-500 text-white ring-4 ring-brand-100 dark:ring-brand-900/25'
+                      : 'border border-line dark:border-slate-800 bg-surface dark:bg-slate-900 text-ink-4 dark:text-slate-400'
                 }`}
               >
                 {done ? <Check size={15} strokeWidth={2.5} /> : <Icon size={15} strokeWidth={2.2} />}
@@ -37,7 +37,7 @@ export function StepIndicator({ current, onNavigate }: { current: Step; onNaviga
               <span className="hidden items-baseline gap-1.5 sm:flex">
                 <span
                   className={`font-data text-xs font-semibold ${
-                    active || done ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'
+                    active || done ? 'text-brand-600 dark:text-brand-400' : 'text-ink-4 dark:text-slate-400'
                   }`}
                   aria-hidden
                 >
@@ -45,7 +45,7 @@ export function StepIndicator({ current, onNavigate }: { current: Step; onNaviga
                 </span>
                 <span
                   className={`text-sm font-semibold ${
-                    active ? 'text-slate-900 dark:text-slate-100' : done ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'
+                    active ? 'text-ink dark:text-slate-100' : done ? 'text-brand-600 dark:text-brand-400' : 'text-ink-4 dark:text-slate-400'
                   }`}
                 >
                   {step.shortLabel}
@@ -85,7 +85,7 @@ export function StepIndicator({ current, onNavigate }: { current: Step; onNaviga
           )
         })}
       </ol>
-      <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400 sm:hidden">{steps[currentIndex]?.label}</p>
+      <p className="mt-2 text-center text-xs text-ink-4 sm:hidden">{steps[currentIndex]?.label}</p>
     </nav>
   )
 }

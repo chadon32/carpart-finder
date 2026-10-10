@@ -6,6 +6,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import { searchCheapestListings } from '../server/search.js'
+import { searchLimit } from '../server/lib/searchLimit.js'
 import { getMakes, getModels, decodeVin } from '../server/nhtsa.js'
 import { getTrims } from '../server/ebayCompatibility.js'
 import { getCurrentPrices } from '../server/providers/ebay.js'
@@ -221,6 +222,7 @@ const writeLimiter = createSharedRateLimiter({
 
 app.use('/api/supabase/login', authLimiter)
 app.use('/api/supabase/signup', authLimiter)
+app.use('/api/supabase/password', authLimiter)
 app.use('/api/supabase/price-alerts/subscribe', subscribeLimiter)
 // Logout only clears the client cookie and remains available while the shared
 // limiter is being migrated or temporarily unavailable.
@@ -564,7 +566,7 @@ app.post('/api/identify-part', async (req, res) => {
 })
 
 app.get('/api/search', async (req, res) => {
-  const { year, make, model, part, trim, zip } = req.query
+  const { year, make, model, part, trim, zip, limit } = req.query
   if (!part || !String(part).trim()) {
     return res.status(400).json({ error: 'part query param is required' })
   }
@@ -583,6 +585,7 @@ app.get('/api/search', async (req, res) => {
       part: String(part),
       zip: cleanZip,
       channel: affiliateChannelFromRequest(req),
+      limit: searchLimit(limit),
     })
     // Record the day's observed low from genuinely live results only (cache
     // hits re-observe nothing; stale results are old data). Awaited because

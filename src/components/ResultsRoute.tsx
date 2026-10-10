@@ -1,9 +1,10 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { usePersistedState } from '../hooks/usePersistedState'
 import { usePartsSearch } from '../hooks/usePartsSearch'
 import type { ResultsListProps } from './ResultsList'
+import { lazyWithRecovery } from '../lib/lazyWithRecovery'
 
-const ResultsList = lazy(() => import('./ResultsList').then((module) => ({ default: module.ResultsList })))
+const ResultsList = lazyWithRecovery(() => import('./ResultsList').then((module) => ({ default: module.ResultsList })))
 
 export function ResultsRoute({ fallback, ...props }: ResultsListProps & { fallback: ReactNode }) {
   const [storedZip, setZip] = usePersistedState<string>('cpf-zip', '')

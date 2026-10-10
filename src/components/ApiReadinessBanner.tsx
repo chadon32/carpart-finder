@@ -64,7 +64,7 @@ export function ApiReadinessBanner() {
         <button
           type="button"
           onClick={() => void checkReadiness()}
-          className="btn inline-flex shrink-0 items-center justify-center gap-2 border border-amber-400 bg-white px-3 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:hover:bg-amber-900"
+          className="btn inline-flex shrink-0 items-center justify-center gap-2 border border-amber-400 bg-surface px-3 py-2 font-semibold text-amber-950 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
         >
           <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
           Retry service check

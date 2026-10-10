@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
+import { Suspense, useEffect, useId, useRef, useState } from 'react'
 import { ArrowRight, AlertCircle, X, BookmarkPlus, Check, ScanLine, Activity, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchMakes, fetchModels, fetchTrims, decodeVinApi } from '../api/client'
@@ -7,8 +7,9 @@ import { StickyActionBar } from './StickyActionBar'
 import { VehicleThumbnail } from './VehicleThumbnail'
 import { cachedRecallCount } from '../lib/recallCache'
 import { normalizeMake } from '../../shared/vehicleMake.js'
+import { lazyWithRecovery } from '../lib/lazyWithRecovery'
 
-const VehicleHealthModal = lazy(() =>
+const VehicleHealthModal = lazyWithRecovery(() =>
   import('./VehicleHealthModal').then((module) => ({ default: module.VehicleHealthModal }))
 )
 
@@ -282,7 +283,7 @@ export function CarSelector({
       </div>
 
       {/* Always rendered so aria-controls resolves; hidden until opened. */}
-      <div id="vin-panel" hidden={!vinOpen} className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+      <div id="vin-panel" hidden={!vinOpen} className="mt-3 rounded-xl border border-line bg-surface-2/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
         <label htmlFor="vin-input" className="field-label">Vehicle identification number (VIN)</label>
         <div className="flex gap-2">
           <input
@@ -313,16 +314,16 @@ export function CarSelector({
             {vinLoading ? 'Decoding…' : 'Decode'}
           </button>
         </div>
-        <p id="vin-help" className="mt-1.5 text-xs text-slate-500">
+        <p id="vin-help" className="mt-1.5 text-sm text-ink-4">
           Find it on the driver's door jamb or the lower windshield. It has 17 letters and numbers, never I, O, or Q.
         </p>
-        {vinError && <p id="vin-error" role="alert" className="mt-1.5 text-xs text-rose-700">{vinError}</p>}
+        {vinError && <p id="vin-error" role="alert" className="mt-1.5 text-sm text-rose-700">{vinError}</p>}
       </div>
 
       {/* My Garage — hidden until a vehicle is saved; first-time visitors
           get the form, not a placeholder for a feature they haven't used. */}
       {garage.length > 0 && (
-        <div className="mt-6 border-b border-slate-100 pb-6 dark:border-slate-800/60">
+        <div className="mt-6 border-b border-line-soft pb-6 dark:border-slate-800/60">
           <h3 className="eyebrow mb-3">My Garage</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {garage.map((c, i) => (
@@ -331,7 +332,7 @@ export function CarSelector({
                 className={`group flex min-w-0 items-center gap-1 rounded-xl border p-1.5 transition-all ${
                   year === c.year && make === c.make && model === c.model && trim === c.trim
                     ? 'border-brand-500 bg-brand-50/20'
-                    : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                    : 'border-line/80 bg-surface hover:border-slate-300 hover:bg-surface-2/50'
                 }`}
               >
                 <button
@@ -342,10 +343,10 @@ export function CarSelector({
                 >
                   <VehicleThumbnail make={c.make} model={c.model} year={c.year} className="h-9 w-14 rounded-lg" iconSize={16} />
                   <div className="min-w-0">
-                    <div className="font-bold text-slate-900 truncate text-xs">
+                    <div className="font-bold text-ink truncate text-xs">
                       {c.year} {c.make} {c.model}
                     </div>
-                    {c.trim && <div className="text-xs text-slate-500 truncate">{c.trim}</div>}
+                    {c.trim && <div className="text-xs text-ink-4 truncate">{c.trim}</div>}
                   </div>
                 </button>
                 <div className="flex shrink-0 items-center gap-1">
@@ -364,7 +365,7 @@ export function CarSelector({
                       setHealthIndex(i)
                     }}
                     aria-label={`Vehicle health for ${c.year} ${c.make} ${c.model}`}
-                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-brand-600"
+                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-4 transition hover:bg-surface-3 hover:text-brand-600"
                   >
                     <Activity size={16} />
                   </button>
@@ -372,7 +373,7 @@ export function CarSelector({
                     type="button"
                     onClick={(e) => removeFromGarage(i, e)}
                     aria-label="Remove vehicle"
-                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-rose-600"
+                    className="-m-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-4 transition hover:bg-surface-3 hover:text-rose-600"
                   >
                     <X size={16} />
                   </button>
@@ -435,12 +436,12 @@ export function CarSelector({
             </button>
           )}
         </div>
-        <p className="mb-2 text-xs leading-relaxed text-slate-500">
+        <p className="mb-2 text-sm leading-relaxed text-ink-4">
           Trim is the package name, such as LE, Sport, or Limited. Leave it blank if you are not sure.
         </p>
 
         {trimsLoading ? (
-          <div className="field bg-slate-50 text-slate-500">Loading trim options…</div>
+          <div className="field bg-surface-2 text-ink-4">Loading trim options…</div>
         ) : trims.length > 0 ? (
           <>
             {/* Nice card-style selector when there aren't too many options */}
@@ -453,7 +454,7 @@ export function CarSelector({
                   className={`min-h-11 touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
                     !trim
                       ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20 dark:bg-brand-950 dark:text-brand-400'
-                      : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                      : 'border-line text-ink-2 hover:border-slate-300 hover:bg-surface-2'
                   }`}
                 >
                   Any trim
@@ -467,7 +468,7 @@ export function CarSelector({
                     className={`min-h-11 touch-manipulation rounded-xl border px-4 py-3 text-left text-sm font-medium transition sm:py-2.5 ${
                       trim === t
                         ? 'border-brand-600 bg-brand-50 text-brand-700 ring-1 ring-brand-600/20 dark:bg-brand-950 dark:text-brand-400'
-                        : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                        : 'border-line text-ink-2 hover:border-slate-300 hover:bg-surface-2'
                     }`}
                   >
                     {t}
@@ -477,7 +478,7 @@ export function CarSelector({
             ) : (
               <Combobox id={trimInputId} label="" ariaLabel="Trim (optional)" placeholder="Select trim" options={trims} value={trim} onChange={(v) => setTrim(v)} />
             )}
-            <p className="mt-2 text-xs text-slate-500">Trim options come from eBay's vehicle data.</p>
+            <p className="mt-2 text-sm text-ink-4">Trim options come from eBay's vehicle data.</p>
           </>
         ) : (
           <input
@@ -507,18 +508,18 @@ export function CarSelector({
               <div className="min-w-0 py-0.5">
                 <div className="mb-1.5 flex items-center gap-1.5">
                   <span className="h-1 w-1 rounded-full bg-emerald-400" />
-                  <span className="font-data text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  <span className="font-data text-xs font-semibold uppercase tracking-[0.14em] text-ink-5">
                     Your vehicle
                   </span>
                 </div>
 
                 <h3 className="font-data text-lg font-semibold leading-tight tracking-tight text-white sm:text-xl">
-                  <span className="text-slate-500">{year}</span>{' '}
+                  <span className="text-ink-4">{year}</span>{' '}
                   {make.toUpperCase()} {model.toUpperCase()}
                 </h3>
 
                 {trim && (
-                  <p className="font-data mt-1 text-[12px] font-medium text-slate-400">
+                  <p className="font-data mt-1 text-[12px] font-medium text-ink-5">
                     TRIM · {trim.toUpperCase()}
                   </p>
                 )}
@@ -576,7 +577,7 @@ export function CarSelector({
         <Suspense
           fallback={(
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45" role="status">
-              <div className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-xl">
+              <div className="rounded-xl bg-surface px-5 py-3 text-sm font-semibold text-ink-2 shadow-overlay">
                 Loading vehicle health…
               </div>
             </div>

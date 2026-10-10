@@ -1,4 +1,5 @@
 import { fetchWithRetry } from './httpClient.js'
+import { cleanModelNames } from './lib/modelNames.js'
 
 const BASE_URL = 'https://vpic.nhtsa.dot.gov/api/vehicles'
 
@@ -58,6 +59,20 @@ export async function getMakes(type) {
   return promise
 }
 
+// Registered body builders and trailer makers appear next to real models in
+// vPIC. Asking per vehicle type (as the makes list does) drops most of them.
+async function fetchModelNames(make, year, nhtsaType) {
+  const typePath = nhtsaType ? `/vehicleType/${encodeURIComponent(nhtsaType)}` : ''
+  const res = await fetchWithRetry(
+    `${BASE_URL}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}${typePath}?format=json`,
+    {},
+    { timeoutMs: 10000, retries: 2 }
+  )
+  if (!res.ok) throw new Error(`NHTSA models lookup failed (${res.status})`)
+  const data = await res.json()
+  return (data.Results || []).map((r) => r.Model_Name)
+}
+
 export async function getModels(make, year) {
   const key = `${make.toLowerCase()}::${year}`
   const cached = modelsCache.get(key)
@@ -71,17 +86,16 @@ export async function getModels(make, year) {
 
   const promise = (async () => {
     try {
-      const res = await fetchWithRetry(
-        `${BASE_URL}/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}?format=json`,
-        {},
-        { timeoutMs: 10000, retries: 2 }
+      const typed = await Promise.allSettled(
+        Object.values(VEHICLE_TYPES).map((nhtsaType) => fetchModelNames(make, year, nhtsaType))
       )
-      if (!res.ok) throw new Error(`NHTSA models lookup failed (${res.status})`)
-      const data = await res.json()
+      let names = typed.flatMap((outcome) => (outcome.status === 'fulfilled' ? outcome.value : []))
+      // Some makes and years have no typed data at all; the untyped list is
+      // better than an empty dropdown. If every lookup failed this throws,
+      // exactly as the single lookup used to.
+      if (names.length === 0) names = await fetchModelNames(make, year)
 
-      const models = Array.from(
-        new Set((data.Results || []).map((r) => r.Model_Name?.trim()).filter(Boolean))
-      ).sort()
+      const models = cleanModelNames(names)
 
       modelsCache.set(key, { data: models, expiresAt: Date.now() + CACHE_TTL_MS })
       return models

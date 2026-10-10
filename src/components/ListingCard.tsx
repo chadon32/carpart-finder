@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { Star, Award, Tag, Sparkles, MapPin, AlertTriangle, ExternalLink, Check, Plus, Package, Truck, ShieldCheck } from 'lucide-react'
+import { Star, Award, Tag, Sparkles, MapPin, AlertTriangle, ExternalLink, Check, Plus, Package, Truck, ShieldCheck, Hash, Info } from 'lucide-react'
 import type { Listing } from '../api/client'
 import { deliveryLabel, knownTotalCost, shippingLabel } from '../lib/listingHelpers'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -7,12 +7,14 @@ import { OutboundLink } from './OutboundLink'
 
 interface ListingCardProps {
   listing: Listing
-  index: number
   isBestValue: boolean
   isCheapest: boolean
   inWatchlist: boolean
   isComparing: boolean
   effectiveZip: string
+  // eBay's more specific name for the selected model that this listing matched
+  // (RX -> RX350). Null when it is the model the shopper chose.
+  modelVariant?: string | null
   onSelect: (listing: Listing) => void
   onAddToWatchlist: (listing: Listing) => void
   onToggleCompare: (listing: Listing) => void
@@ -20,7 +22,7 @@ interface ListingCardProps {
 }
 
 const VALUE_ESTIMATE_EXPLANATION =
-  'A deterministic comparison of item price, known shipping (before tax), seller feedback (assumes 92% when missing), and top-rated status. Confirm engine and option details before purchase.'
+  'Ranked by price, shipping, seller rating, and Top Rated status among the listings that match your vehicle. Shipping is before tax. Confirm engine and options before you buy.'
 
 // Total-with-shipping note. Unknown shipping says so instead of implying a
 // total; free shipping needs no second number because the price is the total.
@@ -30,17 +32,25 @@ function TotalNote({ listing, knownTotal }: { listing: Listing; knownTotal: numb
   }
   if (!listing.shippingCost) return null
   return (
-    <div className="font-data mt-1 text-xs font-bold text-slate-700 dark:text-slate-300">
+    <div className="font-data mt-1 text-xs font-bold text-ink-2">
       ${knownTotal.toFixed(2)} with shipping, before tax
     </div>
   )
 }
 
-function FitmentBadge({ verified }: { verified: boolean }) {
-  return verified ? (
-    <span className="badge bg-emerald-100 text-emerald-800"><ShieldCheck size={12} /> Year, make &amp; model match</span>
-  ) : (
-    <span className="badge bg-amber-100 text-amber-800"><AlertTriangle size={12} /> Fit not confirmed</span>
+function FitmentBadge({ verified, modelVariant, partNumberInTitle }: { verified: boolean; modelVariant?: string | null; partNumberInTitle?: boolean }) {
+  if (verified) {
+    return (
+      <span className="badge badge-fit">
+        <ShieldCheck size={12} /> {modelVariant ? `Matches ${modelVariant}` : 'Year, make & model match'}
+      </span>
+    )
+  }
+  return (
+    <>
+      {partNumberInTitle && <span className="badge badge-fact"><Hash size={12} /> Part number in title</span>}
+      <span className="badge badge-caution"><AlertTriangle size={12} /> Fit not confirmed</span>
+    </>
   )
 }
 
@@ -48,15 +58,15 @@ function ListingImage({ listing, className }: { listing: Listing; className: str
   return listing.image ? (
     <img
       src={listing.image}
-      alt={listing.title}
+      alt=""
       loading="lazy"
       decoding="async"
       width={96}
       height={96}
-      className={`${className} rounded-xl border border-slate-100 object-cover shadow-sm`}
+      className={`${className} rounded-xl border border-line-soft object-cover shadow-sm`}
     />
   ) : (
-    <div className={`${className} flex items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-slate-500`}>
+    <div className={`${className} flex items-center justify-center rounded-xl border border-line-soft bg-surface-2 text-ink-4`}>
       <Package size={28} strokeWidth={1.25} />
     </div>
   )
@@ -67,7 +77,7 @@ function SellerRating({ listing, showCount = true }: { listing: Listing; showCou
   return (
     <span className="inline-flex shrink-0 items-center gap-1 text-amber-700 dark:text-amber-300">
       <Star size={13} className="fill-current" /> {listing.sellerFeedbackPercentage}%
-      {showCount && listing.sellerFeedbackScore && <span className="text-slate-500">({listing.sellerFeedbackScore.toLocaleString()})</span>}
+      {showCount && listing.sellerFeedbackScore && <span className="text-ink-4">({listing.sellerFeedbackScore.toLocaleString()})</span>}
     </span>
   )
 }
@@ -79,12 +89,12 @@ export function ListingCard(props: ListingCardProps) {
 
 function FullListingCard({
   listing,
-  index,
   isBestValue,
   isCheapest,
   inWatchlist,
   isComparing,
   effectiveZip,
+  modelVariant,
   onSelect,
   onAddToWatchlist,
   onToggleCompare,
@@ -108,10 +118,7 @@ function FullListingCard({
       )}
 
       <div className="relative shrink-0">
-        <div className="font-data flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
-          {String(index + 1).padStart(2, '0')}
-        </div>
-        <ListingImage listing={listing} className="mt-3 h-24 w-24" />
+        <ListingImage listing={listing} className="h-24 w-24" />
       </div>
 
       <div className="min-w-0 max-w-full flex-1 pt-1">
@@ -119,16 +126,16 @@ function FullListingCard({
           {/* Wrap by the card's available width, not the viewport: the tablet
               sidebar leaves too little room for a title and total side by side. */}
           <div className="flex min-w-0 grow basis-48 flex-wrap items-center gap-2">
-            <h3 id={titleId} className="break-anywhere min-w-0 text-[15px] font-semibold leading-tight tracking-[-0.1px] text-slate-950 group-hover:text-brand-700">
+            <h3 id={titleId} className="break-anywhere min-w-0 text-base font-semibold leading-snug tracking-[-0.1px] text-ink group-hover:text-brand-700">
               {listing.title}
             </h3>
             {showBestValue && (
-              <span className="badge bg-brand-50 text-brand-700 dark:bg-brand-950/20 dark:text-brand-400 font-extrabold uppercase tracking-wider px-2 py-0.5 shrink-0">
+              <span className="badge badge-rank shrink-0">
                 Best value estimate
               </span>
             )}
             {showCheapest && (
-              <span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 font-extrabold uppercase tracking-wider px-2 py-0.5 shrink-0">
+              <span className="badge badge-rank-soft shrink-0">
                 Lowest known total
               </span>
             )}
@@ -137,36 +144,35 @@ function FullListingCard({
             {listing.originalPrice && (
               <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">↓ Price dropped</div>
             )}
-            {listing.originalPrice && <div className="font-data text-xs text-slate-500 line-through">${listing.originalPrice.toFixed(2)}</div>}
-            <div className="font-data font-semibold text-slate-950 text-[24px] leading-none">
+            {listing.originalPrice && <div className="font-data text-xs text-ink-4 line-through">${listing.originalPrice.toFixed(2)}</div>}
+            <div className="font-data font-semibold text-ink text-[24px] leading-none">
               ${listing.price.toFixed(2)}
             </div>
             <TotalNote listing={listing} knownTotal={knownTotal} />
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-          <span className="badge bg-slate-100 text-slate-700 px-2.5 py-0.5 text-xs">{listing.condition}</span>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
+          <span className="badge badge-fact px-2.5 py-0.5 text-xs">{listing.condition}</span>
           <span className="font-medium">{listing.seller} · {listing.source}</span>
           <SellerRating listing={listing} />
+          {listing.itemLocation && <span className="inline-flex items-center gap-1 text-ink-4"><MapPin size={13} aria-hidden="true" /> {listing.itemLocation}</span>}
         </div>
 
-        {listing.itemLocation && <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500"><MapPin size={13} /> {listing.itemLocation}</div>}
-
         {(shippingLabel(listing) || deliveryLabel(listing, effectiveZip)) && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm text-slate-600">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm text-ink-3">
             <span className="inline-flex items-center gap-1 font-medium">
-              <Truck size={13} className="text-slate-500" />
+              <Truck size={13} className="text-ink-4" />
               {shippingLabel(listing) === 'Free shipping' ? <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free shipping</span> : shippingLabel(listing)}
             </span>
-            {deliveryLabel(listing, effectiveZip) && <span className="text-slate-500">· {deliveryLabel(listing, effectiveZip)}</span>}
+            {deliveryLabel(listing, effectiveZip) && <span className="text-ink-4">· {deliveryLabel(listing, effectiveZip)}</span>}
           </div>
         )}
 
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <FitmentBadge verified={isFitmentVerified} />
+          <FitmentBadge verified={isFitmentVerified} modelVariant={modelVariant} partNumberInTitle={listing.partNumberMatch === 'exact'} />
           {showBestValue && (
-            <span className="group relative badge bg-emerald-100 text-emerald-800 p-0">
+            <span className="group relative inline-flex">
               <button
                 type="button"
                 onClick={(e) => {
@@ -175,24 +181,24 @@ function FullListingCard({
                 }}
                 aria-expanded={showValueInfo}
                 aria-describedby={`bv-tip-${listing.id}`}
-                aria-label="Explain this value estimate"
-                className="inline-flex min-h-11 touch-manipulation items-center gap-1 px-2.5 py-1.5"
+                className="inline-flex min-h-11 touch-manipulation items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold text-brand-700 underline decoration-brand-300 underline-offset-2 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/30"
               >
-                <Sparkles size={12} /> Value estimate among matched listings
+                <Info size={13} aria-hidden="true" /> How is best value ranked?
               </button>
               <span
                 id={`bv-tip-${listing.id}`}
                 role="tooltip"
-                className={`pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-normal leading-normal text-white shadow-xl transition-all duration-200 ${showValueInfo ? 'opacity-100' : 'opacity-0'} sm:group-hover:opacity-100`}
+                aria-hidden={!showValueInfo}
+                className={`pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-normal leading-normal text-white shadow-overlay transition-all duration-200 ${showValueInfo ? 'opacity-100' : 'opacity-0'} sm:group-hover:opacity-100`}
               >
                 <strong>Value estimate:</strong> {VALUE_ESTIMATE_EXPLANATION}
                 <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 bg-slate-950 rotate-45" />
               </span>
             </span>
           )}
-          {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={12} /> Top Rated</span>}
-          {listing.bestOfferAccepted && <span className="badge bg-slate-100 text-slate-700">Best Offer</span>}
-          {listing.originalPrice && listing.discountPercentage && <span className="badge bg-rose-100 text-rose-700"><Tag size={12} /> {listing.discountPercentage}% off</span>}
+          {listing.topRatedSeller && <span className="badge badge-fact"><Award size={12} /> Top Rated</span>}
+          {listing.bestOfferAccepted && <span className="badge badge-fact">Best Offer</span>}
+          {listing.originalPrice && listing.discountPercentage && <span className="badge badge-fact"><Tag size={12} /> {listing.discountPercentage}% off</span>}
         </div>
 
         <div className="mt-4 flex min-w-0 flex-wrap gap-2">
@@ -255,6 +261,7 @@ function CompactListingCard({
   inWatchlist,
   isComparing,
   effectiveZip,
+  modelVariant,
   onSelect,
   onAddToWatchlist,
   onToggleCompare,
@@ -272,7 +279,7 @@ function CompactListingCard({
 
   return (
     <li
-      className={`listing-card grid min-w-0 max-w-full grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1.5 p-3 ${showBestValue ? 'ring-1 ring-brand-300/70' : ''}`}
+      className={`listing-card grid min-w-0 max-w-full grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 p-3 ${showBestValue ? 'ring-1 ring-brand-300/70' : ''}`}
     >
       {showBestValue && (
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-400 via-brand-600 to-brand-500" />
@@ -282,28 +289,28 @@ function CompactListingCard({
         <ListingImage listing={listing} className="h-[72px] w-[72px]" />
       </div>
 
-      <h3 id={titleId} className="break-anywhere line-clamp-2 text-sm font-semibold leading-snug text-slate-950">
+      <h3 id={titleId} className="break-anywhere line-clamp-2 text-base font-semibold leading-snug text-ink">
         {listing.title}
       </h3>
 
-      <div className="flex min-w-0 items-center gap-2 text-xs text-slate-600">
-        <span className="shrink-0 font-semibold text-slate-700">{listing.condition}</span>
+      <div className="flex min-w-0 items-center gap-2 text-xs text-ink-3">
+        <span className="shrink-0 font-semibold text-ink-2">{listing.condition}</span>
         <span className="min-w-0 flex-1 truncate">{listing.seller}</span>
         <SellerRating listing={listing} showCount={false} />
       </div>
 
       <div className="min-w-0">
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-data text-xl font-semibold leading-none text-slate-950">${listing.price.toFixed(2)}</span>
+          <span className="font-data text-xl font-semibold leading-none text-ink">${listing.price.toFixed(2)}</span>
           {shipping && (
-            <span className="text-xs text-slate-600">
+            <span className="text-xs text-ink-3">
               {shipping === 'Free shipping' ? <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free shipping</span> : shipping}
             </span>
           )}
         </div>
         <TotalNote listing={listing} knownTotal={knownTotal} />
         {(delivery || listing.itemLocation) && (
-          <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+          <div className="mt-0.5 flex items-center gap-1 text-xs text-ink-4">
             <Truck size={12} className="shrink-0" />
             <span className="min-w-0 truncate">{[delivery, listing.itemLocation].filter(Boolean).join(' · ')}</span>
           </div>
@@ -311,24 +318,24 @@ function CompactListingCard({
       </div>
 
       <div className="col-span-2 flex flex-wrap items-center gap-1.5">
-        <FitmentBadge verified={isFitmentVerified} />
+        <FitmentBadge verified={isFitmentVerified} modelVariant={modelVariant} partNumberInTitle={listing.partNumberMatch === 'exact'} />
         {showBestValue && (
           <button
             type="button"
             onClick={() => setShowValueInfo((v) => !v)}
             aria-expanded={showValueInfo}
             aria-controls={valueInfoId}
-            className="badge min-h-11 touch-manipulation bg-brand-50 px-2.5 text-brand-700 dark:bg-brand-950/20 dark:text-brand-400"
+            className="badge badge-rank min-h-11 touch-manipulation px-2.5"
           >
-            <Sparkles size={12} /> Best value estimate
+            <Sparkles size={12} aria-hidden="true" /> Best value estimate
           </button>
         )}
-        {showCheapest && <span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400">Lowest known total</span>}
-        {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={12} /> Top Rated</span>}
-        {listing.originalPrice && listing.discountPercentage && <span className="badge bg-rose-100 text-rose-700"><Tag size={12} /> {listing.discountPercentage}% off</span>}
+        {showCheapest && <span className="badge badge-rank-soft">Lowest known total</span>}
+        {listing.topRatedSeller && <span className="badge badge-fact"><Award size={12} /> Top Rated</span>}
+        {listing.originalPrice && listing.discountPercentage && <span className="badge badge-fact"><Tag size={12} /> {listing.discountPercentage}% off</span>}
       </div>
       {showBestValue && showValueInfo && (
-        <p id={valueInfoId} className="col-span-2 rounded-xl bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+        <p id={valueInfoId} className="col-span-2 rounded-xl bg-surface-3 px-3 py-2 text-sm leading-relaxed text-ink-2">
           <strong>Value estimate:</strong> {VALUE_ESTIMATE_EXPLANATION}
         </p>
       )}

@@ -75,3 +75,36 @@ test('listing contradiction check also validates structured listing details', ()
     true
   )
 })
+
+// ---- listings that are plainly for other vehicles --------------------------
+
+const lexusRx = { year: '2015', make: 'Lexus', model: 'RX' }
+
+test('a title naming several other vehicles, but not the selected one, is for another vehicle', () => {
+  assert.equal(
+    titleDoesNotContradictVehicle('2 PACK Cabin Air Filter Upgraded Activated Carbon FITS Accord Civic Odyssey CR-V', lexusRx),
+    false,
+  )
+})
+
+test('heavy-truck makes count as other vehicles', () => {
+  assert.equal(titleDoesNotContradictVehicle('Cabin Air Filter PA30269 AF56102 For Kenworth Peterbilt S-9034', lexusRx), false)
+  assert.equal(titleDoesNotContradictVehicle('Air Filter for Freightliner Cascadia', lexusRx), false)
+})
+
+test('generic titles and a single stray model name are not treated as another vehicle', () => {
+  assert.equal(titleDoesNotContradictVehicle('ACDelco Cabin Air Filter', lexusRx), true)
+  assert.equal(titleDoesNotContradictVehicle('Premium cabin air filter, replaces Civic style', lexusRx), true)
+  assert.equal(titleDoesNotContradictVehicle('Spark plug wire set with boots', { year: '2018', make: 'Honda', model: 'Civic' }), true)
+  assert.equal(titleDoesNotContradictVehicle('Brake pad hardware kit, universal fit, with leaf spring clips', lexusRx), true)
+})
+
+test('a list of vehicles that includes the selected one is kept', () => {
+  assert.equal(titleDoesNotContradictVehicle('Cabin Air Filter for Accord Civic CR-V Odyssey', { year: '2018', make: 'Honda', model: 'Civic' }), true)
+  assert.equal(titleDoesNotContradictVehicle('Cabin Air Filter fits Accord Civic CR-V Pilot RX350', lexusRx), false, 'RX350 is not the selected model name unless it is an alias')
+  assert.equal(titleDoesNotContradictVehicle('Cabin Air Filter fits Accord Civic CR-V RX350', { ...lexusRx, modelAliases: ['RX350'] }), true)
+})
+
+test('models of the selected make are not other vehicles', () => {
+  assert.equal(titleDoesNotContradictVehicle('Wiper blades for Camry Corolla RAV4', { year: '2019', make: 'Toyota', model: 'Highlander' }), true)
+})

@@ -61,7 +61,9 @@ const SYMPTOMS = [
     safety: 'Increases stopping distance — worth fixing promptly.',
     keywords: [
       { terms: ['shake', 'shakes', 'shaking', 'shudder', 'vibrat', 'pulsat', 'pulsing', 'wobble'], weight: 4 },
-      { terms: ['brake', 'braking', 'brake pedal', 'stop', 'stopping'], weight: 3 },
+      // Not bare "stop": the word-prefix match would also catch "stopped at a
+      // light", which describes an idling engine rather than the brakes.
+      { terms: ['brake', 'braking', 'brake pedal', 'stopping'], weight: 3 },
       { terms: ['steering wheel'], weight: 1 },
     ],
     parts: [
@@ -253,7 +255,7 @@ const SYMPTOMS = [
       'Rough idle, stumbling, hesitation on acceleration, or a flashing check-engine light typically means one or more cylinders are misfiring — most often spark plugs or ignition coils.',
     safety: 'A flashing check-engine light means an active misfire — avoid hard driving until fixed to protect the catalytic converter.',
     keywords: [
-      { terms: ['misfire', 'misfiring', 'rough idle', 'idles rough', 'sputter', 'sputtering', 'stumble', 'stumbling', 'hesitat', 'shudder', 'bogs down'], weight: 5 },
+      { terms: ['misfire', 'misfiring', 'rough idle', 'idles rough', 'sputter', 'sputtering', 'stumble', 'stumbling', 'hesitat', 'shudder', 'bogs down', 'flashing check engine', 'blinking check engine', 'check engine light flashing', 'check engine light is flashing', 'check engine light blinking', 'check engine light is blinking', 'check engine flashing', 'engine light flashing', 'engine light is flashing', 'engine light blinking', 'engine light is blinking', 'flashing engine light', 'blinking engine light'], weight: 5 },
       { terms: ['rough', 'roughly', 'poorly', 'badly', 'missing'], weight: 2 },
       { terms: ['check engine', 'idle', 'engine', 'runs', 'running', 'motor', 'accelerat'], weight: 3 },
     ],
@@ -559,7 +561,8 @@ const SYMPTOMS = [
       'If the car shakes at a stop but smooths out while driving, the usual causes are a broken engine/transmission mount or a cylinder misfire.',
     keywords: [
       { terms: ['shake', 'shakes', 'shaking', 'vibrat', 'shudder', 'rough'], weight: 3 },
-      { terms: ['idle', 'idling', 'stopped', 'parked', 'neutral', 'stop light', 'at a stop', 'when stopped', 'in park'], weight: 3 },
+      { terms: ['idle', 'idling', 'stopped', 'parked', 'neutral', 'stop light', 'stoplight', 'at a stop', 'when stopped', 'in park', 'stop at a light', 'stop at the light', 'stop at a red', 'at a light', 'at the light', 'red light', 'traffic light', 'stop sign', 'standing still', 'sitting still'], weight: 3 },
+      { terms: ['check engine', 'engine light', 'service engine'], weight: 2 },
     ],
     parts: [
       { name: 'Motor Mount', why: 'A collapsed engine mount lets normal engine shake reach the cabin at idle.', priority: 'likely' },

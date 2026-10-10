@@ -1,6 +1,9 @@
 export const site = {
   name: 'CarPartsRadar',
   origin: 'https://carpartsradar.com',
+  // The public contact address, shown on About, Contact, and the policies.
+  // A mailbox on the site's own domain (support@carpartsradar.com) reads as a
+  // business to visitors; change it here and regenerate the pages.
   email: 'chadon322@gmail.com',
   updated: 'July 22, 2026',
   isoDate: '2026-07-22',
@@ -638,7 +641,7 @@ export const trustPages = {
       {
         heading: 'Privacy and accounts',
         paragraphs: [
-          'The privacy policy explains data use and account deletion. Users can permanently delete an account inside the iOS app. Privacy questions or requests can also be sent from the email address associated with the account so ownership can be verified.',
+          'The privacy policy explains data use and account deletion. Users can permanently delete an account on this website (Account, then Danger zone) or inside the iOS app. Privacy questions or requests can also be sent from the email address associated with the account so ownership can be verified.',
         ],
       },
       {
@@ -683,7 +686,7 @@ export const legalPages = {
       {
         heading: 'Account deletion and retention',
         paragraphs: [
-          'The iOS app provides permanent account deletion at Profile, Settings, Account, Delete Account. The confirmed flow removes the Supabase authentication user and known account-linked rows, including saved searches, price alerts, and matching email-only alerts. It is deletion, not temporary deactivation.',
+          'The website (Account, then Danger zone, Delete my account) and the iOS app (Profile, Settings, Account, Delete Account) both provide permanent account deletion. The confirmed flow removes the Supabase authentication user and known account-linked rows, including saved searches, price alerts, and matching email-only alerts. It is deletion, not temporary deactivation.',
           'Aggregate price observations are not linked to an account and may remain as non-personal product data. Users may also contact us with a privacy request from the email address associated with the account so ownership can be verified.',
         ],
       },
@@ -733,7 +736,7 @@ export const legalPages = {
         heading: 'Accounts and acceptable use',
         paragraphs: [
           'You are responsible for maintaining the confidentiality of your account credentials and for activity performed through your account. Do not attempt to access another user’s data, interfere with security controls, overload the service, scrape protected endpoints, manipulate attribution, submit malicious content, or use the service unlawfully.',
-          'We may restrict access when reasonably necessary to protect users, service availability, data providers, or legal compliance. Users may permanently delete their own accounts through the iOS app.',
+          'We may restrict access when reasonably necessary to protect users, service availability, data providers, or legal compliance. Users may permanently delete their own accounts on the website or in the iOS app.',
         ],
       },
       {

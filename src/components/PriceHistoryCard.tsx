@@ -34,14 +34,14 @@ export function PriceHistoryCard({ car, part }: { car: Car; part: string }) {
       <div className="flex items-center gap-3">
         <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400"><TrendingDown size={17} /></div>
         <div>
-          <div className="font-semibold tracking-tight text-slate-950">Price radar — observed lows</div>
-          <div className="text-xs text-slate-500">Lowest daily item + known shipping, before tax, we've seen for this search</div>
+          <div className="font-semibold tracking-tight text-ink">Price radar — observed lows</div>
+          <div className="text-xs text-ink-4">Lowest daily item + known shipping, before tax, we've seen for this search</div>
         </div>
       </div>
       <div className="mt-4 text-brand-600 dark:text-brand-400">
         <Sparkline points={history} />
       </div>
-      <div className="font-data mt-3 flex items-center justify-between text-xs font-medium uppercase tracking-[0.06em] text-slate-500">
+      <div className="font-data mt-3 flex items-center justify-between text-xs font-medium uppercase tracking-[0.06em] text-ink-4">
         <span>Low ${Math.min(...history.map((point) => point.price)).toFixed(2)}</span>
         <span>High ${Math.max(...history.map((point) => point.price)).toFixed(2)}</span>
         <span>Since {new Date(`${history[0].date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>

@@ -11,13 +11,13 @@ function gate() {
 }
 
 async function changeZip(page: Page, zip: string) {
-  const phone = await page.evaluate(() => window.innerWidth < 640)
-  if (phone) await page.getByRole('button', { name: 'Sort & filters' }).click()
-  const input = phone
+  const sheet = await page.evaluate(() => window.innerWidth < 1280)
+  if (sheet) await page.getByRole('button', { name: 'Sort & filters' }).click()
+  const input = sheet
     ? page.getByRole('dialog', { name: 'Sort and filter listings' }).getByRole('textbox', { name: 'Delivery ZIP code' })
     : page.getByRole('textbox', { name: 'Delivery ZIP code' })
   await input.fill(zip)
-  if (phone) await page.getByRole('button', { name: 'Show results' }).click()
+  if (sheet) await page.getByRole('button', { name: 'Show results' }).click()
   else await input.press('Enter')
 }
 

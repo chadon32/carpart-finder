@@ -26,7 +26,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/70 bg-white/95 pb-safe backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-900/95 sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-white/95 pb-safe backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-900/95 sm:hidden"
     >
       <div className="grid h-14 grid-cols-3">
         {tabs.map((t) => {
@@ -39,7 +39,7 @@ export function BottomNav({
               onClick={t.onClick}
               aria-current={isActive ? 'page' : undefined}
               className={`relative flex touch-manipulation flex-col items-center justify-center gap-0.5 transition-colors ${
-                isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-400'
+                isActive ? 'text-brand-600 dark:text-brand-400' : 'text-ink-3'
               }`}
             >
               <span className="relative">
@@ -50,7 +50,7 @@ export function BottomNav({
                   </span>
                 )}
               </span>
-              <span className="font-data text-xs font-semibold uppercase tracking-[0.08em]">{t.label}</span>
+              <span className="text-xs font-semibold">{t.label}</span>
             </button>
           )
         })}

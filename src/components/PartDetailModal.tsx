@@ -1,4 +1,4 @@
-import { useState, Suspense, lazy } from 'react'
+import { useState, Suspense } from 'react'
 import { X, ExternalLink, Star, Truck, Award, AlertTriangle, ShieldCheck, Sparkles } from 'lucide-react'
 import type { Listing } from '../api/client'
 import type { Car } from './CarSelector'
@@ -6,11 +6,12 @@ import { Modal } from './Modal'
 import { trackAddedToWatchlist, trackRetailerClick } from '../lib/analytics'
 import { AffiliateDisclosure } from './AffiliateDisclosure'
 import { OutboundLink } from './OutboundLink'
+import { lazyWithRecovery } from '../lib/lazyWithRecovery'
 import { comparisonFitmentCheckedTimestamp, comparisonListingFreshnessLabel } from '../lib/comparisonShare'
 
 // RepairGuideModal pulls in react-markdown (heavy) and only renders when the
 // user clicks "Generate AI Guide" — load it (and its markdown deps) on demand.
-const RepairGuideModal = lazy(() => import('./RepairGuideModal').then((m) => ({ default: m.RepairGuideModal })))
+const RepairGuideModal = lazyWithRecovery(() => import('./RepairGuideModal').then((m) => ({ default: m.RepairGuideModal })))
 
 const fitmentScopeLabels = {
   'year-make-model': 'Year, make, and model',
@@ -61,61 +62,70 @@ export function PartDetailModal({
   return (
     <Modal label={`${part} — listing details`} onClose={onClose}>
       {/* Header — pinned so Close stays reachable while the details scroll */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-surface px-6 py-4">
           <div>
-            <div className="text-xs font-semibold tracking-[1px] text-brand-600 dark:text-brand-400">DETAILED VIEW</div>
-            <div className="font-semibold text-xl tracking-tight text-slate-950">{part}</div>
+            <div className="font-semibold text-xl tracking-tight text-ink">{part}</div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2.5 text-ink-5 hover:bg-surface-3 hover:text-ink-3">
             <X size={20} />
           </button>
         </div>
 
-        <div className="grid gap-6 p-6 md:grid-cols-5">
+        {/* The listing's title, price, and fit status come first, then the
+            photo, then everything else: on a phone the sheet used to open on a
+            full-width photo with the price below the fold. */}
+        <div className="grid gap-x-6 gap-y-4 p-4 sm:p-6 md:grid-cols-5">
+          <div className="md:col-span-3 md:col-start-3 md:row-start-1">
+            <h3 className="text-lg font-semibold leading-tight tracking-[-0.3px] text-ink sm:text-xl">{listing.title}</h3>
+
+            <div className="mt-3 flex items-baseline gap-3">
+              {listing.originalPrice && (
+                <span className="font-data text-lg text-ink-4 line-through">${listing.originalPrice.toFixed(2)}</span>
+              )}
+              <span className="font-data text-4xl font-semibold tracking-[-1px] text-ink sm:text-5xl">${listing.price.toFixed(2)}</span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {isFitmentVerified ? (
+                <span className="badge badge-fit"><ShieldCheck size={13} /> Year, make &amp; model match</span>
+              ) : (
+                <span className="badge badge-caution"><AlertTriangle size={13} /> Fit not confirmed</span>
+              )}
+              <span className="badge badge-fact px-3 py-1">{listing.condition}</span>
+              {listing.topRatedSeller && <span className="badge badge-fact"><Award size={13} /> Top Rated</span>}
+              {listing.sellerFeedbackPercentage && (
+                <span className="badge badge-fact">
+                  <Star size={13} className="fill-current text-amber-500" /> {listing.sellerFeedbackPercentage}%
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* Image */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 md:col-start-1 md:row-span-2 md:row-start-1">
             {listing.image ? (
               <img
                 src={listing.image}
                 alt={listing.title}
                 loading="lazy"
                 decoding="async"
-                className="w-full rounded-2xl border border-slate-100 object-cover shadow-sm"
+                className="mx-auto w-40 rounded-2xl border border-line-soft object-cover shadow-sm sm:w-56 md:w-full"
               />
             ) : (
-              <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-500">
+              <div className="mx-auto flex aspect-square w-40 items-center justify-center rounded-2xl border border-line-soft bg-surface-2 text-ink-4 sm:w-56 md:w-full">
                 No image
               </div>
             )}
           </div>
 
           {/* Details */}
-          <div className="md:col-span-3">
-            <h3 className="text-xl font-semibold leading-tight tracking-[-0.3px] text-slate-950">{listing.title}</h3>
-
-            <div className="mt-4 flex items-baseline gap-3">
-              {listing.originalPrice && (
-                <span className="font-data text-lg text-slate-500 line-through">${listing.originalPrice.toFixed(2)}</span>
-              )}
-              <span className="font-data text-5xl font-semibold tracking-[-1px] text-slate-950">${listing.price.toFixed(2)}</span>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="badge bg-slate-900 text-white px-3 py-1">{listing.condition}</span>
-              {listing.topRatedSeller && <span className="badge bg-brand-100 text-brand-800"><Award size={13} /> Top Rated</span>}
-              {listing.sellerFeedbackPercentage && (
-                <span className="badge bg-amber-100 text-amber-800">
-                  <Star size={13} className="fill-current" /> {listing.sellerFeedbackPercentage}%
-                </span>
-              )}
-            </div>
-
-            <div className="mt-5 space-y-2 text-sm text-slate-600">
-              <div><span className="font-medium text-slate-700">Seller:</span> {listing.seller} on {listing.source}</div>
-              {listing.itemLocation && <div><span className="font-medium text-slate-700">Location:</span> {listing.itemLocation}</div>}
+          <div className="md:col-span-3 md:col-start-3">
+            <div className="space-y-2 text-sm text-ink-3">
+              <div><span className="font-medium text-ink-2">Seller:</span> {listing.seller} on {listing.source}</div>
+              {listing.itemLocation && <div><span className="font-medium text-ink-2">Location:</span> {listing.itemLocation}</div>}
               {listing.shippingCost != null && (
                 <div className="flex items-center gap-2">
-                  <Truck size={15} className="text-slate-400" />
+                  <Truck size={15} className="text-ink-5" />
                   {listing.shippingCost === 0 ? (
                     <span className="font-semibold text-emerald-700 dark:text-emerald-400">Free shipping</span>
                   ) : (
@@ -126,7 +136,7 @@ export function PartDetailModal({
             </div>
 
             {listing.shortDescription && (
-              <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
+              <div className="mt-5 rounded-2xl bg-surface-2 p-4 text-sm leading-relaxed text-ink-3">
                 {listing.shortDescription}
               </div>
             )}
@@ -142,8 +152,8 @@ export function PartDetailModal({
             )}
             
             {listing.fitmentEvidence && (
-              <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900/40">
-                <summary className="cursor-pointer font-semibold text-slate-800 dark:text-slate-200">
+              <details className="mt-3 rounded-xl border border-line bg-surface-2 px-4 py-3 text-xs text-ink-3 dark:border-slate-800">
+                <summary className="cursor-pointer font-semibold text-ink">
                   Why this marketplace compatibility label?
                 </summary>
                 <p className="mt-2 leading-relaxed">{listing.fitmentEvidence.note}</p>
@@ -176,7 +186,7 @@ export function PartDetailModal({
                   <dt className="font-semibold">Listing freshness</dt>
                   <dd>{comparisonListingFreshnessLabel(listing)}</dd>
                 </dl>
-                <p className="mt-2 text-slate-500">
+                <p className="mt-2 text-ink-4">
                   This marketplace compatibility match is not a fitment guarantee. Confirm engine, drivetrain, options, dimensions, and original part number on the retailer page before buying.
                 </p>
               </details>
@@ -187,7 +197,7 @@ export function PartDetailModal({
                 <div className="eyebrow">Complete the job</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {companions.map((c) => (
-                    <button key={c} type="button" onClick={() => onSearchPart(c)} className="btn btn-secondary px-3 py-1.5 text-xs">
+                    <button key={c} type="button" onClick={() => onSearchPart(c)} className="btn btn-secondary px-3 py-1.5">
                       {c}
                     </button>
                   ))}
@@ -201,9 +211,9 @@ export function PartDetailModal({
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <Sparkles size={16} className="text-brand-600" />
-                    <h4 className="font-bold text-slate-900 tracking-tight">Need help replacing this?</h4>
+                    <h4 className="font-bold text-ink tracking-tight">Need help replacing this?</h4>
                   </div>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-ink-3">
                     {canGenerateGuide
                       ? `Get a cautious step-by-step AI repair overview for your ${vehicleLabel}.`
                       : 'Repair guidance is available only after the marketplace confirms compatibility for the selected vehicle.'}
@@ -225,8 +235,8 @@ export function PartDetailModal({
 
         {/* Footer actions — pinned to the bottom on every screen size so the
             retailer link never sits below the fold of a long listing */}
-        <div className="sticky bottom-0 z-10 mt-4 border-t bg-slate-50 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
-          <AffiliateDisclosure className="mb-3" />
+        <div className="sticky bottom-0 z-10 mt-4 border-t bg-surface-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+          <AffiliateDisclosure compact className="mb-3" />
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={() => {

@@ -66,10 +66,10 @@ test('results start sorted by lowest known total, with unknown shipping last', a
     'Middle item, paid shipping',
     'Cheapest item, shipping unknown',
   ])
-  if ((page.viewportSize()?.width ?? 0) >= 640) {
+  if ((page.viewportSize()?.width ?? 0) >= 1280) {
     await expect(page.getByRole('combobox', { name: 'Sort listings' })).toHaveValue('total')
   } else {
-    // On phones the sort lives in the sort and filter sheet.
+    // Below the large breakpoint the sort lives in the sort and filter sheet.
     await page.getByRole('button', { name: 'Sort & filters' }).click()
     await expect(page.getByRole('radio', { name: 'Lowest total (with shipping)' })).toBeChecked()
   }

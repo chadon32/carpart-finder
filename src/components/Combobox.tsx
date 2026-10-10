@@ -6,6 +6,15 @@ export type ComboboxGroup = {
   options: string[]
 }
 
+// Typed words match an option when each of them appears in it, in any order:
+// "cabin filter" finds "Cabin Air Filter".
+function matchesQuery(option: string, query: string) {
+  const text = option.toLowerCase()
+  if (text.includes(query)) return true
+  const tokens = query.split(/\s+/).filter(Boolean)
+  return tokens.length > 1 && tokens.every((token) => text.includes(token))
+}
+
 // One flattened render model covers all three modes (flat list, grouped list,
 // free-text search): headers are decorative, items are selectable and carry a
 // sequential index that keyboard navigation moves through.
@@ -60,7 +69,7 @@ export function Combobox({
 
   const trimmedQuery = query.trim()
 
-  const { entries, items } = useMemo(() => {
+  const { entries, items, confidentFirst } = useMemo(() => {
     const q = trimmedQuery.toLowerCase()
     const entries: Entry[] = []
     const items: Extract<Entry, { kind: 'item' }>[] = []
@@ -77,24 +86,35 @@ export function Combobox({
       trimmedQuery.length > 0 &&
       !allOptions.some((o) => o.toLowerCase() === q)
 
-    if (showFreeText) pushItem(trimmedQuery, true)
-
-    const isExactMatchSelected = value && trimmedQuery.toLowerCase() === value.toLowerCase()
+    // In a select, reopening a filled field lists everything. A free-text
+    // field's value IS what was typed, so it must keep filtering as you type.
+    const isExactMatchSelected = !allowFreeText && value && trimmedQuery.toLowerCase() === value.toLowerCase()
     const filterQuery = isExactMatchSelected ? '' : q
+
+    // Someone typing a part in their own words ("cabin filter") almost always
+    // means the one listed part those words point to. When exactly one option
+    // matches several typed words, offer it before the literal search and let
+    // Enter take it.
+    const queryWords = filterQuery.split(/\s+/).filter(Boolean)
+    const wordMatches = showFreeText && queryWords.length > 1 ? allOptions.filter((o) => matchesQuery(o, filterQuery)) : []
+    const confident = wordMatches.length === 1 ? wordMatches[0] : null
+    if (confident) pushItem(confident)
+
+    if (showFreeText) pushItem(trimmedQuery, true)
 
     if (groups) {
       for (const group of groups) {
-        const matches = filterQuery ? group.options.filter((o) => o.toLowerCase().includes(filterQuery)) : group.options
+        const matches = (filterQuery ? group.options.filter((o) => matchesQuery(o, filterQuery)) : group.options).filter((o) => o !== confident)
         if (matches.length === 0) continue
         entries.push({ kind: 'header', label: group.label })
         matches.forEach((m) => pushItem(m))
       }
     } else {
-      const matches = filterQuery ? options.filter((o) => o.toLowerCase().includes(filterQuery)) : options
+      const matches = (filterQuery ? options.filter((o) => matchesQuery(o, filterQuery)) : options).filter((o) => o !== confident)
       matches.forEach((m) => pushItem(m))
     }
 
-    return { entries, items }
+    return { entries, items, confidentFirst: Boolean(confident) }
   }, [options, groups, trimmedQuery, allowFreeText, value])
 
   // Reset keyboard highlight whenever the candidate list changes.
@@ -109,7 +129,20 @@ export function Combobox({
   // Enter handling, and reopening a filled field highlights nothing.
   const typing = !allowFreeText && open && trimmedQuery !== '' &&
     trimmedQuery.toLowerCase() !== value.toLowerCase()
-  const highlightedIndex = activeIndex >= 0 ? activeIndex : typing && items.length > 0 ? 0 : -1
+  const highlightedIndex = activeIndex >= 0 ? activeIndex : (typing || confidentFirst) && items.length > 0 ? 0 : -1
+
+  // On a phone the list opens below the field, where the fixed bottom bar can
+  // cover it. Bring the whole list above that bar.
+  useEffect(() => {
+    if (!open || disabled) return
+    const frame = requestAnimationFrame(() => {
+      const list = document.getElementById(listId)
+      if (!list) return
+      const hidden = list.getBoundingClientRect().bottom - (window.innerHeight - 88)
+      if (hidden > 0) window.scrollBy({ top: hidden, behavior: 'auto' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [open, disabled, listId])
 
   // Keep the highlighted option visible while arrowing through a long list.
   useEffect(() => {
@@ -221,7 +254,7 @@ export function Combobox({
           }}
           className="field pr-9"
         />
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-ink-5">
           {allowFreeText ? (
             <Search size={16} />
           ) : (
@@ -234,12 +267,12 @@ export function Combobox({
           id={listId}
           role="listbox"
           aria-label={accessibleName}
-          className="absolute z-30 mt-1.5 max-h-60 w-full animate-fade-in overflow-auto rounded-xl border border-slate-200/80 bg-white p-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5 sm:max-h-72"
+          className="absolute z-30 mt-1.5 max-h-60 w-full animate-fade-in overflow-auto rounded-xl border border-line/80 bg-surface p-1 shadow-overlay ring-1 ring-slate-900/5 sm:max-h-72"
         >
-          {items.length === 0 && <li className="px-3 py-2 text-sm text-slate-500">No matches</li>}
+          {items.length === 0 && <li className="px-3 py-2 text-sm text-ink-4">No matches</li>}
           {entries.map((entry) =>
             entry.kind === 'header' ? (
-              <li key={`h-${entry.label}`} aria-hidden className="px-3 py-1.5 text-xs font-bold tracking-wider text-slate-500">
+              <li key={`h-${entry.label}`} aria-hidden className="px-3 py-1.5 text-xs font-bold tracking-wider text-ink-4">
                 {entry.label}
               </li>
             ) : (
@@ -257,10 +290,10 @@ export function Combobox({
                         highlightedIndex === entry.index ? 'bg-brand-50' : 'hover:bg-brand-50'
                       }`
                     : highlightedIndex === entry.index
-                      ? 'bg-slate-100 text-slate-900'
+                      ? 'bg-surface-3 text-ink'
                       : entry.value === value
                         ? 'bg-brand-50 font-semibold text-brand-700'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        : 'text-ink-2 hover:bg-surface-2'
                 }`}
               >
                 {entry.isFree ? (
@@ -276,7 +309,7 @@ export function Combobox({
         </ul>
       )}
       {allowFreeText && emptySubmit && (
-        <p id={`${listId}-empty-submit`} role="alert" className="mt-1.5 text-xs text-rose-600">
+        <p id={`${listId}-empty-submit`} role="alert" className="mt-1.5 text-sm text-rose-600">
           Enter a part name or choose a suggested part.
         </p>
       )}

@@ -6,6 +6,7 @@ import App from './App.tsx'
 import { AppProvider } from './contexts/AppContext.tsx'
 import { initAnalytics } from './lib/analytics.ts'
 import { OwnerRoute } from './OwnerRoute'
+import { AppErrorBoundary } from './components/AppErrorBoundary'
 
 const isOwnerDashboard = /^\/admin(?:\/|$)/.test(window.location.pathname)
 if (!isOwnerDashboard) initAnalytics()
@@ -18,9 +19,11 @@ document.head.querySelectorAll('[data-rh="true"]').forEach((element) => element.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HelmetProvider>
-      {isOwnerDashboard ? <OwnerRoute /> : <AppProvider>
-        <App />
-      </AppProvider>}
+      <AppErrorBoundary>
+        {isOwnerDashboard ? <OwnerRoute /> : <AppProvider>
+          <App />
+        </AppProvider>}
+      </AppErrorBoundary>
     </HelmetProvider>
   </StrictMode>,
 )

@@ -1,8 +1,24 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
 /* The theme toggle sets .dark on <html>; make every dark: utility follow
    that class instead of the OS media query so there's one source of truth. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Neutral colours, brand text and the focus ring live in the shared tokens
+   file (also used by the guide pages). Tailwind utilities read them here. */
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-5: var(--ink-5);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+}
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -34,6 +50,18 @@
 
   --color-accent-500: #f97316;
   --color-accent-600: #ea580c;
+
+  /* Elevation: two levels, nothing else. Cards sit flat on a 1px line with
+     the faintest lift; anything that floats over the page (menus, dialogs,
+     sheets, the compare bar, tooltips) gets the overlay shadow.
+     Corner radius by role, using Tailwind's scale: rounded-lg (8px) small
+     parts inside a control, rounded-xl (12px) controls and inner boxes,
+     rounded-2xl (16px) cards and dialogs, rounded-full pills and chips.
+     Page and card side padding stays in px (p-[16px], px-[20px]) on purpose:
+     rem padding doubles under 200% text and squeezes the reading column at
+     320px wide. */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-overlay: 0 8px 24px -8px rgb(15 23 42 / 0.18), 0 2px 6px rgb(15 23 42 / 0.06);
 
   --animate-fade-in: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-slide-up: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -91,20 +119,17 @@ body,
 body {
   font-feature-settings: "cv11", "ss01", "ss03";
   overscroll-behavior-y: none;
-  @apply text-slate-800 bg-slate-50 transition-colors duration-200;
+  @apply text-ink bg-surface-2 transition-colors duration-200;
 }
 
 .dark body {
-  @apply text-slate-200 bg-slate-950;
+  background-color: #0b0f19;
 }
 
 /* Root-level backstop: overscroll / rubber-band regions render the html
    background, so keep it in sync with the theme even where .app-bg ends. */
 html {
-  background-color: #fafafa;
-}
-html.dark {
-  background-color: #090d16;
+  background-color: var(--canvas);
 }
 
 /* Respect users who prefer less motion: collapse all animation to instant. */
@@ -149,10 +174,11 @@ html.dark {
   background: rgb(32 80 200 / 0.16);
 }
 
-/* One consistent keyboard-focus treatment everywhere. Buttons/fields add
-   their own rings; this catches links, pills, and custom controls. */
+/* One consistent keyboard-focus treatment everywhere. The ring must reach 3:1
+   against what is behind it: cobalt does on light surfaces (6.9:1) but not on
+   the dark ones (2.8:1), so dark mode uses the light cobalt (8.9:1). */
 :focus-visible {
-  outline: 2px solid var(--color-brand-500);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -210,7 +236,7 @@ html.dark {
   .spec-plate {
     position: relative;
     background: linear-gradient(155deg, #1c2431 0%, #10151d 100%);
-    border-radius: 14px;
+    border-radius: 16px;
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.06),
       0 12px 32px -12px rgb(0 0 0 / 0.35);
@@ -289,82 +315,70 @@ html.dark {
   }
 
   .card {
-    @apply rounded-2xl border border-slate-200/60 bg-white shadow-sm shadow-slate-900/[0.02] transition-all duration-300;
+    @apply rounded-2xl border border-line/60 bg-surface shadow-card;
   }
 
-  .dark .card {
-    @apply border-slate-800/60 bg-slate-900 shadow-slate-950/20;
-  }
-
-  .card-elevated {
-    @apply rounded-2xl border border-slate-200/50 bg-white shadow-lg shadow-slate-900/[0.04];
-  }
-
-  .dark .card-elevated {
-    @apply border-slate-800/50 bg-slate-900 shadow-slate-950/40;
-  }
 
   /* Premium listing card */
   .listing-card {
-    @apply relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white transition-all duration-300 ease-out hover:border-brand-500 hover:shadow-lg hover:shadow-slate-900/[0.03];
+    @apply relative overflow-hidden rounded-2xl border border-line/70 bg-surface transition-colors duration-200 hover:border-brand-500;
   }
 
-  .dark .listing-card {
-    @apply border-slate-800/80 bg-slate-900 hover:border-brand-500 hover:shadow-slate-950/30;
+  .dark .card {
+    box-shadow: none;
   }
 
   .chip {
-    @apply inline-flex touch-manipulation items-center rounded-full border border-slate-200/70 bg-white px-3.5 py-1 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-900/[0.01] transition-all hover:border-brand-500 hover:bg-brand-50 hover:text-brand-500 active:scale-[0.985];
+    @apply inline-flex touch-manipulation items-center rounded-full border border-line/70 bg-surface px-3.5 py-1 text-sm font-semibold text-ink-2 transition-colors hover:border-brand-500 hover:bg-brand-50 hover:text-brand-500 active:scale-[0.985];
   }
 
   .dark .chip {
-    @apply border-slate-800 bg-slate-900 text-slate-400 hover:border-brand-500 hover:bg-brand-900/10 hover:text-brand-400;
+    @apply text-ink-4 hover:bg-brand-900/10 hover:text-brand-300;
   }
 
   .filter-bar {
-    @apply flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white p-1.5 shadow-sm;
+    @apply flex flex-wrap items-center gap-2 rounded-xl border border-line/60 bg-surface p-1.5 shadow-sm;
   }
 
-  .dark .filter-bar {
-    @apply border-slate-800 bg-slate-900;
-  }
 
   /* Premium button system */
   .btn {
-    @apply inline-flex min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.975];
+    @apply inline-flex min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-out outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.975];
   }
 
+  /* The one primary action per view, in the brand cobalt. */
   .btn-primary {
-    @apply bg-slate-900 text-white shadow-sm hover:bg-slate-800 hover:shadow-md;
+    @apply bg-brand-600 text-white shadow-card hover:bg-brand-700;
   }
 
   .dark .btn-primary {
-    @apply bg-slate-100 text-slate-900 hover:bg-slate-200;
+    @apply bg-brand-500 text-white hover:bg-brand-600;
   }
 
   .btn-secondary {
-    @apply border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50;
+    @apply border border-line bg-surface text-ink-2 hover:border-ink-5/40 hover:bg-surface-2;
   }
 
   .dark .btn-secondary {
-    @apply border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-800;
+    @apply hover:border-slate-700 hover:bg-slate-800;
   }
 
   .btn-ghost {
-    @apply text-slate-500 hover:bg-slate-50 hover:text-slate-900;
+    @apply text-ink-4 hover:bg-surface-2 hover:text-ink;
   }
 
   .dark .btn-ghost {
-    @apply text-slate-400 hover:bg-slate-800 hover:text-slate-100;
+    @apply text-ink-4 hover:bg-slate-800;
   }
 
+  /* Kept as an alias so older markup keeps working; same as .btn-primary. */
   .btn-accent {
-    @apply bg-brand-500 text-white shadow-sm hover:bg-brand-600;
+    @apply bg-brand-600 text-white shadow-card hover:bg-brand-700;
   }
 
   /* Button size modifiers — use instead of ad-hoc px/py per call site */
   .btn-sm {
-    @apply px-3 py-1.5 text-xs rounded-lg;
+    @apply px-3 py-1.5 text-sm rounded-lg;
   }
 
   .btn-lg {
@@ -372,29 +386,24 @@ html.dark {
   }
 
   .field {
-    @apply min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:bg-slate-50;
+    @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-4 outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:bg-surface-2;
   }
 
   .dark .field {
-    @apply border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:border-brand-500;
+    @apply placeholder:text-ink-4;
   }
 
   /* Form label — one source of truth for every input label in the app */
   .field-label {
-    @apply mb-1.5 block text-sm font-semibold text-slate-700;
+    @apply mb-1.5 block text-sm font-semibold text-ink-2;
   }
 
-  .dark .field-label {
-    @apply text-slate-300;
-  }
 
-  /* Section eyebrow — small uppercase label above grouped content, set in
-     the catalog mono so every metadata label in the app shares one voice.
-     slate-500, not 400: 400 on white is ~2.8:1 and fails WCAG AA for
-     small text; 500 passes at ~4.6:1. */
+  /* Group label — a plain sentence-case label above grouped content (popular
+     parts, parts to price). Not an all-caps tracked eyebrow: mono and capitals
+     are kept for the data they suit (prices, part numbers, VINs). */
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-slate-500;
-    font-family: var(--font-data);
+    @apply text-sm font-semibold text-ink-3;
   }
 
   /* The safe markdown renderer does not use a typography plugin. Keep its
@@ -404,11 +413,10 @@ html.dark {
     overflow-wrap: anywhere;
   }
   .repair-guide-content :is(h1, h2, h3) {
-    @apply font-bold text-slate-950;
+    @apply font-bold text-ink;
     margin: 1.25em 0 0.5em;
     line-height: 1.3;
   }
-  .dark .repair-guide-content :is(h1, h2, h3) { @apply text-slate-100; }
   .repair-guide-content h1 { font-size: 1.5rem; }
   .repair-guide-content h2 { font-size: 1.25rem; }
   .repair-guide-content h3 { font-size: 1.125rem; }
@@ -418,21 +426,17 @@ html.dark {
   .repair-guide-content ul { list-style-type: disc; }
   .repair-guide-content ol { list-style-type: decimal; }
   .repair-guide-content li + li { margin-top: 0.35em; }
-  .repair-guide-content code { @apply rounded bg-slate-100 px-1 font-mono text-sm; }
-  .dark .repair-guide-content code { @apply bg-slate-800; }
+  .repair-guide-content code { @apply rounded bg-surface-3 px-1 font-mono text-sm; }
 
-  .dark .eyebrow {
-    @apply text-slate-400;
-  }
 
   /* Underline tab — used by PartSelector and the Account modal.
      slate-500 for AA contrast on inactive labels (400 fails at small sizes). */
   .tab {
-    @apply shrink-0 touch-manipulation whitespace-nowrap border-b-2 border-transparent px-4 pb-2.5 text-center text-xs font-semibold text-slate-500 transition hover:text-slate-700 sm:flex-1;
+    @apply shrink-0 touch-manipulation whitespace-nowrap border-b-2 border-transparent px-4 pb-2.5 text-center text-sm font-semibold text-ink-3 transition hover:text-ink-2 sm:flex-1;
   }
 
   .dark .tab {
-    @apply text-slate-400 hover:text-slate-300;
+    @apply text-ink-4 hover:text-ink-2;
   }
 
   .tab-active {
@@ -445,11 +449,11 @@ html.dark {
 
   /* Filter pill — the white ring-bordered controls in the results toolbar */
   .filter-pill {
-    @apply inline-flex min-h-11 touch-manipulation items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 transition sm:min-h-0;
+    @apply inline-flex min-h-11 touch-manipulation items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-sm font-medium text-ink-2 ring-1 ring-line transition sm:min-h-10;
   }
 
   .dark .filter-pill {
-    @apply bg-slate-900 text-slate-400 ring-slate-800;
+    @apply ring-line;
   }
 
   .filter-pill-active {
@@ -465,8 +469,40 @@ html.dark {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
 
+  /* Badge meanings. Each one is defined once for both themes:
+     fit = year, make and model confirmed; caution = fit not confirmed;
+     rank = best value (solid) and lowest total (soft); fact = neutral facts
+     such as Top Rated or a discount; rating = seller feedback. */
+  .badge-fit {
+    @apply bg-emerald-100 text-emerald-800;
+  }
+  .dark .badge-fit {
+    @apply bg-emerald-950/60 text-emerald-300;
+  }
+  .badge-caution {
+    @apply bg-amber-100 text-amber-800;
+  }
+  .dark .badge-caution {
+    @apply bg-amber-950/60 text-amber-300;
+  }
+  .badge-rank {
+    @apply bg-brand-600 text-white;
+  }
+  .dark .badge-rank {
+    @apply bg-brand-500;
+  }
+  .badge-rank-soft {
+    @apply bg-brand-50 text-brand-700 ring-1 ring-brand-200;
+  }
+  .dark .badge-rank-soft {
+    @apply bg-brand-950/40 text-brand-300 ring-brand-800;
+  }
+  .badge-fact {
+    @apply bg-surface-3 text-ink-2;
+  }
+
   .section-title {
-    @apply text-xl text-slate-900 sm:text-2xl;
+    @apply text-xl text-ink sm:text-2xl;
     font-family: var(--font-display);
     text-transform: uppercase;
     letter-spacing: 0.01em;
@@ -474,24 +510,19 @@ html.dark {
     font-weight: 700;
   }
 
-  .dark .section-title {
-    @apply text-slate-100;
-  }
 
   /* Headroom.js: dynamic header hide/show on scroll */
   .headroom {
-    will-change: transform, opacity;
-    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .headroom--pinned {
     transform: translateY(0%);
-    opacity: 1;
   }
 
   .headroom--unpinned {
     transform: translateY(-100%);
-    opacity: 0.7;
     pointer-events: none;
   }
 
@@ -499,51 +530,17 @@ html.dark {
     transition: none;
   }
 
-  /* Global Premium Dark Mode Overrides */
-  .dark body {
-    color: #f1f5f9 !important;
-    background-color: #0b0f19 !important;
+  /* A short screen (a laptop at 200% zoom, a phone on its side) cannot spare a
+     pinned header: let it scroll away like the page. */
+  @media (max-height: 520px) {
+    .headroom {
+      transform: none !important;
+      pointer-events: auto !important;
+    }
   }
 
-  .dark .text-slate-950,
-  .dark .text-slate-900,
-  .dark .text-slate-800 {
-    color: #f1f5f9 !important;
-  }
-
-  .dark .text-slate-700,
-  .dark .text-slate-600 {
-    color: #cbd5e1 !important;
-  }
-
-  .dark .text-slate-500,
-  .dark .text-slate-400 {
-    color: #94a3b8 !important;
-  }
-
-  .dark .bg-white {
-    background-color: #0f172a !important;
-  }
-
-  .dark .bg-slate-50 {
-    background-color: #161e2e !important;
-  }
-
-  .dark .bg-slate-100 {
-    background-color: #1e293b !important;
-  }
-
-  .dark .border-slate-200,
-  .dark .border-slate-100,
-  .dark .border-slate-200\/60,
-  .dark .border-slate-200\/70,
-  .dark .border-slate-200\/50,
-  .dark .border-slate-100\/80 {
-    border-color: rgba(51, 65, 85, 0.4) !important;
-  }
-
-  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
-    border-color: rgba(51, 65, 85, 0.4) !important;
+  main h1:focus {
+    outline: none;
   }
 
   /* Touch-target floor: on phones every control reaches the 44px Apple /
@@ -567,6 +564,17 @@ html.dark {
     .tab {
       min-height: 44px;
       padding-top: 0.625rem;
+    }
+    /* Part search methods wrap as pills on phones (see PartSelector). */
+    .method-tab {
+      border: 1px solid var(--line);
+      border-radius: 9999px;
+      padding: 8px 14px;
+    }
+    .method-tab.tab-active {
+      border-color: var(--color-brand-600);
+      background-color: var(--color-brand-600);
+      color: #fff;
     }
     .field,
     textarea.field {

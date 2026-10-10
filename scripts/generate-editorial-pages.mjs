@@ -98,7 +98,7 @@ function header() {
       <div class="shell header-inner">
         <a class="brand" href="/" aria-label="CarPartsRadar home">
           <span class="brand-mark"><img src="/favicon.svg" alt="" width="30" height="30" /></span>
-          <span class="brand-copy"><strong>CarParts<span>Radar</span></strong><small>Live price comparison</small></span>
+          <span class="brand-copy"><strong>CarParts<span>Radar</span></strong></span>
         </a>
         <nav class="primary-nav" aria-label="Primary navigation">
           <a href="/guides.html">Guides</a>
@@ -148,7 +148,7 @@ function pageShell({ title, description, path, body, type = 'website', modified,
   const pageTitle = title.includes(site.name) ? title : `${title} | ${site.name}`
   const pageUrl = canonical(path)
   return `<!doctype html>
-<html lang="en">
+<html lang="en" class="editorial">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -161,6 +161,7 @@ function pageShell({ title, description, path, body, type = 'website', modified,
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="${BRAND_FONTS_HREF}" />
+  <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/editorial.css" />
   <meta property="og:type" content="${type}" />
   <meta property="og:site_name" content="CarPartsRadar" />
@@ -435,6 +436,8 @@ export async function generateEditorialPages() {
   await mkdir(guideDir, { recursive: true })
   // Static pages share the same closed analytics contract as the React app.
   await copyFile(resolve(root, 'shared/visitAnalytics.mjs'), resolve(publicDir, 'analytics-contract.js'))
+  // One token file for the app and the guide pages; see src/styles/tokens.css.
+  await copyFile(resolve(root, 'src/styles/tokens.css'), resolve(publicDir, 'tokens.css'))
 
   const pages = new Map([
     [resolve(publicDir, 'guides.html'), guideIndex()],

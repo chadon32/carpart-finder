@@ -229,3 +229,29 @@ test('the site loads no third-party script and the CSP allows only the app and P
   const scriptSrc = csp.split(';').map((directive) => directive.trim()).find((directive) => directive.startsWith('script-src'))
   assert.deepEqual(scriptSrc.split(/\s+/).slice(1), ["'self'", 'https://us.i.posthog.com', 'https://us-assets.i.posthog.com'])
 })
+
+// The app and the guide pages read their neutral colours, brand text and
+// focus ring from one file, so the two sides cannot drift apart again.
+test('the app and the guide pages share one tokens file', async () => {
+  const source = await readFile(resolve(root, 'src/styles/tokens.css'), 'utf8')
+  const published = await readFile(resolve(publicDir, 'tokens.css'), 'utf8')
+  assert.equal(published, source, 'public/tokens.css must be a copy of src/styles/tokens.css')
+  for (const token of ['--ink:', '--ink-3:', '--ink-4:', '--surface:', '--line:', '--canvas:', '--focus-ring:', '--accent-text:']) {
+    assert.ok(source.includes(token), `tokens.css defines ${token}`)
+  }
+
+  const appCss = await readFile(resolve(root, 'src/index.css'), 'utf8')
+  assert.match(appCss, /@import "\.\/styles\/tokens\.css";/)
+
+  const editorialCss = await readFile(resolve(publicDir, 'editorial.css'), 'utf8')
+  for (const own of ['--ink:', '--line:', '--canvas:', '--muted: #', '--soft: #', '--panel: #']) {
+    assert.ok(!editorialCss.includes(own), `editorial.css must not define its own ${own}`)
+  }
+
+  for (const path of ['guides.html', 'about.html', '404.html', `guides/${guides[0].slug}.html`]) {
+    const html = await readFile(resolve(publicDir, path), 'utf8')
+    const tokens = html.indexOf('href="/tokens.css"')
+    assert.ok(tokens > -1, `${path} loads the shared tokens`)
+    assert.ok(tokens < html.indexOf('href="/editorial.css"'), `${path} loads tokens before editorial.css`)
+  }
+})

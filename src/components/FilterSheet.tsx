@@ -42,13 +42,13 @@ export function FilterSheet({
 }) {
   return (
     <Modal label="Sort and filter listings" onClose={onClose} maxWidth="max-w-md">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800/60">
+      <div className="flex items-center justify-between border-b border-line-soft px-5 py-4 dark:border-slate-800/60">
         <h3 className="section-title text-lg">Sort &amp; filters</h3>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close sort and filters"
-          className="hidden rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 sm:block"
+          className="hidden rounded-full p-2 text-ink-5 hover:bg-surface-3 hover:text-ink-3 sm:block"
         >
           <X size={18} />
         </button>
@@ -68,7 +68,7 @@ export function FilterSheet({
                   onChange={() => onSortBy(option.value)}
                   className="h-5 w-5 accent-brand-600"
                 />
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{option.label}</span>
+                <span className="text-sm font-medium text-ink-2">{option.label}</span>
               </label>
             ))}
           </div>
@@ -76,7 +76,7 @@ export function FilterSheet({
 
         <div>
           <div className="field-label" id="filter-condition-label">Condition</div>
-          <div role="group" aria-labelledby="filter-condition-label" className="inline-flex gap-0.5 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+          <div role="group" aria-labelledby="filter-condition-label" className="inline-flex gap-0.5 rounded-full bg-surface-3 p-1">
             {(['all', 'new', 'used'] as ConditionFilter[]).map((c) => (
               <button
                 key={c}
@@ -84,7 +84,7 @@ export function FilterSheet({
                 onClick={() => onCondition(c)}
                 aria-pressed={condition === c}
                 className={`min-h-11 touch-manipulation rounded-full px-5 text-xs font-semibold capitalize transition ${
-                  condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600'
+                  condition === c ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-3'
                 }`}
               >
                 {c === 'all' ? 'All' : c}
@@ -94,7 +94,7 @@ export function FilterSheet({
         </div>
 
         <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Hide overseas listings</span>
+          <span className="text-sm font-medium text-ink-2">Hide overseas listings</span>
           <input
             type="checkbox"
             checked={hideOverseas}
@@ -104,7 +104,7 @@ export function FilterSheet({
         </label>
 
         <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Arrives within a week</span>
+          <span className="text-sm font-medium text-ink-2">Arrives within a week</span>
           <input
             type="checkbox"
             checked={fastDelivery}
@@ -116,7 +116,7 @@ export function FilterSheet({
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <span className="field-label mb-0">Minimum seller rating</span>
-            <span className="font-data text-sm font-semibold text-slate-700 dark:text-slate-300">{minRating}%</span>
+            <span className="font-data text-sm font-semibold text-ink-2">{minRating}%</span>
           </div>
           <input
             type="range"
@@ -145,11 +145,11 @@ export function FilterSheet({
             placeholder="e.g. 90210"
             className="field"
           />
-          <p className="mt-1.5 text-xs text-slate-500">Used for delivery estimates on each listing.</p>
+          <p className="mt-1.5 text-sm text-ink-4">Used for delivery estimates on each listing.</p>
         </div>
       </div>
 
-      <div className="flex gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800/60">
+      <div className="flex gap-3 border-t border-line-soft px-5 py-4 dark:border-slate-800/60">
         <button type="button" onClick={onClearAll} className="btn btn-secondary flex-1">
           Clear all
         </button>

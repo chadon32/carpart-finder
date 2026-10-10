@@ -5,6 +5,9 @@ import { mapWithConcurrency } from '../lib/concurrency.js'
 import { listingDoesNotContradictVehicle } from '../lib/fitmentPolicy.js'
 import { safeRetailerUrl } from '../../shared/outboundUrl.js'
 import { normalizeMake } from '../../shared/vehicleMake.js'
+import { getEbayModels } from '../ebayCompatibility.js'
+import { matchEbayModels } from '../lib/ebayModelMatch.js'
+import { isLikelyPartNumberQuery, mentionsPartNumber, partNumberQueryVariants } from '../lib/partNumber.js'
 
 const SEARCH_URL = `${EBAY_API_ROOT}/buy/browse/v1/item_summary/search`
 const ITEM_URL = `${EBAY_API_ROOT}/buy/browse/v1/item`
@@ -139,26 +142,45 @@ export function marketplaceSearchKeyword(ctx) {
   return String(ctx?.part || '').trim() || String(ctx?.query || '').trim()
 }
 
-export function buildSearchAttempts(ctx, { categoryId, compatibilityFilter, zip, sort }) {
+// compatibilityTargets lists every eBay spelling of the selected model
+// ({ filter, model }). The single compatibilityFilter is the first of them.
+export function buildSearchAttempts(ctx, { categoryId, compatibilityFilter, compatibilityTargets, zip, sort }) {
   const q = marketplaceSearchKeyword(ctx)
+  const targets = compatibilityTargets?.length
+    ? compatibilityTargets
+    : compatibilityFilter ? [{ filter: compatibilityFilter, model: ctx.model }] : []
+
+  if (isLikelyPartNumberQuery(ctx.part)) {
+    // A part number identifies one item, so the vehicle words in the fallback
+    // query only get in the way. Ask for the number as typed, then with its
+    // separators as spaces.
+    return [
+      { q, categoryId, compatibilityFilter: targets[0]?.filter, compatibilityTargets: targets, zip, sort: 'relevance' },
+      ...partNumberQueryVariants(ctx.part).map((variant) => ({ q: variant, categoryId: undefined, zip, sort, partNumberKeyword: true })),
+    ]
+  }
+
   return [
     // Fetch compatibility matches by marketplace relevance so cheap clips,
     // hardware, and damaged inventory do not crowd exact matches out of the
     // first provider page. The server still ranks accepted results by total.
-    { q, categoryId, compatibilityFilter, zip, sort: 'relevance' },
+    { q, categoryId, compatibilityFilter, compatibilityTargets: targets, zip, sort: 'relevance' },
     { q, categoryId, zip, sort },
     { q: ctx.query, categoryId: undefined, compatibilityFilter: undefined, zip, sort },
   ]
 }
 
-export function mapItem(item, { compatibilityFilterUsed = false, vehicle = null } = {}) {
+export function mapItem(item, { compatibilityFilterUsed = false, vehicle = null, partNumberQuery = null } = {}) {
   const exactProviderMatch = compatibilityFilterUsed && isExactCompatibility(item)
   const titleConsistent = listingDoesNotContradictVehicle(item, vehicle)
   const verifiedFitment = exactProviderMatch && titleConsistent
+  // For a part-number search, say whether the listing itself states the number.
+  const partNumberMatch = partNumberQuery ? (mentionsPartNumber(item, partNumberQuery) ? 'exact' : 'related') : null
   return {
     id: `ebay-${item.itemId}`,
     verifiedFitment,
     fitmentTier: verifiedFitment ? 'verified' : 'fallback',
+    partNumberMatch,
     fitmentEvidence: {
       provider: 'eBay',
       matchType: verifiedFitment ? 'EXACT' : null,
@@ -167,7 +189,9 @@ export function mapItem(item, { compatibilityFilterUsed = false, vehicle = null 
         ? {
             year: vehicle.year,
             make: vehicle.make,
-            model: vehicle.model,
+            // eBay may list the vehicle under a more specific name than the
+            // one selected (RX -> RX350); report the one that matched.
+            model: item.matchedModel || vehicle.model,
           }
         : null,
       checkedAt: new Date().toISOString(),
@@ -175,7 +199,9 @@ export function mapItem(item, { compatibilityFilterUsed = false, vehicle = null 
         ? 'The marketplace returned an exact year, make, and model compatibility match. Trim, engine, drivetrain, and option-level fitment may still require confirmation.'
         : exactProviderMatch && !titleConsistent
           ? 'The marketplace compatibility response conflicted with the vehicle or model years stated in the listing, so CarPartsRadar did not treat it as a match.'
-          : 'This is a broad marketplace result. Compatibility was not confirmed.',
+          : partNumberMatch === 'exact'
+            ? 'The listing states the part number you searched. Compatibility with your vehicle was not confirmed.'
+            : 'This is a broad marketplace result. Compatibility was not confirmed.',
     },
     title: item.title,
     price: Number(item.price?.value ?? 0),
@@ -217,12 +243,65 @@ export function buildCompatibilityFilter(ctx) {
     : undefined
 }
 
+// eBay may list a vehicle under several more specific model names than NHTSA
+// (RX -> RX350, RX450h). Translate to eBay's spelling; if eBay's list cannot be
+// loaded, search with the model exactly as given, as before.
+async function resolveEbayModels(ctx) {
+  if (!ctx.year || !ctx.make || !ctx.model) return [ctx.model]
+  try {
+    const ebayModels = await getEbayModels(ctx.year, toEbayMake(ctx.make))
+    const { models } = matchEbayModels(ctx.model, ebayModels)
+    return models.length > 0 ? models : [ctx.model]
+  } catch {
+    return [ctx.model]
+  }
+}
+
+// Take one listing from each model's results in turn, so the first model's
+// relevance ranking cannot crowd the others out of the page.
+function interleave(batches) {
+  const seen = new Set()
+  const merged = []
+  const longest = Math.max(0, ...batches.map((batch) => batch.length))
+  for (let i = 0; i < longest; i += 1) {
+    for (const batch of batches) {
+      const item = batch[i]
+      if (item && !seen.has(item.itemId)) {
+        seen.add(item.itemId)
+        merged.push(item)
+      }
+    }
+  }
+  return merged
+}
+
+// eBay documents that compatibility-filtered searches can include POSSIBLE and
+// non-matching items. Only EXACT results stay; if none exist, the next tier is
+// intentionally unverified.
+async function runCompatibleAttempt(token, attempt, affiliate) {
+  const outcomes = await Promise.allSettled(
+    attempt.compatibilityTargets.map(async (target) => {
+      const found = (await runSearch(token, { ...attempt, compatibilityFilter: target.filter, affiliate })).filter(isValidItem)
+      return filterExactCompatibility(found).map((item) => ({ ...item, matchedModel: target.model }))
+    })
+  )
+  const fulfilled = outcomes.filter((outcome) => outcome.status === 'fulfilled')
+  // One variant failing is tolerable; all of them failing is an eBay failure.
+  if (fulfilled.length === 0) throw outcomes[0].reason
+  return interleave(fulfilled.map((outcome) => outcome.value))
+}
+
 // ctx: { year, make, model, trim, part, query }
 export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
   const token = await getAccessToken()
 
+  const partNumber = isLikelyPartNumberQuery(ctx.part)
   const categoryId = ctx.part ? categoryForPart(ctx.part) : undefined
-  const compatibilityFilter = buildCompatibilityFilter(ctx)
+  const models = await resolveEbayModels(ctx)
+  const compatibilityTargets = models
+    .map((model) => ({ model, filter: buildCompatibilityFilter({ ...ctx, model }) }))
+    .filter((target) => target.filter)
+  const compatibilityFilter = compatibilityTargets[0]?.filter
   // The category constrains the part type and the compatibility filter
   // constrains the vehicle. A verbose trim label such as "LE Sedan 4-Door"
   // over-narrows eBay's keyword search, so keep the keyword to the part name.
@@ -231,27 +310,36 @@ export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
   // Each tier trades precision for recall so we still return something useful
   // for vehicles/parts eBay has thin fitment data on.
   const zip = ctx.zip
-  const attempts = buildSearchAttempts(ctx, { categoryId, compatibilityFilter, zip, sort })
+  const attempts = buildSearchAttempts(ctx, { categoryId, compatibilityFilter, compatibilityTargets, zip, sort })
   const vehicle = {
     year: ctx.year,
     make: ctx.make,
     model: ctx.model,
+    // A title naming any eBay variant of the model names the selected model.
+    modelAliases: models,
     ...(ctx.trim ? { trim: ctx.trim } : {}),
   }
 
   let items = []
   let compatibilityFilterUsed = false
   for (const attempt of attempts) {
-    const rawItems = (await runSearch(token, { ...attempt, affiliate: ctx.affiliate })).filter(isValidItem)
-    // eBay documents that compatibility-filtered searches can include
-    // POSSIBLE and non-matching items. Exclude those from the filtered tier;
-    // if no EXACT result exists, the next tier is intentionally unverified.
-    const compatibleItems = attempt.compatibilityFilter ? filterExactCompatibility(rawItems) : rawItems
-    // Unknown fitment can remain in a clearly labeled fallback group, but an
-    // explicit wrong make, model, or year is never useful. Filter before
-    // deciding an attempt succeeded so a contradictory tier cannot prevent a
-    // later, more useful fallback attempt from running.
-    items = filterVehicleContradictions(compatibleItems, vehicle)
+    const candidates = attempt.compatibilityFilter
+      ? await runCompatibleAttempt(token, attempt, ctx.affiliate)
+      : (await runSearch(token, { ...attempt, affiliate: ctx.affiliate })).filter(isValidItem)
+
+    if (attempt.partNumberKeyword) {
+      // Listings that state the number are what was asked for, whatever
+      // vehicle their title also names. Without any, keep only related
+      // listings that do not contradict the selected vehicle.
+      const stating = candidates.filter((item) => mentionsPartNumber(item, ctx.part))
+      items = stating.length > 0 ? stating : filterVehicleContradictions(candidates, vehicle)
+    } else {
+      // Unknown fitment can remain in a clearly labeled fallback group, but an
+      // explicit wrong make, model, or year is never useful. Filter before
+      // deciding an attempt succeeded so a contradictory tier cannot prevent a
+      // later, more useful fallback attempt from running.
+      items = filterVehicleContradictions(candidates, vehicle)
+    }
     if (items.length > 0) {
       compatibilityFilterUsed = Boolean(attempt.compatibilityFilter)
       break
@@ -269,6 +357,7 @@ export async function search(ctx, { limit = 10, sort = 'price' } = {}) {
     results.push(mapItem(item, {
       compatibilityFilterUsed,
       vehicle,
+      partNumberQuery: partNumber ? ctx.part : null,
     }))
     if (results.length >= limit) break
   }

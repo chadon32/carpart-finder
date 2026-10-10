@@ -190,6 +190,24 @@ export async function loginUser(credentials: {
   })
 }
 
+// The answer is the same whether or not an account exists for the address.
+export async function requestPasswordReset(email: string): Promise<{ success: boolean }> {
+  return requestJson('/password/forgot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+}
+
+// The recovery token comes from the emailed link; the server verifies it.
+export async function resetPassword(accessToken: string, password: string): Promise<AuthResponse> {
+  return requestJson<AuthResponse>('/password/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ access_token: accessToken, password }),
+  })
+}
+
 type AccountDeletionStatus = { success: boolean; deleted: boolean }
 
 async function checkDeletionReceipt(receipt: string): Promise<AccountDeletionStatus> {

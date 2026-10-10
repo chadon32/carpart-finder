@@ -54,6 +54,13 @@ export function validateAuthInput(body, { signup = false } = {}) {
   return { value: { email, password: body.password, name } }
 }
 
+// A new password chosen after a reset follows the same rules as sign-up.
+export function validateNewPassword(value) {
+  if (typeof value !== 'string' || value.length < 8) return { error: 'Password must be at least 8 characters' }
+  if (value.length > MAX_PASSWORD_LENGTH || hasControlCharacters(value)) return { error: 'Password must be 128 characters or fewer' }
+  return { value }
+}
+
 export function validateSavedSearchInput(body) {
   const year = Number(body?.year)
   if (!Number.isInteger(year) || year < 1980 || year > new Date().getFullYear() + 1) {

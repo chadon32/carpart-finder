@@ -40,12 +40,12 @@ function PriceDropNote({ saved, info }: { saved: number; info: PriceInfo | undef
       </span>
     )
   }
-  return <span className="text-xs text-slate-400">Price unchanged</span>
+  return <span className="text-xs text-ink-5">Price unchanged</span>
 }
 
 function CompareTable({ items }: { items: CartItem[] }) {
   const rows: { label: string; render: (item: CartItem) => ReactNode }[] = [
-    { label: 'Price', render: (i) => <span className="font-data text-lg font-bold text-slate-900">${i.price.toFixed(2)}</span> },
+    { label: 'Price', render: (i) => <span className="font-data text-lg font-bold text-ink">${i.price.toFixed(2)}</span> },
     { label: 'Fits', render: (i) => i.carLabel },
     { label: 'Part', render: (i) => i.part },
     { label: 'Condition', render: (i) => i.condition },
@@ -68,11 +68,11 @@ function CompareTable({ items }: { items: CartItem[] }) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <th className="w-24 border-b border-slate-200 p-2" />
+            <th className="w-24 border-b border-line p-2" />
             {items.map((item) => (
-              <th key={item.cartId} className="min-w-[190px] border-b border-slate-200 p-3 align-top">
+              <th key={item.cartId} className="min-w-[190px] border-b border-line p-3 align-top">
                 {item.image && <img src={item.image} alt="" loading="lazy" decoding="async" className="mx-auto h-20 w-20 rounded-xl object-cover" />}
-                <p className="mt-2 line-clamp-3 text-left text-xs font-semibold text-slate-900">{item.title}</p>
+                <p className="mt-2 line-clamp-3 text-left text-sm font-semibold text-ink">{item.title}</p>
               </th>
             ))}
           </tr>
@@ -80,11 +80,11 @@ function CompareTable({ items }: { items: CartItem[] }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.label} className="align-top">
-              <td className="border-b border-slate-100 p-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+              <td className="border-b border-line-soft p-3 text-xs font-bold uppercase tracking-wide text-ink-5">
                 {row.label}
               </td>
               {items.map((item) => (
-                <td key={item.cartId} className="border-b border-slate-100 p-3 text-slate-700">
+                <td key={item.cartId} className="border-b border-line-soft p-3 text-ink-2">
                   {row.render(item)}
                 </td>
               ))}
@@ -106,7 +106,7 @@ function CompareTable({ items }: { items: CartItem[] }) {
                   })}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-primary px-3 py-1.5 text-xs"
+                  className="btn btn-primary px-3 py-1.5"
                 >
                   Buy on {item.source} <ExternalLink size={13} />
                 </OutboundLink>
@@ -154,7 +154,7 @@ export function CartPanel({
             <Bookmark size={17} strokeWidth={2.2} />
           </span>
           Watchlist
-          {items.length > 0 && <span className="text-sm font-medium text-slate-400">({items.length})</span>}
+          {items.length > 0 && <span className="text-sm font-medium text-ink-5">({items.length})</span>}
         </h2>
         <div className="flex items-center gap-1">
           {items.length > 1 && (
@@ -179,16 +179,16 @@ export function CartPanel({
 
       {checkError && <p className="mt-3 text-sm text-red-600">Couldn't check prices: {checkError}</p>}
       {prices && !checkError && (
-        <p className="mt-3 text-xs text-slate-400">Re-checked against live listings just now.</p>
+        <p className="mt-3 text-sm text-ink-5">Re-checked against live listings just now.</p>
       )}
 
       {items.length === 0 ? (
-        <div className="mt-8 flex flex-col items-center rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-slate-800 dark:bg-slate-900/20">
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-white text-slate-300 shadow-sm ring-1 ring-slate-100 dark:bg-slate-800 dark:text-slate-600 dark:ring-slate-700/50">
+        <div className="mt-8 flex flex-col items-center rounded-2xl border border-dashed border-line bg-surface-2/50 p-12 text-center dark:border-slate-800 dark:bg-slate-900/20">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-surface text-slate-300 shadow-sm ring-1 ring-slate-100 dark:text-slate-600 dark:ring-slate-700/50">
             <Bookmark size={36} strokeWidth={1.5} />
           </div>
           <h3 className="section-title dark:text-slate-100">Your Watchlist is empty</h3>
-          <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400 mb-6">
+          <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-4 mb-6">
             Keep track of the parts you need. Add items from your search results to compare options and check for price drops over time.
           </p>
           <button
@@ -207,12 +207,12 @@ export function CartPanel({
             {items.map((item) => (
               <li
                 key={item.cartId}
-                className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 p-3 transition hover:border-slate-300 sm:gap-4"
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line p-3 transition hover:border-slate-300 sm:gap-4"
               >
                 {item.image && <img src={item.image} alt="" loading="lazy" decoding="async" className="h-16 w-16 shrink-0 rounded-xl object-cover" />}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900">{item.title}</p>
-                  <p className="mt-0.5 truncate text-sm text-slate-500">
+                  <p className="truncate font-semibold text-ink">{item.title}</p>
+                  <p className="mt-0.5 truncate text-sm text-ink-4">
                     {item.carLabel} · {item.part} · {item.source}
                   </p>
                   <div className="mt-1">
@@ -220,7 +220,7 @@ export function CartPanel({
                   </div>
                 </div>
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end">
-                  <span className="font-data text-lg font-bold text-slate-900">${item.price.toFixed(2)}</span>
+                  <span className="font-data text-lg font-bold text-ink">${item.price.toFixed(2)}</span>
                   <div className="flex gap-1.5">
                     <OutboundLink
                       href={item.link}
@@ -234,14 +234,14 @@ export function CartPanel({
                       })}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-primary px-3 py-1.5 text-xs"
+                      className="btn btn-primary px-3 py-1.5"
                     >
                       Buy on {item.source} <ExternalLink size={13} />
                     </OutboundLink>
                     <button
                       type="button"
                       onClick={() => onRemove(item.cartId)}
-                      className="btn btn-secondary px-2.5 py-1.5 text-xs hover:border-red-300 hover:text-red-600"
+                      className="btn btn-secondary px-2.5 py-1.5 hover:border-red-300 hover:text-red-600"
                       aria-label="Remove from Watchlist"
                     >
                       <Trash2 size={14} />
@@ -252,17 +252,17 @@ export function CartPanel({
             ))}
           </ul>
 
-          <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-ink-4">
                 {items.length} item{items.length === 1 ? '' : 's'} · bought directly from each seller
               </p>
-              <p className="text-xl font-bold text-slate-900">Total of watched items: <span className="font-data">${total.toFixed(2)}</span></p>
+              <p className="text-xl font-bold text-ink">Total of watched items: <span className="font-data">${total.toFixed(2)}</span></p>
             </div>
             <button
               type="button"
               onClick={onClear}
-              className="self-start py-2 text-sm font-semibold text-slate-500 transition hover:text-red-600 sm:self-auto sm:py-0"
+              className="self-start py-2 text-sm font-semibold text-ink-4 transition hover:text-red-600 sm:self-auto sm:py-0"
             >
               Clear Watchlist
             </button>

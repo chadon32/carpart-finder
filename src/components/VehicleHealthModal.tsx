@@ -78,9 +78,9 @@ export function VehicleHealthModal({
       <div className="border-b px-6 py-4">
         <div className="eyebrow text-brand-600 dark:text-brand-400">Vehicle health</div>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-2xl text-slate-950">{vehicleLabel}</h2>
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <Gauge size={14} className="text-slate-400" />
+          <h2 className="font-display text-2xl text-ink">{vehicleLabel}</h2>
+          <label className="flex items-center gap-2 text-xs font-medium text-ink-4">
+            <Gauge size={14} className="text-ink-5" />
             Mileage
             <input
               id="vehicle-mileage"
@@ -99,17 +99,17 @@ export function VehicleHealthModal({
             />
           </label>
         </div>
-        <p id="vehicle-mileage-help" className="mt-1 text-xs text-slate-500">Optional. Enter a whole number from 0 to 1,000,000.</p>
-        {mileageError && <p id="vehicle-mileage-error" role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">{mileageError}</p>}
+        <p id="vehicle-mileage-help" className="mt-1 text-sm text-ink-4">Optional. Enter a whole number from 0 to 1,000,000.</p>
+        {mileageError && <p id="vehicle-mileage-error" role="alert" className="mt-1 text-sm text-rose-700 dark:text-rose-300">{mileageError}</p>}
         {vehicle.vin && (
-          <p className="font-data mt-1 text-xs uppercase tracking-[0.14em] text-slate-600">VIN · {vehicle.vin}</p>
+          <p className="font-data mt-1 text-xs uppercase tracking-[0.14em] text-ink-3">VIN · {vehicle.vin}</p>
         )}
       </div>
 
       <div className="space-y-8 p-6">
         <section>
           <h3 className="section-title text-lg">Model recall notices</h3>
-          <p className="mt-0.5 text-xs text-slate-500">NHTSA notices for this year, make, and model — not your VIN's repair status.</p>
+          <p className="mt-0.5 text-sm text-ink-4">NHTSA notices for this year, make, and model — not your VIN's repair status.</p>
           <a href="https://www.nhtsa.gov/recalls" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 underline dark:text-sky-300">
             Check your VIN on NHTSA (opens a new tab)
           </a>
@@ -123,11 +123,11 @@ export function VehicleHealthModal({
               }}>Retry recall lookup</button>
             </div>
           ) : recalls === null ? (
-            <div className="mt-4 flex items-center gap-2.5 text-sm text-slate-500" role="status">
+            <div className="mt-4 flex items-center gap-2.5 text-sm text-ink-4" role="status">
               <RadarMark className="h-5 w-5 text-brand-600 dark:text-brand-400" /> Checking NHTSA…
             </div>
           ) : recalls.length === 0 ? (
-            <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
+            <p className="mt-4 rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-sm text-ink-2">
               No recall notices were returned for this model. Check your VIN on NHTSA to confirm your vehicle's recall status.
             </p>
           ) : (
@@ -141,13 +141,13 @@ export function VehicleHealthModal({
                         {r.campaignNumber}
                       </span>
                     )}
-                    {r.reportedDate && <span className="text-xs text-slate-600">{r.reportedDate}</span>}
+                    {r.reportedDate && <span className="text-xs text-ink-3">{r.reportedDate}</span>}
                   </div>
-                  {r.component && <p className="mt-2 text-sm font-semibold text-slate-900">{r.component}</p>}
-                  {r.summary && <p className="mt-1 text-sm leading-relaxed text-slate-600">{r.summary}</p>}
+                  {r.component && <p className="mt-2 text-sm font-semibold text-ink">{r.component}</p>}
+                  {r.summary && <p className="mt-1 text-sm leading-relaxed text-ink-3">{r.summary}</p>}
                   {r.remedy && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      <span className="font-semibold text-slate-600">Remedy:</span> {r.remedy}
+                    <p className="mt-2 text-sm text-ink-4">
+                      <span className="font-semibold text-ink-3">Remedy:</span> {r.remedy}
                     </p>
                   )}
                 </li>
@@ -158,21 +158,21 @@ export function VehicleHealthModal({
 
         <section>
           <h3 className="section-title text-lg">Typical maintenance</h3>
-          <p className="mt-0.5 text-xs text-slate-500">Typical intervals — always check your owner's manual.</p>
-          <p className="mt-1 text-xs text-slate-500">Engine-specific services are omitted because this vehicle's engine is unconfirmed; your owner's manual controls.</p>
-          <ul className="mt-4 divide-y divide-slate-100 dark:divide-slate-800/60">
+          <p className="mt-0.5 text-sm text-ink-4">Typical intervals — always check your owner's manual.</p>
+          <p className="mt-1 text-sm text-ink-4">Engine-specific services are omitted because this vehicle's engine is unconfirmed; your owner's manual controls.</p>
+          <ul className="mt-4 divide-y divide-line-soft dark:divide-slate-800/60">
             {maintenance.map((m) => (
               <li key={m.part} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900">{m.part}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-sm font-semibold text-ink">{m.part}</div>
+                  <div className="text-xs text-ink-4">
                     <span className="font-data">~{m.intervalMiles.toLocaleString()} mi</span> · {m.note}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onShopPart(m.part)}
-                  className="btn btn-secondary shrink-0 px-3 py-1.5 text-xs"
+                  className="btn btn-secondary shrink-0 px-3 py-1.5"
                 >
                   <ShoppingCart size={13} /> Shop
                 </button>
@@ -182,7 +182,7 @@ export function VehicleHealthModal({
         </section>
       </div>
 
-      <div className="flex justify-end border-t bg-slate-50 px-6 py-4">
+      <div className="flex justify-end border-t bg-surface-2 px-6 py-4">
         <button type="button" onClick={onClose} className="btn btn-ghost px-4 py-2 text-sm">Close</button>
       </div>
     </Modal>

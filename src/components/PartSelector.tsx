@@ -53,7 +53,7 @@ const CONFIDENCE_LABELS: Record<'strong' | 'likely' | 'possible', string> = {
 const CONFIDENCE_STYLES: Record<'strong' | 'likely' | 'possible', string> = {
   strong: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
   likely: 'bg-brand-100 text-brand-800 dark:bg-brand-950/30 dark:text-brand-400',
-  possible: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  possible: 'bg-surface-3 text-ink-3 dark:bg-slate-800 dark:text-slate-400',
 }
 
 // Follow-up clarifiers. "When does it happen?" is the single most
@@ -80,12 +80,12 @@ const SYMPTOM_EXAMPLES = [
 
 type SearchMethod = 'name' | 'kits' | 'code' | 'photo' | 'symptom'
 
-const SEARCH_METHODS: { id: SearchMethod; label: string }[] = [
-  { id: 'name', label: 'Part Name' },
-  { id: 'kits', label: 'Maintenance Kits' },
-  { id: 'code', label: 'Error Code (OBD-II)' },
-  { id: 'photo', label: 'Photo Search' },
-  { id: 'symptom', label: 'Describe a Problem' },
+const SEARCH_METHODS: { id: SearchMethod; label: string; short: string }[] = [
+  { id: 'name', label: 'Part Name', short: 'Part name' },
+  { id: 'kits', label: 'Maintenance Kits', short: 'Kits' },
+  { id: 'code', label: 'Error Code (OBD-II)', short: 'Error code' },
+  { id: 'photo', label: 'Photo Search', short: 'Photo' },
+  { id: 'symptom', label: 'Describe a Problem', short: 'Problem' },
 ]
 
 const COMMON_DTCs: Record<string, { definition: string; parts: string[]; description: string }> = {
@@ -271,10 +271,10 @@ export function PartSelector({
   // A follow-up "When does it happen?" prompt. Rendered when the match is
   // absent or not yet strong, so a vague description can be sharpened.
   const clarifier = (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/40">
-      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+    <div className="rounded-xl border border-line bg-surface p-4 dark:border-slate-800">
+      <p className="text-sm font-semibold text-ink-2">
         When does it happen?{' '}
-        <span className="font-normal text-slate-400">— optional, sharpens the match</span>
+        <span className="font-normal text-ink-5">— optional, sharpens the match</span>
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {WHEN_CONTEXTS.map((c) => (
@@ -296,7 +296,7 @@ export function PartSelector({
         <button
           type="button"
           onClick={clearRefinement}
-          className="mt-2 min-h-11 px-2 text-xs font-medium text-slate-500 transition hover:text-brand-600"
+          className="mt-2 min-h-11 px-2 text-xs font-medium text-ink-4 transition hover:text-brand-600"
         >
           Clear “{refineContext.label}” ✕
         </button>
@@ -385,9 +385,9 @@ export function PartSelector({
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="section-title">What part do you need?</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-ink-3">
             Showing parts for{' '}
-            <span className="font-medium text-slate-800">
+            <span className="font-medium text-ink">
               {car.year} {car.make} {car.model}
               {car.trim && ` ${car.trim}`}
             </span>
@@ -399,15 +399,16 @@ export function PartSelector({
       </div>
 
       {electric && (
-        <p className="mt-4 flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
+        <p className="mt-4 flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700">
           <Zap size={14} /> Electric vehicle detected — engine-only parts are hidden.
         </p>
       )}
 
-      {/* Switcher Tab — horizontally scrollable on phones so all five fit */}
-      <div className="relative -mx-7 mb-5 mt-6 sm:mx-0">
+      {/* Search methods: wrapping pills with short labels on phones (all five
+          visible at once), underline tabs from the small breakpoint up. */}
+      <div className="mb-5 mt-6">
         <div
-          className="flex snap-x overflow-x-auto scrollbar-none border-b border-slate-100 px-7 pr-12 dark:border-slate-800/60 sm:mx-0 sm:px-0 sm:pr-0"
+          className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-0 sm:border-b sm:border-line-soft"
           role="tablist"
           aria-label="Part search method"
           aria-orientation="horizontal"
@@ -419,21 +420,19 @@ export function PartSelector({
             type="button"
             onClick={() => setSearchMethod(method.id)}
             onKeyDown={handleSearchMethodKeyDown}
-            className={`tab snap-start ${searchMethod === method.id ? 'tab-active' : ''}`}
+            className={`tab method-tab ${searchMethod === method.id ? 'tab-active' : ''}`}
+            aria-label={method.label}
             role="tab"
             aria-selected={searchMethod === method.id}
             aria-controls={`part-panel-${method.id}`}
             tabIndex={searchMethod === method.id ? 0 : -1}
           >
-            {method.label}
+            <span className="sm:hidden">{method.short}</span>
+            <span className="hidden sm:inline">{method.label}</span>
           </button>
         ))}
         </div>
-        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 flex w-12 items-center justify-end bg-gradient-to-l from-white via-white/95 to-transparent pr-1 dark:from-slate-900 dark:via-slate-900/95">
-          <ArrowRight size={14} className="text-slate-400 sm:hidden" />
-        </div>
       </div>
-      <p className="-mt-3 mb-4 text-xs text-slate-500 sm:hidden">Swipe the tabs to see every search method.</p>
 
       <div
         id={`part-panel-${searchMethod}`}
@@ -461,6 +460,15 @@ export function PartSelector({
               onChange={(e) => setSymptomText(e.target.value)}
               className="field resize-none"
             />
+            {/check[- ]engine|engine light|service engine|malfunction indicator/i.test(symptomText) && (
+              <p className="mt-2 rounded-lg bg-surface-3 px-3 py-2 text-sm leading-relaxed text-ink-2">
+                A check-engine light stores a code. Many parts stores will read the code for free, and entering it in the{' '}
+                <button type="button" onClick={() => setSearchMethod('code')} className="font-semibold text-brand-700 underline underline-offset-2 dark:text-brand-300">
+                  Error Code tab
+                </button>{' '}
+                points to the part far more precisely than a description.
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
               <div className="-mx-1 flex gap-1.5 overflow-x-auto scrollbar-none px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
                 {SYMPTOM_EXAMPLES.map((ex) => (
@@ -495,10 +503,10 @@ export function PartSelector({
 
           {matches !== null && matches.length === 0 && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/40">
+              <div className="rounded-xl border border-line bg-surface-2/50 p-4 text-center text-sm text-ink-4 dark:border-slate-800 dark:bg-slate-900/40">
                 We couldn't match that yet. Add a bit more detail — the{' '}
-                <span className="font-medium text-slate-700 dark:text-slate-300">sound or symptom</span> and{' '}
-                <span className="font-medium text-slate-700 dark:text-slate-300">when it happens</span> — or search by part name instead.
+                <span className="font-medium text-ink-2">sound or symptom</span> and{' '}
+                <span className="font-medium text-ink-2">when it happens</span> — or search by part name instead.
               </div>
               {symptomText.trim() && clarifier}
             </div>
@@ -529,34 +537,34 @@ export function PartSelector({
                   strong, unambiguous match. */}
               {(activeMatch.confidence !== 'strong' || matches.length > 1) && clarifier}
 
-              <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+              <div className="rounded-xl border border-line/80 bg-surface-2/30 p-4 dark:border-slate-800 dark:bg-slate-900/40">
                 <div className="flex items-start gap-2.5">
                   <span className="badge bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-400 shrink-0 mt-0.5">{activeMatch.system}</span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm font-semibold tracking-tight text-slate-900">{activeMatch.title}</div>
+                      <div className="text-sm font-semibold tracking-tight text-ink">{activeMatch.title}</div>
                       <span className={`badge shrink-0 ${CONFIDENCE_STYLES[activeMatch.confidence]}`}>
                         {CONFIDENCE_LABELS[activeMatch.confidence]}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">{activeMatch.summary}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink-4">{activeMatch.summary}</p>
                   </div>
                 </div>
 
                 {activeMatch.safety && (
-                  <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+                  <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
                     <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                     {activeMatch.safety}
                   </p>
                 )}
 
-                <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800/60">
+                <div className="mt-4 border-t border-line-soft pt-3 dark:border-slate-800/60">
                   <div className="eyebrow mb-2">Parts to price — untick anything you don't need</div>
                   <div className="flex flex-col gap-1.5">
                     {activeMatch.parts.map((p) => (
                       <label
                         key={p.name}
-                        className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 bg-white p-2.5 transition hover:border-slate-300 dark:border-slate-800"
+                        className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-surface p-2.5 transition hover:border-slate-300 dark:border-slate-800"
                       >
                         <input
                           type="checkbox"
@@ -571,12 +579,12 @@ export function PartSelector({
                         />
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-800">{p.name}</span>
-                            <span className={`badge px-2 py-px text-xs ${p.priority === 'likely' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            <span className="text-xs font-semibold text-ink">{p.name}</span>
+                            <span className={`badge px-2 py-px text-xs ${p.priority === 'likely' ? 'bg-brand-600 text-white' : 'bg-surface-3 text-ink-4'}`}>
                               {p.priority === 'likely' ? 'Most likely' : 'Possible'}
                             </span>
                           </span>
-                          <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{p.why}</span>
+                          <span className="mt-0.5 block text-xs leading-relaxed text-ink-4">{p.why}</span>
                         </span>
                       </label>
                     ))}
@@ -606,48 +614,48 @@ export function PartSelector({
               )}
 
               {quoting && (
-                <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 text-center text-xs font-medium text-slate-400 dark:border-slate-800">
+                <div className="animate-pulse rounded-xl border border-line bg-surface p-4 text-center text-xs font-medium text-ink-5 dark:border-slate-800">
                   Searching eBay for {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} that match your {car.year} {car.make} {car.model}…
                 </div>
               )}
 
               {quote && (
-                <div className="animate-fade-in overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800">
-                  <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800/60">
-                    <div className="text-sm font-semibold tracking-tight text-slate-900">
+                <div className="animate-fade-in overflow-hidden rounded-xl border border-line bg-surface dark:border-slate-800">
+                  <div className="border-b border-line-soft px-4 py-3 dark:border-slate-800/60">
+                    <div className="text-sm font-semibold tracking-tight text-ink">
                       Your quote — {car.year} {car.make} {car.model}
                       {car.trim ? ` ${car.trim}` : ''}
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="mt-0.5 text-sm text-ink-4">
                       Lowest total with shipping, before tax, among listings that match your year, make, and model. Listings that don't list your vehicle are excluded.
                     </p>
                   </div>
 
-                  <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <ul className="divide-y divide-line-soft dark:divide-slate-800/60">
                     {quote.items.map((item) => (
                       <li key={item.part} className="flex flex-wrap items-center gap-3 px-4 py-3">
                         {item.listing?.image ? (
-                          <img src={item.listing.image} alt="" loading="lazy" decoding="async" className="h-11 w-11 shrink-0 rounded-lg border border-slate-100 object-cover" />
+                          <img src={item.listing.image} alt="" loading="lazy" decoding="async" className="h-11 w-11 shrink-0 rounded-lg border border-line-soft object-cover" />
                         ) : (
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-300 dark:bg-slate-800">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-slate-300">
                             <Wrench size={16} />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-slate-800">{item.part}</div>
+                          <div className="text-xs font-semibold text-ink">{item.part}</div>
                           {item.listing ? (
-                            <p className="truncate text-xs text-slate-500">
+                            <p className="truncate text-xs text-ink-4">
                               {item.listing.condition} · {item.listing.seller} · {item.listing.source}
                               {' · year, make & model match'}
                             </p>
                           ) : (
-                            <p className="text-xs text-slate-500">No matching listings found right now</p>
+                            <p className="text-sm text-ink-4">No matching listings found right now</p>
                           )}
                         </div>
                         {item.listing && (
                           <div className="shrink-0 text-right">
-                            <div className="font-data text-sm font-bold text-slate-900">${item.listing.price.toFixed(2)}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="font-data text-sm font-bold text-ink">${item.listing.price.toFixed(2)}</div>
+                            <div className="text-xs text-ink-4">
                               {item.listing.shippingCost ? `+ $${item.listing.shippingCost.toFixed(2)} ship` : 'Free shipping'}
                             </div>
                           </div>
@@ -669,23 +677,23 @@ export function PartSelector({
                     ))}
                   </ul>
 
-                  <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <div className="border-t border-line bg-surface-2/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
                     <div className="flex items-baseline justify-between">
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-ink-4">
                         Items ${quote.subtotal.toFixed(2)} + known shipping ${quote.shipping.toFixed(2)}
                       </div>
-                      <div className="font-data text-lg font-bold tracking-tight text-slate-950">
+                      <div className="font-data text-lg font-bold tracking-tight text-ink">
                         Total with shipping, before tax: ~${quote.total.toFixed(2)}
                       </div>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    <p className="mt-1 text-sm leading-relaxed text-ink-4">
                       Estimate only — parts, not labor. Confirm engine, drivetrain, options, and original part number before purchase.
                     </p>
                   </div>
                 </div>
               )}
 
-              <p className="text-xs leading-relaxed text-slate-500">
+              <p className="text-sm leading-relaxed text-ink-4">
                 Based on commonly reported causes for these symptoms — not a professional inspection. When in doubt, have a mechanic confirm before buying parts.
               </p>
             </div>
@@ -696,11 +704,11 @@ export function PartSelector({
           {reviewingGuideStart && startingPart && (
             <section aria-labelledby="guide-part-review-heading" className="mb-5 rounded-xl border border-brand-200/80 bg-brand-50/50 p-4 dark:border-brand-900/50 dark:bg-brand-950/20">
               <p className="eyebrow text-brand-700 dark:text-brand-300">Review before searching</p>
-              <h3 id="guide-part-review-heading" className="mt-1 text-sm font-bold text-slate-950 dark:text-slate-50">Suggested from {startingGuideTitle || 'this guide'}</h3>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              <h3 id="guide-part-review-heading" className="mt-1 text-sm font-bold text-ink">Suggested from {startingGuideTitle || 'this guide'}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-ink-3">
                 The part category is editable. Confirm it below to begin the normal marketplace search. A guide does not establish diagnosis or fitment.
               </p>
-              <button type="button" onClick={confirmGuidePart} disabled={!partName.trim()} className="btn btn-primary mt-3 w-full text-xs sm:w-auto">
+              <button type="button" onClick={confirmGuidePart} disabled={!partName.trim()} className="btn btn-primary mt-3 w-full sm:w-auto">
                 Search {partName || startingPart} <ArrowRight size={14} />
               </button>
             </section>
@@ -708,7 +716,7 @@ export function PartSelector({
           <div>
             <Combobox
               label="Part search"
-              placeholder="Search by part name or OEM number (e.g. Brake Rotors, 04465-0K010)"
+              placeholder="Search by part name or part number (e.g. Brake Rotors)"
               options={partTypes.map((p) => p.name)}
               value={partName}
               onChange={handlePartNameChange}
@@ -717,7 +725,7 @@ export function PartSelector({
               enterKeyHint="search"
               maxLength={MAX_PART_QUERY_LENGTH}
             />
-            <p className="mt-1.5 text-xs text-slate-500">Pick from the autocomplete list, or enter any custom part name or number and press Enter.</p>
+            <p className="mt-1.5 text-sm text-ink-4">Pick from the list, or type a part name or part number and press Enter.</p>
           </div>
 
           <div className="mt-6">
@@ -735,10 +743,10 @@ export function PartSelector({
         <div className="animate-fade-in space-y-5">
           <div>
             <label className="field-label">Maintenance kit searches</label>
-            <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+            <p className="mb-2 text-sm font-medium text-amber-700 dark:text-amber-300">
               Services that require confirmed engine details, such as timing-belt work, are intentionally not suggested here.
             </p>
-            <p className="mb-4 text-xs text-slate-500">
+            <p className="mb-4 text-sm text-ink-4">
               Search for components sold together. If no combined kit is available, we’ll help you search each component separately.
             </p>
           </div>
@@ -750,15 +758,15 @@ export function PartSelector({
                   key={kit.title}
                   type="button"
                   onClick={() => onSelect(kit.search)}
-                  className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 text-left transition-all hover:border-brand-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/50"
+                  className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-5 text-left transition-colors hover:border-brand-300 dark:border-slate-800"
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-300">
                       <Icon size={22} strokeWidth={2} />
                     </div>
                     <div>
-                      <h3 className="font-bold tracking-tight text-slate-900 group-hover:text-brand-700">{kit.title}</h3>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500">{kit.description}</p>
+                      <h3 className="font-bold tracking-tight text-ink group-hover:text-brand-700">{kit.title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-ink-4">{kit.description}</p>
                     </div>
                   </div>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-0 -translate-x-2">
@@ -773,7 +781,7 @@ export function PartSelector({
         <div className="animate-fade-in space-y-5">
           <div className="text-center mb-6">
             <h3 className="section-title">Don't know the part name?</h3>
-            <p className="text-sm text-slate-500 mt-1">Take a clear photo and our AI will try to identify the part.</p>
+            <p className="text-sm text-ink-4 mt-1">Take a clear photo and our AI will try to identify the part.</p>
           </div>
 
           <PartIdentificationDemo
@@ -787,14 +795,14 @@ export function PartSelector({
             <div className="space-y-3">
               <label
                 htmlFor="part-photo-input"
-                className="group relative flex h-48 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 transition-all hover:border-brand-300 hover:bg-slate-50 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-800 dark:bg-slate-900/30 sm:h-64"
+                className="group relative flex h-48 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line bg-surface-2/50 transition-all hover:border-brand-300 hover:bg-surface-2 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-800 dark:bg-slate-900/30 sm:h-64"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <div className="h-12 w-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                     <Camera size={24} />
                   </div>
-                  <p className="mb-1 text-sm font-semibold text-slate-700">Tap to take a photo</p>
-                  <p className="text-xs text-slate-400">or upload an existing image</p>
+                  <p className="mb-1 text-sm font-semibold text-ink-2">Tap to take a photo</p>
+                  <p className="text-sm text-ink-5">or upload an existing image</p>
                 </div>
                 {/* capture="environment" prefers the rear camera on mobile */}
                 <input
@@ -808,13 +816,13 @@ export function PartSelector({
                   onChange={handlePhotoUpload}
                 />
               </label>
-              <p id="part-photo-help" className="text-center text-xs leading-relaxed text-slate-500">
+              <p id="part-photo-help" className="text-center text-sm leading-relaxed text-ink-4">
                 Use a clear, well-lit photo of the part only. The image is compressed before it is sent for AI identification.
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-black/5 dark:border-slate-800 h-64 sm:h-80 w-full flex items-center justify-center">
+              <div className="relative rounded-2xl overflow-hidden border border-line bg-black/5 dark:border-slate-800 h-64 sm:h-80 w-full flex items-center justify-center">
                 <img src={photoPreview} alt="Uploaded part" className="max-h-full object-contain" />
                 
                 {photoScanning && (
@@ -858,7 +866,7 @@ export function PartSelector({
                       <CheckCircle2 size={22} />
                     </div>
                     <div className="w-full">
-                      <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-500 mb-0.5">AI suggestion</div>
+                      <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">AI suggestion</div>
                       <label htmlFor="photo-part-name" className="sr-only">Suggested part name</label>
                       <input
                         id="photo-part-name"
@@ -866,9 +874,9 @@ export function PartSelector({
                         value={photoPartName}
                         onChange={(e) => setPhotoPartName(e.target.value)}
                         aria-describedby="photo-ai-suggestion-help"
-                        className="field h-auto min-h-0 border-0 bg-transparent p-0 text-lg font-bold text-slate-900 focus:ring-0 dark:bg-transparent"
+                        className="field h-auto min-h-0 border-0 bg-transparent p-0 text-lg font-bold text-ink focus:ring-0 dark:bg-transparent"
                       />
-                      <p id="photo-ai-suggestion-help" className="mt-1 text-xs leading-relaxed text-emerald-800 dark:text-emerald-200">
+                      <p id="photo-ai-suggestion-help" className="mt-1 text-sm leading-relaxed text-emerald-800 dark:text-emerald-200">
                         AI suggestion only — confirm or edit the part name before searching.
                       </p>
                     </div>
@@ -885,9 +893,9 @@ export function PartSelector({
               )}
 
               {photoResult && !photoResult.identified && (
-                <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 animate-fade-in text-center">
-                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Couldn't identify that part</div>
-                  <p className="mt-1 text-xs text-slate-500">
+                <div className="p-5 rounded-2xl border border-line bg-surface-2 dark:border-slate-800 animate-fade-in text-center">
+                  <div className="text-sm font-semibold text-ink-2">Couldn't identify that part</div>
+                  <p className="mt-1 text-sm text-ink-4">
                     Try a clearer, well-lit photo of just the part — or search by name instead.
                   </p>
                 </div>
@@ -902,7 +910,7 @@ export function PartSelector({
                     setPhotoPartName('')
                     setPhotoError(null)
                   }}
-                  className="min-h-11 px-2 text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors"
+                  className="min-h-11 px-2 text-xs font-medium text-ink-4 hover:text-brand-600 transition-colors"
                 >
                   Try another photo
                 </button>
@@ -914,7 +922,7 @@ export function PartSelector({
         <div className="space-y-5">
           <div>
             <label htmlFor="dtc-input" className="field-label">
-              DTC error code
+              Check-engine code (OBD-II)
             </label>
             <div className="relative">
               <input
@@ -931,28 +939,28 @@ export function PartSelector({
                  aria-describedby={dtcHasProblem ? `dtc-help ${dtcUnknown ? 'dtc-unknown' : 'dtc-error'}` : 'dtc-help'}
                 className="field pl-9 uppercase"
               />
-              <span className="absolute left-3.5 top-3 text-slate-400">
+              <span className="absolute left-3.5 top-3 text-ink-5">
                 <Search size={14} />
               </span>
             </div>
-            <p id="dtc-help" className="mt-1.5 text-xs text-slate-500">
+            <p id="dtc-help" className="mt-1.5 text-sm text-ink-4">
               A trouble code identifies a detected condition, not a confirmed failed part. Use it to find components commonly inspected.
             </p>
           </div>
 
           {matchedDtc ? (
-            <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4 space-y-3 animate-fade-in">
-              <div className="flex items-start gap-2.5 text-slate-800">
+            <div className="rounded-xl border border-line/80 bg-surface-2/30 p-4 space-y-3 animate-fade-in">
+              <div className="flex items-start gap-2.5 text-ink">
                 <span className="mt-0.5 shrink-0 text-brand-500">
                   <AlertTriangle size={15} />
                 </span>
                 <div>
-                  <div className="font-extrabold text-slate-900 text-sm tracking-tight">{matchedDtc.definition}</div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{matchedDtc.description}</p>
+                  <div className="font-data text-xs font-semibold text-ink-4">{codeKey} · {matchedDtc.definition}</div>
+                  <p className="mt-1 text-sm font-semibold leading-snug text-ink">{matchedDtc.description}</p>
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-3 dark:border-slate-800/60">
+              <div className="border-t border-line-soft pt-3 dark:border-slate-800/60">
                 <div className="eyebrow mb-2">Parts commonly inspected for this code</div>
                 <div className="flex flex-col gap-1.5">
                   {matchedDtc.parts.map((partName) => (
@@ -960,10 +968,10 @@ export function PartSelector({
                       key={partName}
                       type="button"
                       onClick={() => onSelect(partName)}
-                      className="flex min-h-11 items-center justify-between rounded-lg border border-slate-200 bg-white p-2.5 hover:border-brand-500 hover:bg-brand-50/10 text-xs font-semibold text-slate-700 transition-all text-left"
+                      className="flex min-h-11 items-center justify-between rounded-lg border border-line bg-surface p-2.5 hover:border-brand-500 hover:bg-brand-50/10 text-xs font-semibold text-ink-2 transition-all text-left"
                     >
                       <span>Find {partName}</span>
-                      <ArrowRight size={13} className="text-slate-400 group-hover:text-brand-500" />
+                      <ArrowRight size={13} className="text-ink-5 group-hover:text-brand-500" />
                     </button>
                   ))}
                 </div>

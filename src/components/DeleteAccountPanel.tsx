@@ -74,7 +74,7 @@ export function DeleteAccountPanel({ onDeleted, onSessionExpired, startExpanded 
           Delete my account
         </summary>
         <div className="mt-4 border-t border-rose-100 pt-4 dark:border-rose-900/50">
-          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+          <p className="text-sm leading-relaxed text-ink-3">
             All saved searches, price alerts, and account data will be permanently removed. Type <strong>DELETE</strong> to confirm.
           </p>
           <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -95,8 +95,8 @@ export function DeleteAccountPanel({ onDeleted, onSessionExpired, startExpanded 
               aria-describedby={error ? 'delete-account-error' : 'delete-account-help'}
               className="field max-w-xs border-rose-200 focus:border-rose-500 focus:ring-rose-500 dark:border-rose-900"
             />
-            {!error && <p id="delete-account-help" className="text-xs text-slate-500">This confirmation prevents accidental deletion.</p>}
-            {error && <p id="delete-account-error" role="alert" className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
+            {!error && <p id="delete-account-help" className="text-sm text-ink-4">This confirmation prevents accidental deletion.</p>}
+            {error && <p id="delete-account-error" role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
             <button
               type="submit"
               disabled={deleting || confirmation !== 'DELETE'}

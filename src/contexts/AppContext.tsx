@@ -25,6 +25,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   })
 
   const [accountData, setAccountData] = useState<AccountData | null>(null)
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null)
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     try {
@@ -57,6 +58,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const hashStr = window.location.hash.substring(1)
     const hashParams = new URLSearchParams(hashStr)
     const accessToken = hashParams.get('access_token')
+
+    if (accessToken && hashParams.get('type') === 'recovery') {
+      // A password-reset link: keep the token in memory for the "choose a new
+      // password" form instead of starting a session with it.
+      window.history.replaceState({}, '', window.location.pathname)
+      setRecoveryToken(accessToken)
+      return
+    }
 
     if (accessToken) {
       // Clear the sensitive token from the URL immediately
@@ -131,7 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ user, setUser, accountData, setAccountData, darkMode, setDarkMode }}>
+    <AppContext.Provider value={{ user, setUser, accountData, setAccountData, darkMode, setDarkMode, recoveryToken, setRecoveryToken }}>
       {children}
     </AppContext.Provider>
   )

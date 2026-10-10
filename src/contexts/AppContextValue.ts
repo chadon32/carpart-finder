@@ -36,6 +36,9 @@ export interface AppContextType {
   setAccountData: Dispatch<SetStateAction<AccountData | null>>
   darkMode: boolean
   setDarkMode: (mode: boolean) => void
+  // Held in memory only: the short-lived token from a password-reset email.
+  recoveryToken: string | null
+  setRecoveryToken: (token: string | null) => void
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined)

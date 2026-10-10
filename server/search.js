@@ -4,6 +4,7 @@ import { issueFitmentProof } from './lib/fitmentProof.js'
 import { partitionListingsByFitment } from './lib/fitmentPolicy.js'
 import { filterListingsByPartIntent } from './lib/listingRelevance.js'
 import { affiliateContextForChannel } from './lib/affiliatePolicy.js'
+import { isLikelyPartNumberQuery } from './lib/partNumber.js'
 
 const providers = [
   { name: 'eBay', module: ebay },
@@ -29,6 +30,21 @@ function evictOldestIfNeeded() {
   }
 }
 
+
+// eBay may list the selected vehicle under more specific model names (RX ->
+// RX350, RX450h). Report which of those names the confirmed results matched, so
+// the page can say so. Differences in capitalization or punctuation alone are
+// not variants.
+const modelWords = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+function matchedModelNames(results, selectedModel) {
+  const names = new Set()
+  for (const listing of results) {
+    const matched = listing.fitmentEvidence?.matchedVehicle?.model
+    if (matched && modelWords(matched) !== modelWords(selectedModel)) names.add(matched)
+  }
+  return [...names].sort((a, b) => a.localeCompare(b))
+}
 
 // ==================== MAIN SEARCH FUNCTION ====================
 export async function searchCheapestListings({
@@ -74,7 +90,8 @@ export async function searchCheapestListings({
           query,
           results: [],
           fallbackResults: [],
-          fitmentSummary: { verified: 0, fallback: 0, hiddenIrrelevantFallbacks: 0 },
+          fitmentSummary: { verified: 0, fallback: 0, hiddenIrrelevantFallbacks: 0, matchedModels: [] },
+          partNumberSearch: isLikelyPartNumberQuery(part),
           providerErrors: { config: 'No search providers are configured (missing API keys)' },
           skippedProviders: skipped,
         }
@@ -123,7 +140,13 @@ export async function searchCheapestListings({
         query,
         results,
         fallbackResults,
-        fitmentSummary: { verified: results.length, fallback: fallbackResults.length, hiddenIrrelevantFallbacks },
+        fitmentSummary: {
+          verified: results.length,
+          fallback: fallbackResults.length,
+          hiddenIrrelevantFallbacks,
+          matchedModels: matchedModelNames(results, model),
+        },
+        partNumberSearch: isLikelyPartNumberQuery(part),
         providerErrors,
         skippedProviders: skipped,
       }

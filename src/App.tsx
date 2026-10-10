@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Suspense, lazy } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { Toaster, toast } from 'sonner'
 import { Helmet } from 'react-helmet-async'
 import { Car as CarIcon, Bookmark, BookOpen, ShieldCheck, Tag, User as UserIcon, Moon, Sun } from 'lucide-react'
@@ -8,10 +8,13 @@ import { BottomNav } from './components/BottomNav'
 import { CarSelector, type Car } from './components/CarSelector'
 import { RecentSearches } from './components/RecentSearches'
 import { ResultsRoute } from './components/ResultsRoute'
+import { AppErrorBoundary } from './components/AppErrorBoundary'
+import { lazyWithRecovery } from './lib/lazyWithRecovery'
+import { focusPageHeading } from './lib/focusHeading'
 
-const PartSelector = lazy(() => import('./components/PartSelector').then(m => ({ default: m.PartSelector })))
-const CartPanel = lazy(() => import('./components/CartPanel').then(m => ({ default: m.CartPanel })))
-const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })))
+const PartSelector = lazyWithRecovery(() => import('./components/PartSelector').then(m => ({ default: m.PartSelector })))
+const CartPanel = lazyWithRecovery(() => import('./components/CartPanel').then(m => ({ default: m.CartPanel })))
+const Dashboard = lazyWithRecovery(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })))
 
 import { StepIndicator } from './components/StepIndicator'
 
@@ -39,13 +42,22 @@ import { guideSearchStart } from './data/guideSearch'
 import { normalizeMake } from '../shared/vehicleMake.js'
 
 function App() {
-  const { user, darkMode, setDarkMode } = useAppContext()
+  const { user, darkMode, setDarkMode, recoveryToken } = useAppContext()
   const initial = routeFromSearch(window.location.search)
   const [step, setStep] = useState<Step | 'dashboard'>(initial.step)
   const [car, setCar] = useState<Car | null>(initial.car)
   const [part, setPart] = useState<string | null>(initial.part)
   const [guide, setGuide] = useState<string | null>(initial.guide ?? null)
   const [showWatchlist, setShowWatchlist] = useState(false)
+
+  // A password-reset email opens the account screen, where the new-password
+  // form waits.
+  useEffect(() => {
+    if (recoveryToken) {
+      setStep('dashboard')
+      setShowWatchlist(false)
+    }
+  }, [recoveryToken])
 
   const watchlist = useCart(user?.email)
   const recent = useRecentSearches()
@@ -93,7 +105,7 @@ function App() {
     // A client-side step change otherwise keeps the previous form's scroll
     // offset, landing phone users halfway down their new results. Leave
     // browser Back/Forward restoration to the separate popstate handler.
-    mainRef.current?.focus({ preventScroll: true })
+    focusPageHeading(mainRef.current)
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
@@ -169,7 +181,7 @@ function App() {
     : 'Compare live car-part listings, review fitment evidence, and use independent buying guides before ordering for your vehicle.'
 
   return (
-    <div className="app-bg flex min-h-screen min-w-0 max-w-full flex-col overflow-x-clip text-slate-900 dark:text-slate-100">
+    <div className="app-bg flex min-h-screen min-w-0 max-w-full flex-col overflow-x-clip text-ink">
       <Helmet>
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
@@ -188,30 +200,29 @@ function App() {
           event.preventDefault()
           mainRef.current?.focus()
         }}
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-brand-700 focus:shadow-lg dark:focus:bg-slate-900 dark:focus:text-brand-300"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-brand-700 focus:shadow-overlay dark:focus:bg-slate-900 dark:focus:text-brand-300"
       >
         Skip to content
       </a>
 
       <Toaster position="top-center" richColors />
-      <header ref={headroomRef} className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
+      <header ref={headroomRef} className="sticky top-0 z-30 [@media(max-height:520px)]:static border-b border-line/70 bg-white/95 dark:border-slate-800/70 dark:bg-slate-900/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <button type="button" onClick={goHome} className="group flex min-h-11 min-w-0 items-center gap-2.5 sm:gap-3.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-lg shadow-brand-900/25 transition-all group-hover:scale-[1.03] sm:h-11 sm:w-11 sm:rounded-2xl">
               <RadarMark className="h-6 w-6 sm:h-7 sm:w-7" />
             </span>
             <div className="min-w-0 text-left">
-              <span className="font-display block truncate text-[22px] leading-none text-slate-950 dark:text-slate-50 sm:text-[26px]">
+              <span className="font-display block truncate text-[22px] leading-none text-ink sm:text-[26px]">
                 CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
               </span>
-              <span className="font-data hidden text-xs font-medium tracking-[1px] text-slate-500 sm:block">LIVE PRICE COMPARISON</span>
             </div>
           </button>
 
           <div className="flex items-center gap-2">
             <a
               href="/guides.html"
-              className="btn btn-secondary hidden px-3 py-2.5 text-sm min-[360px]:inline-flex sm:px-4"
+              className="btn btn-secondary hidden min-w-11 px-3 py-2.5 text-sm min-[360px]:inline-flex sm:px-4"
               aria-label="Open buying guides"
             >
               <BookOpen size={17} strokeWidth={2.3} />
@@ -260,18 +271,24 @@ function App() {
 
       <main id="main-content" ref={mainRef} tabIndex={-1} className="mx-auto min-w-0 w-full max-w-6xl flex-1 overflow-x-clip px-[20px] pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-8 focus:outline-none sm:px-6 sm:pb-10">
         {!showWatchlist && step !== 'dashboard' && step !== 'car' && (
-          <StepIndicator
-            current={step as Step}
-            onNavigate={(target) => {
-              if (target === 'car') goHome()
-              else if (car) navigate({ step: 'part', car, part: null, guide })
-            }}
-          />
+          // On a phone the results screen drops the progress dots: the first
+          // listing is worth more of the first screen, and the Part button
+          // beside the title already leads back.
+          <div className={step === 'results' ? 'hidden sm:block' : undefined}>
+            <StepIndicator
+              current={step as Step}
+              onNavigate={(target) => {
+                if (target === 'car') goHome()
+                else if (car) navigate({ step: 'part', car, part: null, guide })
+              }}
+            />
+          </div>
         )}
         {/* Keep primary content visible from its first paint. A page-wide
             opacity/transform animation delayed reading and also trapped fixed
             descendants (such as the compare bar) until the animation ended. */}
         <div key={viewKey}>
+          <AppErrorBoundary>
           {showWatchlist ? (
             <Suspense fallback={<ViewLoader />}>
               <CartPanel
@@ -300,12 +317,12 @@ function App() {
                   {/* Hero — the form is this page's job, so one headline says what
                       the site does and the vehicle picker follows right away. */}
                   <div className="blueprint-grid relative mb-6 pt-2 text-center sm:mb-8 sm:pt-6">
-                    <h1 className="font-display break-anywhere mx-auto max-w-4xl text-balance text-[2.15rem] text-slate-950 sm:text-6xl md:text-7xl">
+                    <h1 className="font-display break-anywhere mx-auto max-w-4xl text-balance text-[2.15rem] text-ink sm:text-6xl md:text-7xl">
                       Compare car part prices{' '}
                       <span className="block text-brand-600 dark:text-brand-400">for your vehicle.</span>
                     </h1>
 
-                    <p className="mx-auto mt-3 max-w-xl text-balance text-base text-slate-600 sm:mt-4 sm:text-lg">
+                    <p className="mx-auto mt-3 max-w-xl text-balance text-base text-ink-3 sm:mt-4 sm:text-lg">
                       Pick your year, make, and model. Listings that match your vehicle come first; anything else is marked “fit not confirmed.”
                     </p>
                   </div>
@@ -313,8 +330,8 @@ function App() {
                   {guideStart && (
                     <section aria-labelledby="guide-search-start-heading" className="mb-6 rounded-2xl border border-brand-200/80 bg-brand-50/60 p-4 dark:border-brand-900/50 dark:bg-brand-950/20 sm:p-5">
                       <p className="eyebrow text-brand-700 dark:text-brand-300">Starting from a buying guide</p>
-                      <h2 id="guide-search-start-heading" className="mt-1 text-base font-bold text-slate-950 dark:text-slate-50">{guideStart.title}</h2>
-                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      <h2 id="guide-search-start-heading" className="mt-1 text-base font-bold text-ink">{guideStart.title}</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-3">
                         After you confirm the vehicle, we will suggest <strong>{guideStart.part}</strong> for review. You can edit the part category before any listings are searched. This suggestion does not diagnose your vehicle.
                       </p>
                     </section>
@@ -331,9 +348,9 @@ function App() {
                     onRemove={recent.remove}
                   />
                   <TrustBanner />
-                  <nav aria-label="Before you buy" className="mt-8 rounded-2xl border border-slate-200 p-5 dark:border-slate-700">
+                  <nav aria-label="Before you buy" className="mt-8 rounded-2xl border border-line p-5 dark:border-slate-700">
                     <h2 className="text-lg font-semibold">Not sure what to buy?</h2>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Check compatibility and the full cost before choosing a listing.</p>
+                    <p className="mt-1 text-sm text-ink-3">Check compatibility and the full cost before choosing a listing.</p>
                     <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-brand-700 dark:text-brand-400">
                       <a className="inline-flex min-h-11 items-center underline underline-offset-4" href="/guides/how-to-confirm-car-part-fitment.html">Will this part fit?</a>
                       <a className="inline-flex min-h-11 items-center underline underline-offset-4" href="/guides/oem-vs-aftermarket-car-parts.html">OEM or aftermarket?</a>
@@ -375,10 +392,11 @@ function App() {
               )}
             </>
           )}
+          </AppErrorBoundary>
         </div>
       </main>
 
-      <footer className="border-t border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/60">
+      <footer className="border-t border-line/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-950/60">
         <div className="mx-auto max-w-6xl px-[24px] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-10 sm:pb-10">
           <div className="grid min-w-0 grid-cols-1 gap-8 sm:grid-cols-[minmax(0,1.4fr)_auto_auto] sm:gap-10">
             <div className="break-anywhere">
@@ -386,11 +404,11 @@ function App() {
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-800 text-white">
                   <RadarMark className="h-5 w-5" />
                 </span>
-                <span className="font-display max-w-full text-lg leading-none text-slate-900 dark:text-slate-100">
+                <span className="font-display max-w-full text-lg leading-none text-ink">
                   CarParts<span className="text-brand-600 dark:text-brand-400">Radar</span>
                 </span>
               </div>
-              <div className="mt-4 max-w-xl space-y-2 text-center text-xs leading-relaxed text-slate-500 sm:text-left">
+              <div className="mt-4 max-w-xl space-y-2 text-center text-xs leading-relaxed text-ink-4 sm:text-left">
                 <p>
                   We compare live listings from third-party marketplaces. Prices and availability are set by sellers
                   and may change. Always confirm details on the retailer's site before buying.
@@ -401,21 +419,21 @@ function App() {
                 </p>
               </div>
             </div>
-            <nav aria-label="Explore" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:gap-2">
-              <span className="w-full text-center font-semibold text-slate-900 dark:text-slate-100 sm:text-left">Explore</span>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/guides.html">Buying guides</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/methodology.html">Methodology</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/about.html">About</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/contact.html">Contact</a>
+            <nav aria-label="Explore" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:justify-start sm:gap-2">
+              <span className="w-full text-center font-semibold text-ink sm:text-left">Explore</span>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/guides.html">Buying guides</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/methodology.html">Methodology</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/about.html">About</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/contact.html">Contact</a>
             </nav>
-            <nav aria-label="Policies" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:gap-2">
-              <span className="w-full text-center font-semibold text-slate-900 dark:text-slate-100 sm:text-left">Policies</span>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/privacy.html">Privacy</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/terms.html">Terms</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-500 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/affiliate-disclosure.html">Affiliate disclosure</a>
+            <nav aria-label="Policies" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm sm:flex-col sm:items-start sm:justify-start sm:gap-2">
+              <span className="w-full text-center font-semibold text-ink sm:text-left">Policies</span>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/privacy.html">Privacy</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/terms.html">Terms</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center justify-center text-ink-4 transition-colors hover:text-brand-600 dark:hover:text-brand-400 sm:min-h-0 sm:justify-start" href="/affiliate-disclosure.html">Affiliate disclosure</a>
             </nav>
           </div>
-          <p className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-500 dark:border-slate-800/60">
+          <p className="mt-8 border-t border-line-soft pt-5 text-center text-xs text-ink-4 dark:border-slate-800/60">
             © {new Date().getFullYear()} CarPartsRadar. We are not a retailer and do not sell listed products.
           </p>
         </div>
@@ -459,10 +477,9 @@ function TrustBanner() {
   ]
 
   return (
-    <div className="mt-20 border-t border-slate-200/60 pt-14 dark:border-slate-800/60">
+    <div className="mt-20 border-t border-line/60 pt-14 dark:border-slate-800/60">
       <div className="text-center">
-        <p className="eyebrow text-brand-600 dark:text-brand-400">How it works</p>
-        <h2 className="font-display mt-3 text-3xl text-slate-950 sm:text-4xl">
+        <h2 className="font-display text-3xl text-ink sm:text-4xl">
           From vehicle to best price in three steps
         </h2>
       </div>
@@ -472,14 +489,14 @@ function TrustBanner() {
           <div key={s.title} className="card group relative p-6 transition-transform duration-300 hover:-translate-y-1">
             {/* Mono step index — this really is a sequence, so the numbering
                 carries information, not decoration. */}
-            <span className="font-data absolute right-5 top-5 text-sm font-semibold text-slate-500 transition-colors group-hover:text-brand-500 dark:text-slate-400" aria-hidden>
+            <span className="font-data absolute right-5 top-5 text-sm font-semibold text-ink-4 transition-colors group-hover:text-brand-500" aria-hidden>
               0{i + 1}
             </span>
             <div className="icon-tile bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">
               <s.icon size={18} strokeWidth={2} />
             </div>
-            <h3 className="mt-4 text-sm font-semibold text-slate-900">{s.title}</h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{s.body}</p>
+            <h3 className="mt-4 text-sm font-semibold text-ink">{s.title}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-ink-4">{s.body}</p>
           </div>
         ))}
       </div>

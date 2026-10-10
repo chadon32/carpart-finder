@@ -56,8 +56,15 @@ test('the account button is named by what it shows', async ({ page, app, fixture
 test('completed steps can be clicked to go back', async ({ page, app, fixtureServer }, testInfo) => {
   await goToResults(page, app.baseUrl)
   const progress = page.getByRole('navigation', { name: 'Search progress' })
-  await expect(progress.getByRole('button', { name: 'Change vehicle' })).toBeVisible()
-  await progress.getByRole('button', { name: 'Change part' }).click()
+  if ((page.viewportSize()?.width ?? 1000) < 640) {
+    // A phone's results screen drops the progress dots so the first listing
+    // fits on the first screen; the Part button beside the title leads back.
+    await expect(progress).toBeHidden()
+    await page.getByRole('button', { name: 'Part', exact: true }).click()
+  } else {
+    await expect(progress.getByRole('button', { name: 'Change vehicle' })).toBeVisible()
+    await progress.getByRole('button', { name: 'Change part' }).click()
+  }
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What part do you need?')
   // The current step is not a control.
   await expect(progress.getByRole('button', { name: 'Change part' })).toHaveCount(0)

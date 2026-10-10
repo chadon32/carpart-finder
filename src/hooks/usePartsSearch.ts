@@ -3,6 +3,10 @@ import { trackEvent } from '../lib/analytics'
 import { searchParts, type SearchResponse } from '../api/client'
 import type { Car } from '../components/CarSelector'
 
+// The page shows 15 at a time and reveals the rest locally, so one request
+// carries two pages instead of needing a second round trip for "show more".
+export const SEARCH_PAGE_SIZE = 30
+
 type CompletedSearch = { key: string; data: SearchResponse | null; error: string | null }
 
 // Owned by the lightweight route, outside the lazy screen's Suspense boundary.
@@ -22,7 +26,7 @@ export function usePartsSearch(car: Car, part: string, zip: string) {
     }
     const controller = new AbortController()
     let cancelled = false
-    void searchParts(car.year, car.make, car.model, part, car.trim, effectiveZip || undefined, controller.signal)
+    void searchParts(car.year, car.make, car.model, part, car.trim, effectiveZip || undefined, controller.signal, SEARCH_PAGE_SIZE)
       .then((data) => {
         if (!cancelled) setCompleted({ key, data, error: null })
       })

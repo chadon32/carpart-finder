@@ -1,3 +1,5 @@
+import { isLikelyPartNumberQuery } from './partNumber.js'
+
 function normalize(value) {
   return ` ${String(value ?? '')
     .toLowerCase()
@@ -70,13 +72,6 @@ const PART_RULES = [
     accessoryOnly: /\b(?:wheel\s+bearing\s+(?:tool|grease|seal|nut))\b/i,
   },
 ]
-
-function isLikelyPartNumberQuery(part) {
-  const raw = String(part ?? '').trim()
-  const compact = raw.replace(/[^a-z0-9]/gi, '')
-  const digitCount = (compact.match(/\d/g) ?? []).length
-  return !/\s/.test(raw) && compact.length >= 5 && compact.length <= 24 && digitCount >= 2
-}
 
 function ruleForPart(part) {
   const normalizedPart = normalize(part).trim()
